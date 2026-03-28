@@ -1,5 +1,7 @@
+using Azure.Core;
 using Azure.Identity;
 using Azure.ResourceManager;
+using Microsoft.Extensions.Options;
 using DuckHouse.ControlPlane.Api.Nodes;
 using DuckHouse.ControlPlane.Api.Nodes.Aks;
 using DuckHouse.ControlPlane.Api.Nodes.Local;
@@ -17,7 +19,14 @@ var nodeBackend = builder.Configuration.GetValue("NodeService:Backend", "Local")
 if (string.Equals(nodeBackend, "Aks", StringComparison.OrdinalIgnoreCase))
 {
     builder.Services.AddOptions<AksNodeOptions>().BindConfiguration(AksNodeOptions.Section);
-    builder.Services.AddSingleton(_ => new ArmClient(new DefaultAzureCredential()));
+    builder.Services.AddSingleton(sp =>
+    {
+        var options = sp.GetRequiredService<IOptions<AksNodeOptions>>().Value;
+        TokenCredential credential = options.HasServicePrincipal
+            ? new ClientSecretCredential(options.TenantId, options.ClientId, options.ClientSecret)
+            : new DefaultAzureCredential();
+        return new ArmClient(credential);
+    });
     builder.Services.AddScoped<INodeService, AksNodeService>();
 }
 else
