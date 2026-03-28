@@ -36,10 +36,14 @@ public sealed class AksNodeService : INodeService
 
         await foreach (var pool in cluster.GetContainerServiceAgentPools().GetAllAsync(cancellationToken: cancellationToken))
         {
+            if (pool.Data.Mode != AgentPoolMode.User)
+                continue;
+
             nodes.Add(new NodeInfo(
                 pool.Data.Name,
                 pool.Data.ProvisioningState ?? "Unknown",
-                pool.Data.VmSize));
+                pool.Data.VmSize,
+                pool.Data.PowerStateCode?.ToString()));
         }
 
         return nodes;
@@ -68,7 +72,7 @@ public sealed class AksNodeService : INodeService
 
         _logger.LogInformation("Started provisioning node pool {PoolName} with VM size {VmSize}", request.Name, vmSize);
 
-        return new NodeInfo(request.Name, "Creating", vmSize);
+        return new NodeInfo(request.Name, "Creating", vmSize, PowerState: "Running");
     }
 
     public async Task RemoveNodeAsync(string name, CancellationToken cancellationToken = default)
@@ -77,6 +81,36 @@ public sealed class AksNodeService : INodeService
         var pool = await cluster.GetContainerServiceAgentPoolAsync(name, cancellationToken);
         await pool.Value.DeleteAsync(WaitUntil.Started, cancellationToken);
         _logger.LogInformation("Started deletion of node pool {PoolName}", name);
+    }
+
+    public Task StopNodeAsync(string name, CancellationToken cancellationToken = default) =>
+        ScaleNodePoolAsync(name, count: 0, cancellationToken);
+
+    public Task StartNodeAsync(string name, CancellationToken cancellationToken = default) =>
+        ScaleNodePoolAsync(name, count: 1, cancellationToken);
+
+    private async Task ScaleNodePoolAsync(string name, int count, CancellationToken cancellationToken)
+    {
+        var cluster = GetClusterResource();
+        var pool = (await cluster.GetContainerServiceAgentPoolAsync(name, cancellationToken)).Value;
+        var existing = pool.Data;
+
+        var updated = new ContainerServiceAgentPoolData
+        {
+            Count = count,
+            VmSize = existing.VmSize,
+            OSType = existing.OSType,
+            OSSku = existing.OSSku,
+            Mode = existing.Mode,
+        };
+
+        await cluster.GetContainerServiceAgentPools().CreateOrUpdateAsync(
+            WaitUntil.Started,
+            name,
+            updated,
+            cancellationToken);
+
+        _logger.LogInformation("Scaling node pool {PoolName} to {Count} node(s)", name, count);
     }
 }
 

@@ -12,10 +12,18 @@ POST http://localhost:5066/nodes
 Content-Type: application/json
 
 {
-  "name": "node-1",
-  "vmSize": "Standard_D4as_v5"
+  "name": "testnode",
+  "vmSize": "Standard_D2as_v5"
 }
+
+### Stop node
+
+POST http://localhost:5066/nodes/testnode/stop
+
+### Start node
+
+POST http://localhost:5066/nodes/testnode/start
 
 ### Remove node
 
-DELETE http://localhost:5066/nodes/node-1
+DELETE http://localhost:5066/nodes/testnode

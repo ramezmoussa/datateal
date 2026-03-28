@@ -24,6 +24,20 @@ public static class NodeEndpoints
         })
         .WithName("RemoveNode");
 
+        group.MapPost("/{name}/stop", async (string name, INodeService nodeService, CancellationToken ct) =>
+        {
+            await nodeService.StopNodeAsync(name, ct);
+            return Results.NoContent();
+        })
+        .WithName("StopNode");
+
+        group.MapPost("/{name}/start", async (string name, INodeService nodeService, CancellationToken ct) =>
+        {
+            await nodeService.StartNodeAsync(name, ct);
+            return Results.NoContent();
+        })
+        .WithName("StartNode");
+
         return endpoints;
     }
 }
