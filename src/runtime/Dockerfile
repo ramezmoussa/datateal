@@ -1,0 +1,29 @@
+FROM python:3.12-slim
+
+# ── API environment ──────────────────────────────────────────────────────────
+RUN python -m venv /opt/venvs/api
+
+COPY dist/*.whl /tmp/wheels/
+RUN /opt/venvs/api/bin/pip install --no-cache-dir /tmp/wheels/*.whl \
+    && rm -rf /tmp/wheels
+
+# ── Kernel environment ───────────────────────────────────────────────────────
+# A separate Python environment for user kernels, isolated from the API.
+# Only ipykernel is required here as a base. Additional packages can be
+# supplied at build time (KERNEL_PACKAGES build arg), at runtime via the
+# KERNEL_PACKAGES environment variable, or via a requirements.txt file
+# mounted at /etc/duckhouse/kernel-requirements.txt.
+RUN python -m venv /opt/venvs/kernel \
+    && /opt/venvs/kernel/bin/pip install --no-cache-dir ipykernel duckdb==1.5.0
+
+# ── Entrypoint ───────────────────────────────────────────────────────────────
+COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN sed -i 's/\r$//' /usr/local/bin/entrypoint.sh \
+    && chmod +x /usr/local/bin/entrypoint.sh
+
+# ── Runtime configuration ────────────────────────────────────────────────────
+ENV DUCKHOUSE_KERNEL_PYTHON=/opt/venvs/kernel/bin/python
+
+EXPOSE 8000
+
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

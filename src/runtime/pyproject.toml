@@ -14,5 +14,8 @@ dependencies = [
   "ipykernel>=6.0.0",
 ]
 
+[tool.setuptools.packages.find]
+include = ["duckhouse_runtime*"]
+
 [project.scripts]
-duckhouse = "duckhouse_runtime.main:run"
+duckhouse-runtime = "duckhouse_runtime.main:run"
