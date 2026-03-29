@@ -1,0 +1,27 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "FastAPI: Run (dev)",
+      "type": "debugpy",
+      "request": "launch",
+      "python": "${workspaceFolder}/.venv/Scripts/python.exe",
+      "module": "uvicorn",
+      "args": ["duckhouse_runtime.main:app", "--host", "0.0.0.0", "--port", "8000"],
+      "jinja": true,
+      "justMyCode": true,
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "name": "FastAPI: Debug",
+      "type": "debugpy",
+      "request": "launch",
+      "python": "${workspaceFolder}/.venv/Scripts/python.exe",
+      "module": "uvicorn",
+      "args": ["duckhouse_runtime.main:app", "--host", "0.0.0.0", "--port", "8000"],
+      "jinja": true,
+      "justMyCode": false,
+      "cwd": "${workspaceFolder}"
+    }
+  ]
+}
