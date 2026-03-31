@@ -161,7 +161,10 @@ resource cluster 'Microsoft.ContainerService/managedClusters@2025-10-01' = {
       enabled: true
     }
   }
-  dependsOn: [networkContributorRoleAssignment]
+  dependsOn: [
+    managedIdentityOperatorRoleAssignment
+    networkContributorRoleAssignment
+  ]
 }
 
 // ── Azure Container Registry ──────────────────────────────────────────────────

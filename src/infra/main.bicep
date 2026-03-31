@@ -4,6 +4,12 @@
 //   • nodeResourceGroupName – AKS creates it automatically to
 //                             hold the underlying VMs, NICs, disks, etc.
 //
+// IMPORTANT!!! The managed node resource group must not exist before deployment.
+// When AKS creates its own node resource group, it automatically applies necessary 
+// permissions and grants its own service principal the Contributor role on it.
+// If the resource group already exists, AKS will not be able to set up the permissions 
+// correctly and the deployment will fail.
+//
 // Deploy with:
 //   az deployment group create \
 //     --resource-group <your-resource-group> \
