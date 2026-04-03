@@ -161,6 +161,12 @@ Tag the local image with the fully qualified ACR repository name.
 docker tag duckhouse-runtime <registry>.azurecr.io/duckhouse-runtime:<tag>
 ```
 
+For example:
+
+```
+docker tag duckhouse-runtime acrduckhousedev.azurecr.io/duckhouse-runtime:latest
+```
+
 Push the image.
 
 ```
@@ -173,7 +179,7 @@ Reference the image in a Kubernetes pod spec or Helm chart.
 image: <registry>.azurecr.io/duckhouse-runtime:<tag>
 ```
 
-Make sure the Kubernetes nodes have pull access to the registry. For AKS this is typically done by attaching the ACR to the cluster.
+Make sure the Kubernetes nodes have pull access to the registry. For AKS this is typically done by attaching the ACR to the cluster. This is automatically done by the Bicep template in the infra folder of this repository.
 
 ```
 az aks update --name <aks-cluster> --resource-group <resource-group> --attach-acr <registry>
