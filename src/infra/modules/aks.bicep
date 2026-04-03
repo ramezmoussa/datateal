@@ -91,6 +91,17 @@ resource networkContributorRoleAssignment 'Microsoft.Authorization/roleAssignmen
   }
 }
 
+resource apiNetworkContributorRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(apiPrincipalId)) {
+  // Deterministic GUID so re-deployments are idempotent.
+  name: guid(nodeSubnet.id, apiPrincipalId, networkContributorRoleId)
+  scope: nodeSubnet
+  properties: {
+    roleDefinitionId: networkContributorRoleId
+    principalId: apiPrincipalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
 // ── AKS cluster ───────────────────────────────────────────────────────────────
 
 resource cluster 'Microsoft.ContainerService/managedClusters@2025-10-01' = {
