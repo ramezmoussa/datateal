@@ -91,6 +91,7 @@ resource networkContributorRoleAssignment 'Microsoft.Authorization/roleAssignmen
   }
 }
 
+// Allows the control plane API to join the nodes to the subnet when creating new node pools via ARM.
 resource apiNetworkContributorRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(apiPrincipalId)) {
   // Deterministic GUID so re-deployments are idempotent.
   name: guid(nodeSubnet.id, apiPrincipalId, networkContributorRoleId)
@@ -208,15 +209,20 @@ resource acrPullAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' 
 
 // ── Role assignment ───────────────────────────────────────────────────────────
 
-// Grants the API principal "Azure Kubernetes Service Contributor" on the cluster
-// resource, which allows creating, listing, and deleting agent pools via ARM.
 var aksContributorRoleId = subscriptionResourceId(
   'Microsoft.Authorization/roleDefinitions',
   'ed7f3fbd-7b88-4dd4-9017-9adb7ce333f8' // Azure Kubernetes Service Contributor Role
 )
+var aksClusterUserRoleId = subscriptionResourceId(
+  'Microsoft.Authorization/roleDefinitions',
+  '4abbcc35-e782-43d8-92c5-2d3f1bd2253f' // Azure Kubernetes Service Cluster User Role
+)
+var aksRbacClusterAdminRoleId = subscriptionResourceId(
+  'Microsoft.Authorization/roleDefinitions',
+  'b1ff04bb-8a4e-4dc4-8eb5-8693973ce19b' // Azure Kubernetes Service RBAC Cluster Admin
+)
 
-resource roleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(apiPrincipalId)) {
-  // Deterministic GUID so re-deployments are idempotent.
+resource apiIdentityAksContributor 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(apiPrincipalId)) {
   name: guid(cluster.id, apiPrincipalId, aksContributorRoleId)
   scope: cluster
   properties: {
@@ -225,6 +231,27 @@ resource roleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = i
     principalType: 'ServicePrincipal'
   }
 }
+
+resource apiIdentityAksClusterUser 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(apiPrincipalId)) {
+  name: guid(cluster.id, apiPrincipalId, aksClusterUserRoleId)
+  scope: cluster
+  properties: {
+    roleDefinitionId: aksClusterUserRoleId
+    principalId: apiPrincipalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+resource apiIdentityAksRbacClusterAdmin 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(apiPrincipalId)) {
+  name: guid(cluster.id, apiPrincipalId, aksRbacClusterAdminRoleId)
+  scope: cluster
+  properties: {
+    roleDefinitionId: aksRbacClusterAdminRoleId
+    principalId: apiPrincipalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
 
 // ── Outputs ───────────────────────────────────────────────────────────────────
 
