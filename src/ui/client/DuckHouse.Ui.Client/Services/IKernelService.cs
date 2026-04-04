@@ -1,0 +1,15 @@
+using DuckHouse.Core.Kernels;
+using DuckHouse.Ui.Shared.Kernels;
+
+namespace DuckHouse.Ui.Client.Services;
+
+public interface IKernelService
+{
+    Task<IReadOnlyList<KernelInfo>> GetKernelsAsync(string nodeName, CancellationToken cancellationToken = default);
+    Task<KernelInfo> CreateKernelAsync(string nodeName, CancellationToken cancellationToken = default);
+    Task<KernelInfo> GetKernelAsync(string nodeName, string kernelId, CancellationToken cancellationToken = default);
+    Task DeleteKernelAsync(string nodeName, string kernelId, CancellationToken cancellationToken = default);
+    Task<ExecutionResult> ExecuteAsync(string nodeName, string kernelId, ExecuteKernelRequest request, CancellationToken cancellationToken = default);
+    Task<KernelInfo> RestartKernelAsync(string nodeName, string kernelId, CancellationToken cancellationToken = default);
+    Task InterruptKernelAsync(string nodeName, string kernelId, CancellationToken cancellationToken = default);
+}
