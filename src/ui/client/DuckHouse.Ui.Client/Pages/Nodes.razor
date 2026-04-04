@@ -10,10 +10,17 @@
         <SvgIcon Icon="LucideIcon.Server" />
         Nodes
     </h2>
-    <Button Color="ButtonColor.Primary" @onclick="OpenCreateModal">
-        <SvgIcon Icon="LucideIcon.Plus" />
-        New Node
-    </Button>
+    <div class="d-flex gap-2">
+        <Button Color="ButtonColor.Secondary" @onclick="LoadNodesAsync"
+                Disabled="@(_loading || _busy is not null)">
+            <SvgIcon Icon="LucideIcon.RefreshCw" />
+            Refresh
+        </Button>
+        <Button Color="ButtonColor.Primary" @onclick="OpenCreateModal">
+            <SvgIcon Icon="LucideIcon.Plus" />
+            New Node
+        </Button>
+    </div>
 </div>
 
 @if (_error is not null)
@@ -215,7 +222,16 @@ else
         try
         {
             await action(name, CancellationToken.None);
-            await LoadNodesAsync();
+            var updated = await NodeService.GetNodeAsync(name);
+            if (updated is not null)
+            {
+                var idx = _nodes.FindIndex(n => n.Name == name);
+                if (idx >= 0) _nodes[idx] = updated;
+            }
+            else
+            {
+                _nodes.RemoveAll(n => n.Name == name);
+            }
         }
         catch (Exception ex)
         {

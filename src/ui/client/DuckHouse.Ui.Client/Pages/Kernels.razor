@@ -17,11 +17,18 @@
         <SvgIcon Icon="LucideIcon.Cpu" />
         Kernels
     </h2>
-    <Button Color="ButtonColor.Primary" Loading="_creating" Disabled="_creating"
-            @onclick="CreateKernelAsync">
-        <SvgIcon Icon="LucideIcon.Plus" />
-        New Kernel
-    </Button>
+    <div class="d-flex gap-2">
+        <Button Color="ButtonColor.Secondary" @onclick="LoadKernelsAsync"
+                Disabled="@(_loading || _busy is not null)">
+            <SvgIcon Icon="LucideIcon.RefreshCw" />
+            Refresh
+        </Button>
+        <Button Color="ButtonColor.Primary" Loading="_creating" Disabled="_creating"
+                @onclick="CreateKernelAsync">
+            <SvgIcon Icon="LucideIcon.Plus" />
+            New Kernel
+        </Button>
+    </div>
 </div>
 
 @if (_error is not null)
