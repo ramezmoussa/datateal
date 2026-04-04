@@ -95,7 +95,7 @@ Build the wheel first (see [Development and build environment setup](#developmen
 docker build -t duckhouse-runtime .
 ```
 
-The kernel environment comes with `ipykernel` and `duckdb==1.5.0` pre-installed. Additional packages can be supplied at runtime without rebuilding (see below).
+The kernel environment comes with `ipykernel`, `duckdb`, `numpy` and `pandas` pre-installed. Additional packages can be supplied at runtime without rebuilding (see below).
 
 #### Configuring kernel packages without rebuilding
 
@@ -117,8 +117,8 @@ metadata:
   name: kernel-requirements
 data:
   requirements.txt: |
-    numpy
-    pandas==2.2.0
+    requests
+    
 ```
 
 ```yaml

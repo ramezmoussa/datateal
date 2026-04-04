@@ -14,7 +14,7 @@ RUN /opt/venvs/api/bin/pip install --no-cache-dir /tmp/wheels/*.whl \
 # KERNEL_PACKAGES environment variable, or via a requirements.txt file
 # mounted at /etc/duckhouse/kernel-requirements.txt.
 RUN python -m venv /opt/venvs/kernel \
-    && /opt/venvs/kernel/bin/pip install --no-cache-dir ipykernel duckdb==1.5.0
+    && /opt/venvs/kernel/bin/pip install --no-cache-dir ipykernel==7.2.0 duckdb==1.5.0 numpy==2.4.4 pandas==3.0.2
 
 # ── Entrypoint ───────────────────────────────────────────────────────────────
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
