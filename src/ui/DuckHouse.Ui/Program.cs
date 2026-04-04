@@ -30,7 +30,7 @@ app.UseAntiforgery();
 app.MapStaticAssets();
 app.MapRazorComponents<App>()
 	.AddInteractiveWebAssemblyRenderMode()
-	.AddAdditionalAssemblies(typeof(DuckHouse.Ui.Client._Imports).Assembly);
+	.AddAdditionalAssemblies(typeof(DuckHouse.Ui.Client.Components._Imports).Assembly);
 
 app.MapDefaultEndpoints();
 
