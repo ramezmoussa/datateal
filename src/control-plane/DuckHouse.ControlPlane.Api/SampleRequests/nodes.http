@@ -6,6 +6,10 @@ GET http://localhost:5066/weatherforecast
 
 GET http://localhost:5066/nodes
 
+### Get node
+
+GET http://localhost:5066/nodes/testnode
+
 ### Create or update node
 
 POST http://localhost:5066/nodes

@@ -12,6 +12,13 @@ public static class NodeEndpoints
             Results.Ok(await nodeService.ListNodesAsync(ct)))
             .WithName("ListNodes");
 
+        group.MapGet("/{name}", async (string name, INodeService nodeService, CancellationToken ct) =>
+        {
+            var node = await nodeService.GetNodeAsync(name, ct);
+            return node is null ? Results.NotFound() : Results.Ok(node);
+        })
+        .WithName("GetNode");
+
         group.MapPost("/", async (CreateNodeRequest request, INodeService nodeService, CancellationToken ct) =>
         {
             var node = await nodeService.CreateNodeAsync(request, ct);

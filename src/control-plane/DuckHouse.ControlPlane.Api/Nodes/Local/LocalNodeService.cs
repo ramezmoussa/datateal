@@ -36,6 +36,24 @@ public sealed class LocalNodeService : INodeService
             .ToList();
     }
 
+    public async Task<NodeInfo?> GetNodeAsync(string name, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var pod = await _kubernetes.CoreV1.ReadNamespacedPodAsync(name, Namespace, cancellationToken: cancellationToken);
+            return new NodeInfo(
+                Name: pod.Metadata.Name,
+                ProvisioningState: pod.Status?.Phase ?? "Unknown",
+                VmSize: null,
+                PowerState: null,
+                State: NodeState.Running);
+        }
+        catch (k8s.Autorest.HttpOperationException ex) when ((int)ex.Response.StatusCode == 404)
+        {
+            return null;
+        }
+    }
+
     public async Task<NodeInfo> CreateNodeAsync(CreateNodeRequest request, CancellationToken cancellationToken = default)
     {
         var pod = new V1Pod

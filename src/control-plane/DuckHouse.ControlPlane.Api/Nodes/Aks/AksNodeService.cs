@@ -38,6 +38,19 @@ public sealed class AksNodeService : INodeService
         return _armClient.GetContainerServiceManagedClusterResource(clusterId);
     }
 
+    private static NodeState CalculateState(string provisioningState, string powerState) =>
+        (provisioningState.ToLower(), powerState.ToLower()) switch
+        {
+            ("failed", _) => NodeState.Failure,
+            ("deleting", _) => NodeState.Deleting,
+            ("creating", _) => NodeState.Creating,
+            ("starting", _) => NodeState.Resuming,
+            ("stopping", _) => NodeState.Stopping,
+            ("succeeded", "stopped") => NodeState.Stopped,
+            ("succeeded", "running") => NodeState.Running,
+            _ => NodeState.Unknown
+        };
+
     public async Task<IReadOnlyList<NodeInfo>> ListNodesAsync(CancellationToken cancellationToken = default)
     {
         var cluster = GetClusterResource();
@@ -50,18 +63,7 @@ public sealed class AksNodeService : INodeService
 
             var provisioningState = pool.Data.ProvisioningState ?? "Unknown";
             var powerState = pool.Data.PowerStateCode?.ToString() ?? "Unknown";
-            var state = (provisioningState.ToLower(), powerState.ToLower()) switch
-            {
-                ("failed", _) => NodeState.Failure,
-                ("deleting", _) => NodeState.Deleting,
-                ("creating", _) => NodeState.Creating,
-                ("starting", _) => NodeState.Resuming,
-                ("stopping", _) => NodeState.Stopping,
-                ("succeeded", "stopped") => NodeState.Stopped,
-                ("succeeded", "running") => NodeState.Running,
-                _ => NodeState.Unknown
-            };
-
+            var state = CalculateState(provisioningState, powerState);
             nodes.Add(new NodeInfo(
                 Name: pool.Data.Name,
                 ProvisioningState: provisioningState,
@@ -71,6 +73,29 @@ public sealed class AksNodeService : INodeService
         }
 
         return nodes;
+    }
+
+    public async Task<NodeInfo?> GetNodeAsync(string name, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var cluster = GetClusterResource();
+            var pool = (await cluster.GetContainerServiceAgentPoolAsync(name, cancellationToken)).Value;
+
+            var provisioningState = pool.Data.ProvisioningState ?? "Unknown";
+            var powerState = pool.Data.PowerStateCode?.ToString() ?? "Unknown";
+            var state = CalculateState(provisioningState, powerState);
+            return new NodeInfo(
+                Name: pool.Data.Name,
+                ProvisioningState: provisioningState,
+                VmSize: pool.Data.VmSize,
+                PowerState: powerState,
+                State: state);
+        }
+        catch (Azure.RequestFailedException ex) when (ex.Status == 404)
+        {
+            return null;
+        }
     }
 
     public async Task<NodeInfo> CreateNodeAsync(CreateNodeRequest request, CancellationToken cancellationToken = default)
