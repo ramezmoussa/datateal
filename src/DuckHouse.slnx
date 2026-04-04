@@ -15,6 +15,9 @@
       <Project Path="ui/server/DuckHouse.Ui.Server.Core/DuckHouse.Ui.Server.Core.csproj" />
       <Project Path="ui/server/DuckHouse.Ui.Server/DuckHouse.Ui.Server.csproj" />
     </Folder>
+  <Folder Name="/ui/">
+    <Project Path="ui/DuckHouse.Ui.Shared/DuckHouse.Ui.Shared.csproj" />
+  </Folder>
   <Folder Name="/ui/client/">
       <Project Path="ui/client/DuckHouse.Ui.Client.Components/DuckHouse.Ui.Client.Components.csproj" />
       <Project Path="ui/client/DuckHouse.Ui.Client.Icons/DuckHouse.Ui.Client.Icons.csproj" />
