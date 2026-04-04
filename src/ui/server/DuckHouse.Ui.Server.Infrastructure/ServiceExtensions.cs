@@ -1,16 +1,20 @@
 using DuckHouse.Ui.Server.Core.Repositories;
 using DuckHouse.Ui.Server.Infrastructure.Repositories;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace DuckHouse.Ui.Server.Infrastructure;
 
 public static class ServiceExtensions
 {
-    public static void AddInfrastructureServices(this IServiceCollection services)
+    public static void AddInfrastructureServices(this IServiceCollection services, IConfiguration configuration)
     {
+        var baseAddress = configuration["ControlPlane:BaseAddress"]
+            ?? throw new InvalidOperationException("ControlPlane:BaseAddress is not configured.");
+
         services.AddHttpClient<INodeRepository, NodeRepository>(
-            static client => client.BaseAddress = new Uri("http://control-plane"));
+            client => client.BaseAddress = new Uri(baseAddress));
         services.AddHttpClient<IKernelRepository, KernelRepository>(
-            static client => client.BaseAddress = new Uri("http://control-plane"));
+            client => client.BaseAddress = new Uri(baseAddress));
     }
 }
