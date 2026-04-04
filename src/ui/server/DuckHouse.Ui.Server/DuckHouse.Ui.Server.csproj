@@ -8,9 +8,16 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\..\client\DuckHouse.Ui.Client\DuckHouse.Ui.Client.csproj"/>
-        <ProjectReference Include="..\..\..\app-host\DuckHouse.ServiceDefaults\DuckHouse.ServiceDefaults.csproj"/>
+        <ProjectReference Include="..\..\client\DuckHouse.Ui.Client\DuckHouse.Ui.Client.csproj" />
+        <ProjectReference Include="..\..\..\app-host\DuckHouse.ServiceDefaults\DuckHouse.ServiceDefaults.csproj" />
+        <ProjectReference Include="..\DuckHouse.Ui.Server.Application\DuckHouse.Ui.Server.Application.csproj" />
+        <ProjectReference Include="..\DuckHouse.Ui.Server.Infrastructure\DuckHouse.Ui.Server.Infrastructure.csproj" />
+        <ProjectReference Include="..\..\DuckHouse.Ui.Shared\DuckHouse.Ui.Shared.csproj" />
         <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Folder Include="Controllers\" />
     </ItemGroup>
 
 </Project>

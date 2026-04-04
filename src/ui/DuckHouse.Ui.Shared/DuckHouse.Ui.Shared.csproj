@@ -6,4 +6,8 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\..\shared\DuckHouse.Core\DuckHouse.Core.csproj" />
+  </ItemGroup>
+
 </Project>

@@ -8,11 +8,6 @@ public record CreateNodeRequest(string Name, string VmSize) : IRequest<NodeInfo>
 
 internal class CreateNodeHandler(INodeRepository nodeRepository) : IRequestHandler<CreateNodeRequest, NodeInfo>
 {
-    private readonly INodeRepository _nodeRepository = nodeRepository;
-
-    public async Task<NodeInfo> Handle(CreateNodeRequest request, CancellationToken cancellationToken)
-    {
-        var node = await _nodeRepository.CreateNodeAsync(request.Name, request.VmSize, cancellationToken);
-        return node;
-    }
+    public Task<NodeInfo> Handle(CreateNodeRequest request, CancellationToken cancellationToken) =>
+        nodeRepository.CreateNodeAsync(request.Name, request.VmSize, cancellationToken);
 }

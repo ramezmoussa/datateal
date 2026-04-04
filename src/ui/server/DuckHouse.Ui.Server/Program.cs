@@ -1,4 +1,7 @@
+using System.Text.Json.Serialization;
+using DuckHouse.Ui.Server.Application;
 using DuckHouse.Ui.Server.Components;
+using DuckHouse.Ui.Server.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -7,6 +10,13 @@ builder.AddServiceDefaults();
 // Add services to the container.
 builder.Services.AddRazorComponents()
 	.AddInteractiveWebAssemblyComponents();
+
+builder.Services.AddControllers()
+	.AddJsonOptions(options =>
+		options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
+
+builder.Services.AddApplicationServices();
+builder.Services.AddInfrastructureServices();
 
 var app = builder.Build();
 
@@ -28,6 +38,7 @@ app.UseHttpsRedirection();
 app.UseAntiforgery();
 
 app.MapStaticAssets();
+app.MapControllers();
 app.MapRazorComponents<App>()
 	.AddInteractiveWebAssemblyRenderMode()
 	.AddAdditionalAssemblies(typeof(DuckHouse.Ui.Client._Imports).Assembly);

@@ -8,6 +8,9 @@ public static class ServiceExtensions
 {
     public static void AddInfrastructureServices(this IServiceCollection services)
     {
-        services.AddSingleton<INodeRepository, NodeRepository>();
+        services.AddHttpClient<INodeRepository, NodeRepository>(
+            static client => client.BaseAddress = new Uri("http://control-plane"));
+        services.AddHttpClient<IKernelRepository, KernelRepository>(
+            static client => client.BaseAddress = new Uri("http://control-plane"));
     }
 }
