@@ -10,6 +10,8 @@
     <Project Path="shared/DuckHouse.Core/DuckHouse.Core.csproj" />
   </Folder>
   <Folder Name="/ui/">
+    <Project Path="ui/DuckHouse.Ui.Icons/DuckHouse.Ui.Icons.csproj" />
+    <Project Path="ui/DuckHouse.Ui.SourceGeneration/DuckHouse.Ui.SourceGeneration.csproj" />
     <Project Path="ui/DuckHouse.Ui/DuckHouse.Ui.csproj" />
     <Project Path="ui/DuckHouse.Ui.Components/DuckHouse.Ui.Components.csproj" />
     <Project Path="ui/DuckHouse.Ui.Client/DuckHouse.Ui.Client.csproj" />

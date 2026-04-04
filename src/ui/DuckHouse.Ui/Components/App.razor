@@ -6,15 +6,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <base href="/"/>
     <ResourcePreloader/>
-    <link rel="stylesheet" href="@Assets["app.css"]"/>
     <link rel="stylesheet" href="@Assets["DuckHouse.Ui.styles.css"]"/>
+    <link rel="stylesheet" href="@Assets["_content/Blazor.Bootstrap/blazor.bootstrap.css"]" />
+    <link rel="stylesheet" href="@Assets["_content/DuckHouse.Ui.Components/defaults.css"]" />
+    <link rel="stylesheet" href="@Assets["css/bootstrap.custom.css"]" />
     <ImportMap/>
     <HeadOutlet @rendermode="InteractiveWebAssembly"/>
 </head>
 
 <body>
-<Routes @rendermode="InteractiveWebAssembly"/>
-<script src="@Assets["_framework/blazor.web.js"]"></script>
+    <Routes @rendermode="InteractiveWebAssembly"/>
+    <script src="@Assets["lib/bootstrap/js/bootstrap.bundle.min.js"]"></script>
+    <script src="@Assets["_content/Blazor.Bootstrap/blazor.bootstrap.js"]"></script>
+    <script src="@Assets["_framework/blazor.web.js"]"></script>
 </body>
 
 </html>
