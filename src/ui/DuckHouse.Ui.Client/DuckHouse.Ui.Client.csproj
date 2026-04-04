@@ -13,4 +13,8 @@
         <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" />
     </ItemGroup>
 
+    <ItemGroup>
+      <ProjectReference Include="..\DuckHouse.Ui.Components\DuckHouse.Ui.Components.csproj" />
+    </ItemGroup>
+
 </Project>

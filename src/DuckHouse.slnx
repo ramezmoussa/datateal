@@ -11,6 +11,7 @@
   </Folder>
   <Folder Name="/ui/">
     <Project Path="ui/DuckHouse.Ui/DuckHouse.Ui.csproj" />
+    <Project Path="ui/DuckHouse.Ui.Components/DuckHouse.Ui.Components.csproj" />
     <Project Path="ui/DuckHouse.Ui.Client/DuckHouse.Ui.Client.csproj" />
   </Folder>
 </Solution>
