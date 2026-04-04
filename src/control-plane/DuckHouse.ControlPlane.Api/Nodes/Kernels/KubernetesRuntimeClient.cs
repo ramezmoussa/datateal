@@ -1,5 +1,6 @@
 using System.Text.Json;
 using k8s;
+using k8s.Authentication;
 
 namespace DuckHouse.ControlPlane.Api.Nodes.Kernels;
 
@@ -14,65 +15,78 @@ public sealed class KubernetesRuntimeClient : INodeRuntimeClient
 
     private readonly HttpClient _httpClient;
     private readonly Uri _baseUri;
+    private readonly ITokenProvider? _tokenProvider;
     private readonly JsonSerializerOptions _jsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
     };
 
-    public KubernetesRuntimeClient(Kubernetes kubernetes)
+    public KubernetesRuntimeClient(Kubernetes kubernetes, ITokenProvider? tokenProvider = null)
     {
         _httpClient = kubernetes.HttpClient;
         _baseUri = kubernetes.BaseUri;
+        _tokenProvider = tokenProvider;
     }
 
     private Uri ProxyUri(string nodeName, string path) =>
         new(_baseUri, $"api/v1/namespaces/{Namespace}/pods/{nodeName}:{RuntimePort}/proxy/{path}");
 
+    private async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+    {
+        if (_tokenProvider is not null)
+            request.Headers.Authorization = await _tokenProvider.GetAuthenticationHeaderAsync(cancellationToken);
+        var response = await _httpClient.SendAsync(request, cancellationToken);
+        response.EnsureSuccessStatusCode();
+        return response;
+    }
+
     public async Task<IReadOnlyList<KernelInfo>> ListKernelsAsync(string nodeName, CancellationToken cancellationToken = default)
     {
-        var response = await _httpClient.GetAsync(ProxyUri(nodeName, "kernels"), cancellationToken);
-        response.EnsureSuccessStatusCode();
+        using var request = new HttpRequestMessage(HttpMethod.Get, ProxyUri(nodeName, "kernels"));
+        var response = await SendAsync(request, cancellationToken);
         return await response.Content.ReadFromJsonAsync<List<KernelInfo>>(_jsonOptions, cancellationToken) ?? [];
     }
 
     public async Task<KernelInfo> CreateKernelAsync(string nodeName, CancellationToken cancellationToken = default)
     {
-        var response = await _httpClient.PostAsync(ProxyUri(nodeName, "kernels"), content: null, cancellationToken);
-        response.EnsureSuccessStatusCode();
+        using var request = new HttpRequestMessage(HttpMethod.Post, ProxyUri(nodeName, "kernels"));
+        var response = await SendAsync(request, cancellationToken);
         return (await response.Content.ReadFromJsonAsync<KernelInfo>(_jsonOptions, cancellationToken))!;
     }
 
     public async Task<KernelInfo> GetKernelAsync(string nodeName, string kernelId, CancellationToken cancellationToken = default)
     {
-        var response = await _httpClient.GetAsync(ProxyUri(nodeName, $"kernels/{kernelId}"), cancellationToken);
-        response.EnsureSuccessStatusCode();
+        using var request = new HttpRequestMessage(HttpMethod.Get, ProxyUri(nodeName, $"kernels/{kernelId}"));
+        var response = await SendAsync(request, cancellationToken);
         return (await response.Content.ReadFromJsonAsync<KernelInfo>(_jsonOptions, cancellationToken))!;
     }
 
     public async Task DeleteKernelAsync(string nodeName, string kernelId, CancellationToken cancellationToken = default)
     {
-        var response = await _httpClient.DeleteAsync(ProxyUri(nodeName, $"kernels/{kernelId}"), cancellationToken);
-        response.EnsureSuccessStatusCode();
+        using var request = new HttpRequestMessage(HttpMethod.Delete, ProxyUri(nodeName, $"kernels/{kernelId}"));
+        await SendAsync(request, cancellationToken);
     }
 
     public async Task<ExecutionResult> ExecuteAsync(string nodeName, string kernelId, ExecuteRequest request, CancellationToken cancellationToken = default)
     {
-        var content = JsonContent.Create(request, options: _jsonOptions);
-        var response = await _httpClient.PostAsync(ProxyUri(nodeName, $"kernels/{kernelId}/execute"), content, cancellationToken);
-        response.EnsureSuccessStatusCode();
+        using var httpRequest = new HttpRequestMessage(HttpMethod.Post, ProxyUri(nodeName, $"kernels/{kernelId}/execute"))
+        {
+            Content = JsonContent.Create(request, options: _jsonOptions),
+        };
+        var response = await SendAsync(httpRequest, cancellationToken);
         return (await response.Content.ReadFromJsonAsync<ExecutionResult>(_jsonOptions, cancellationToken))!;
     }
 
     public async Task<KernelInfo> RestartKernelAsync(string nodeName, string kernelId, CancellationToken cancellationToken = default)
     {
-        var response = await _httpClient.PostAsync(ProxyUri(nodeName, $"kernels/{kernelId}/restart"), content: null, cancellationToken);
-        response.EnsureSuccessStatusCode();
+        using var request = new HttpRequestMessage(HttpMethod.Post, ProxyUri(nodeName, $"kernels/{kernelId}/restart"));
+        var response = await SendAsync(request, cancellationToken);
         return (await response.Content.ReadFromJsonAsync<KernelInfo>(_jsonOptions, cancellationToken))!;
     }
 
     public async Task InterruptKernelAsync(string nodeName, string kernelId, CancellationToken cancellationToken = default)
     {
-        var response = await _httpClient.PostAsync(ProxyUri(nodeName, $"kernels/{kernelId}/interrupt"), content: null, cancellationToken);
-        response.EnsureSuccessStatusCode();
+        using var request = new HttpRequestMessage(HttpMethod.Post, ProxyUri(nodeName, $"kernels/{kernelId}/interrupt"));
+        await SendAsync(request, cancellationToken);
     }
 }
