@@ -4,7 +4,7 @@
     <Project Path="app-host/DuckHouse.ServiceDefaults/DuckHouse.ServiceDefaults.csproj" />
   </Folder>
   <Folder Name="/control-plane/">
-    <Project Path="control-plane/DuckHouse.ControlPlane.Api/DuckHouse.ControlPlane.Api.csproj" />
+    <Project Path="control-plane/DuckHouse.ControlPlane/DuckHouse.ControlPlane.csproj" />
   </Folder>
   <Folder Name="/shared/">
     <Project Path="shared/DuckHouse.Core/DuckHouse.Core.csproj" />
