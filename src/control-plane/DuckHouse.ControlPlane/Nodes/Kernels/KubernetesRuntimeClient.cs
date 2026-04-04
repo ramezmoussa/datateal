@@ -1,4 +1,5 @@
 using System.Text.Json;
+using DuckHouse.Core.Kernels;
 using k8s;
 using k8s.Authentication;
 

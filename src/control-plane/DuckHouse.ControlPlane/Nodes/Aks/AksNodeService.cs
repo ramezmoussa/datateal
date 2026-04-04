@@ -3,6 +3,7 @@ using Azure.Core;
 using Azure.ResourceManager;
 using Azure.ResourceManager.ContainerService;
 using Azure.ResourceManager.ContainerService.Models;
+using DuckHouse.Core.Nodes;
 using k8s;
 using k8s.Models;
 using Microsoft.Extensions.Options;

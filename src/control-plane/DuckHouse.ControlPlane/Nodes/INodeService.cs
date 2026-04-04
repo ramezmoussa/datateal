@@ -1,3 +1,5 @@
+using DuckHouse.Core.Nodes;
+
 namespace DuckHouse.ControlPlane.Api.Nodes;
 
 public interface INodeService

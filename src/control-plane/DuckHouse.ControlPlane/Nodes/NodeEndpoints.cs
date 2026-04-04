@@ -1,4 +1,6 @@
 using DuckHouse.ControlPlane.Api.Nodes.Kernels;
+using DuckHouse.Core.Kernels;
+using DuckHouse.Core.Nodes;
 
 namespace DuckHouse.ControlPlane.Api.Nodes;
 

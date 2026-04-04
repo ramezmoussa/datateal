@@ -14,6 +14,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../../app-host/DuckHouse.ServiceDefaults/DuckHouse.ServiceDefaults.csproj" />
+    <ProjectReference Include="../../shared/DuckHouse.Core/DuckHouse.Core.csproj" />
   </ItemGroup>
 
   <ItemGroup>

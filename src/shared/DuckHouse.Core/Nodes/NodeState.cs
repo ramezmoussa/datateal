@@ -1,4 +1,4 @@
-namespace DuckHouse.ControlPlane.Api.Nodes;
+namespace DuckHouse.Core.Nodes;
 
 public enum NodeState
 {

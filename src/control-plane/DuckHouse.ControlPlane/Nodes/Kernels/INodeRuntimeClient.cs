@@ -1,3 +1,5 @@
+using DuckHouse.Core.Kernels;
+
 namespace DuckHouse.ControlPlane.Api.Nodes.Kernels;
 
 public interface INodeRuntimeClient

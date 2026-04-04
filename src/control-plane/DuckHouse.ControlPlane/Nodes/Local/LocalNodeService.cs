@@ -1,3 +1,4 @@
+using DuckHouse.Core.Nodes;
 using k8s;
 using k8s.Models;
 
