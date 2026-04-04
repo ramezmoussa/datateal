@@ -1,5 +1,0 @@
-<Solution>
-  <Project Path="DuckHouse.ControlPlane.Api/DuckHouse.ControlPlane.Api.csproj" />
-  <Project Path="DuckHouse.ControlPlane.AppHost/DuckHouse.ControlPlane.AppHost.csproj" />
-  <Project Path="DuckHouse.ControlPlane.ServiceDefaults/DuckHouse.ControlPlane.ServiceDefaults.csproj" />
-</Solution>

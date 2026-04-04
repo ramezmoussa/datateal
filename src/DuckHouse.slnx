@@ -1,0 +1,16 @@
+<Solution>
+  <Folder Name="/app-host/">
+    <Project Path="app-host/DuckHouse.AppHost/DuckHouse.AppHost.csproj" />
+    <Project Path="app-host/DuckHouse.ServiceDefaults/DuckHouse.ServiceDefaults.csproj" />
+  </Folder>
+  <Folder Name="/control-plane/">
+    <Project Path="control-plane/DuckHouse.ControlPlane.Api/DuckHouse.ControlPlane.Api.csproj" />
+  </Folder>
+  <Folder Name="/shared/">
+    <Project Path="shared/DuckHouse.Core/DuckHouse.Core.csproj" />
+  </Folder>
+  <Folder Name="/ui/">
+    <Project Path="ui/DuckHouse.Ui/DuckHouse.Ui.csproj" />
+    <Project Path="ui/DuckHouse.Ui.Client/DuckHouse.Ui.Client.csproj" />
+  </Folder>
+</Solution>
