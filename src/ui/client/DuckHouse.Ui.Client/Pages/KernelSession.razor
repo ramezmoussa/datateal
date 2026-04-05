@@ -130,7 +130,13 @@ else
 
             <div class="d-flex gap-2 mb-1 align-items-start">
                 <span class="invisible font-monospace small text-nowrap pt-1">In [ ]:</span>
-                <ExecutionTimer DurationMs="entry.Result.DurationMs" />
+                <div class="d-flex align-items-center gap-2">
+                    <ExecutionTimer DurationMs="entry.Result.DurationMs" />
+                    @if (ExtractRowCount(entry.Result) is { } rowCount)
+                    {
+                        <span class="text-muted small">· @rowCount.ToString("N0") rows</span>
+                    }
+                </div>
             </div>
 
             <hr class="my-2 border-secondary opacity-25" />
@@ -314,6 +320,42 @@ else
     {
         if (data?.TryGetValue(mimeType, out var value) != true) return null;
         return value?.ToString();
+    }
+
+    /// <summary>
+    /// Tries to extract the row count from a kernel output.
+    /// Checks pandas plain-text format first ("[N rows x M columns]"),
+    /// then falls back to counting &lt;tr&gt; elements in an HTML tbody.
+    /// Returns null if the output does not appear to be a DataFrame.
+    /// </summary>
+    private static int? ExtractRowCount(ExecutionResult result)
+    {
+        foreach (var output in result.Outputs)
+        {
+            if (output.Type is not ("execute_result" or "display_data")) continue;
+
+            // Pandas plain-text: "[100 rows x 5 columns]" (actual row count, even when truncated)
+            string? plainText = GetDataText(output.Data, "text/plain") ?? output.Text;
+            if (plainText is not null)
+            {
+                var m = Regex.Match(plainText, @"\[(\d[\d,]*)\s+rows?\s+[x×]");
+                if (m.Success && int.TryParse(m.Groups[1].Value.Replace(",", ""), out int n))
+                    return n;
+            }
+
+            // Fallback: count <tr> elements inside <tbody> in HTML output
+            string? html = GetDataText(output.Data, "text/html");
+            if (html is not null)
+            {
+                var tbody = Regex.Match(html, @"<tbody[^>]*>(.*?)</tbody>", RegexOptions.Singleline);
+                if (tbody.Success)
+                {
+                    int rows = Regex.Matches(tbody.Groups[1].Value, @"<tr[^>]*>").Count;
+                    if (rows > 0) return rows;
+                }
+            }
+        }
+        return null;
     }
 
     private static string StripAnsi(string text) =>
