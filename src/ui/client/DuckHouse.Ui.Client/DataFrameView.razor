@@ -1,8 +1,8 @@
 @using DuckHouse.Core.Kernels
 
-<div class="overflow-x-auto">
-    <table class="table table-sm table-bordered table-striped mb-1">
-        <thead>
+<div class="overflow-auto border rounded" style="max-height: 400px;">
+    <table class="table table-sm table-bordered table-striped mb-0">
+        <thead class="table-light" style="position: sticky; top: 0; z-index: 1;">
             <tr>
                 @foreach (var col in Data.Columns)
                 {
@@ -13,30 +13,34 @@
             </tr>
         </thead>
         <tbody>
-            @foreach (var row in Data.Rows)
-            {
+            <Virtualize Items="_rows" Context="row" ItemSize="33" SpacerElement="tr" OverscanCount="5">
                 <tr>
                     @for (int i = 0; i < Data.Columns.Count; i++)
                     {
                         var col = Data.Columns[i];
-                        var value = i < row.Count ? row[i] : null;
+                        var cell = i < row.Count ? row[i] : null;
                         <td class="@(IsNumeric(col) ? "text-end" : "") text-nowrap font-monospace small">
-                            @FormatCell(value, col)
+                            @FormatCell(cell)
                         </td>
                     }
                 </tr>
-            }
+            </Virtualize>
         </tbody>
     </table>
-
-    @if (FooterLabel is { } label)
-    {
-        <p class="text-muted small mb-0">@label</p>
-    }
 </div>
+
+@if (FooterLabel is { } label)
+{
+    <p class="text-muted small mb-0 mt-1">@label</p>
+}
 
 @code {
     [Parameter, EditorRequired] public DataFrameOutput Data { get; set; } = default!;
+
+    // Virtualize.Items requires ICollection<T>; materialise once when Data changes.
+    private List<IReadOnlyList<object?>> _rows = [];
+
+    protected override void OnParametersSet() => _rows = [..Data.Rows];
 
     private string? FooterLabel =>
         Data.TotalRows == DataFrameOutput.RowCap
@@ -48,6 +52,6 @@
     private static bool IsNumeric(DataFrameColumn col) =>
         col.Type is "number" or "integer";
 
-    private static string FormatCell(object? value, DataFrameColumn col) =>
+    private static string FormatCell(object? value) =>
         value is null ? "" : value.ToString() ?? "";
 }
