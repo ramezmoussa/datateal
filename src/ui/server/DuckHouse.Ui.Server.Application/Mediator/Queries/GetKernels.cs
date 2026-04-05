@@ -1,5 +1,5 @@
 using DuckHouse.Core.Kernels;
-using DuckHouse.Ui.Application.Mediator;
+using DuckHouse.Core.Mediator;
 using DuckHouse.Ui.Server.Core.Repositories;
 
 namespace DuckHouse.Ui.Server.Application.Mediator.Queries;

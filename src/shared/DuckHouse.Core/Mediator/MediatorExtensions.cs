@@ -1,10 +1,17 @@
 using Microsoft.Extensions.DependencyInjection;
 
-namespace DuckHouse.Ui.Application.Mediator;
+namespace DuckHouse.Core.Mediator;
 
 public static class MediatorExtensions
 {
-    public static IServiceCollection AddRequestHandlers<TScanEntryPoint>(this IServiceCollection services)
+    public static IServiceCollection AddMediator<TScanEntryPoint>(this IServiceCollection services)
+    {
+        services.AddScoped<IMediator, MediatorImpl>();
+        services.AddRequestHandlers<TScanEntryPoint>();
+        return services;
+    }
+
+    private static IServiceCollection AddRequestHandlers<TScanEntryPoint>(this IServiceCollection services)
     {
         var commandHandlerType = typeof(IRequestHandler<>);
         var commandHandlers = typeof(TScanEntryPoint).Assembly

@@ -1,6 +1,6 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 
-namespace DuckHouse.Ui.Application.Mediator;
+namespace DuckHouse.Core.Mediator;
 
 /// <summary>
 /// Custom implementation of a dispatcher in the mediator pattern.

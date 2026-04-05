@@ -1,4 +1,4 @@
-using DuckHouse.Ui.Application.Mediator;
+using DuckHouse.Core.Mediator;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace DuckHouse.Ui.Server.Application;
@@ -9,9 +9,10 @@ public static class ServiceExtensions
     {
         public IServiceCollection AddApplicationServices()
         {
-            services.AddScoped<IMediator, MediatorImpl>();
-            services.AddRequestHandlers<MediatorImpl>();
+            services.AddMediator<ScanEntryPoint>();
             return services;
         }
     }
 }
+
+file class ScanEntryPoint;

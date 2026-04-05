@@ -1,4 +1,4 @@
-﻿namespace DuckHouse.Ui.Application.Mediator;
+﻿namespace DuckHouse.Core.Mediator;
 
 /// <summary>
 /// Mediator registered in DI as a scoped service
