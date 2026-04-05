@@ -3,12 +3,14 @@ using Azure.Core;
 using Azure.ResourceManager;
 using Azure.ResourceManager.ContainerService;
 using Azure.ResourceManager.ContainerService.Models;
+using DuckHouse.ControlPlane.Core.Services;
 using DuckHouse.Core.Nodes;
 using k8s;
 using k8s.Models;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
-namespace DuckHouse.ControlPlane.Api.Nodes.Aks;
+namespace DuckHouse.ControlPlane.Infrastructure.Nodes.Aks;
 
 public sealed class AksNodeService : INodeService
 {
@@ -214,4 +216,3 @@ public sealed class AksNodeService : INodeService
         _logger.LogInformation("Set power state of node pool {PoolName} to {State}", name, state);
     }
 }
-

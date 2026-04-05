@@ -1,8 +1,10 @@
+using DuckHouse.ControlPlane.Core.Services;
 using DuckHouse.Core.Nodes;
 using k8s;
 using k8s.Models;
+using Microsoft.Extensions.Logging;
 
-namespace DuckHouse.ControlPlane.Api.Nodes.Local;
+namespace DuckHouse.ControlPlane.Infrastructure.Nodes.Local;
 
 // Uses Kubernetes pods to simulate compute nodes when running against Docker Desktop.
 public sealed class LocalNodeService : INodeService

@@ -7,14 +7,13 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
-    <PackageReference Include="Azure.Identity" />
-    <PackageReference Include="Azure.ResourceManager.ContainerService" />
-    <PackageReference Include="KubernetesClient" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="../../app-host/DuckHouse.ServiceDefaults/DuckHouse.ServiceDefaults.csproj" />
     <ProjectReference Include="../../shared/DuckHouse.Core/DuckHouse.Core.csproj" />
+    <ProjectReference Include="..\DuckHouse.ControlPlane.Application\DuckHouse.ControlPlane.Application.csproj" />
+    <ProjectReference Include="..\DuckHouse.ControlPlane.Infrastructure\DuckHouse.ControlPlane.Infrastructure.csproj" />
   </ItemGroup>
 
   <ItemGroup>

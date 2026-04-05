@@ -1,9 +1,11 @@
+using System.Net.Http.Json;
 using System.Text.Json;
+using DuckHouse.ControlPlane.Core.Services;
 using DuckHouse.Core.Kernels;
 using k8s;
 using k8s.Authentication;
 
-namespace DuckHouse.ControlPlane.Api.Nodes.Kernels;
+namespace DuckHouse.ControlPlane.Infrastructure.Nodes.Kernels;
 
 // Forwards runtime API calls to a pod via the Kubernetes API server HTTP proxy.
 // The API server authenticates and tunnels the request to the pod without requiring

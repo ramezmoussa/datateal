@@ -1,4 +1,4 @@
-namespace DuckHouse.ControlPlane.Api.Nodes.Local;
+namespace DuckHouse.ControlPlane.Infrastructure.Nodes.Local;
 
 public class LocalNodeOptions
 {

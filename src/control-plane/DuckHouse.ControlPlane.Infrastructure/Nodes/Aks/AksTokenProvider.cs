@@ -2,7 +2,7 @@ using Azure.Core;
 using k8s.Authentication;
 using System.Net.Http.Headers;
 
-namespace DuckHouse.ControlPlane.Api.Nodes.Aks;
+namespace DuckHouse.ControlPlane.Infrastructure.Nodes.Aks;
 
 // Bridges Azure.Core TokenCredential with the Kubernetes client's ITokenProvider.
 // Tokens are cached and refreshed automatically by the underlying credential.

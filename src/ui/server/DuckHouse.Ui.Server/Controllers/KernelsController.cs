@@ -1,5 +1,5 @@
 using DuckHouse.Core.Kernels;
-using DuckHouse.Ui.Application.Mediator;
+using DuckHouse.Core.Mediator;
 using Microsoft.AspNetCore.Mvc;
 using Cmd = DuckHouse.Ui.Server.Application.Mediator.Commands;
 using Qry = DuckHouse.Ui.Server.Application.Mediator.Queries;

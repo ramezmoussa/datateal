@@ -1,6 +1,6 @@
 using DuckHouse.Core.Nodes;
 
-namespace DuckHouse.ControlPlane.Api.Nodes;
+namespace DuckHouse.ControlPlane.Core.Services;
 
 public interface INodeService
 {

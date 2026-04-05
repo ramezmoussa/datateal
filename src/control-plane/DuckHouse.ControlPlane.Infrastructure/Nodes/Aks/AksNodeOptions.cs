@@ -1,4 +1,4 @@
-namespace DuckHouse.ControlPlane.Api.Nodes.Aks;
+namespace DuckHouse.ControlPlane.Infrastructure.Nodes.Aks;
 
 public class AksNodeOptions
 {
