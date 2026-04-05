@@ -18,6 +18,7 @@
         <ProjectReference Include="..\DuckHouse.Ui.Client.Icons\DuckHouse.Ui.Client.Icons.csproj" />
         <ProjectReference Include="..\DuckHouse.Ui.Client.Icons\DuckHouse.Ui.Client.Icons.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
         <ProjectReference Include="..\DuckHouse.Ui.Client.SourceGeneration\DuckHouse.Ui.Client.SourceGeneration.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+        <ProjectReference Include="..\..\..\shared\DuckHouse.Core\DuckHouse.Core.csproj" />
     </ItemGroup>
 
   <ItemGroup>

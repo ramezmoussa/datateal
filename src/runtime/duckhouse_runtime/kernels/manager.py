@@ -6,6 +6,7 @@ import time
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
+import pathlib
 import pyflakes.checker
 import jedi
 from jedi.api.environment import Environment as JediEnvironment
@@ -51,7 +52,41 @@ class KernelConnection:
         self.kc = self.km.client()
         self.kc.start_channels()
         await self.kc.wait_for_ready(timeout=30)
+        await self._setup_formatters()
         self.status = "idle"
+
+    async def _wait_for_idle(self, msg_id: str, timeout: float = 10.0) -> None:
+        """Drain iopub messages until status:idle is received for *msg_id*."""
+        if self.kc is None:
+            return
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + timeout
+        while True:
+            remaining = deadline - loop.time()
+            if remaining <= 0:
+                return
+            try:
+                msg = await asyncio.wait_for(self.kc.get_iopub_msg(), timeout=remaining)
+            except asyncio.TimeoutError:
+                return
+            if (msg.get("parent_header", {}).get("msg_id") == msg_id
+                    and msg["msg_type"] == "status"
+                    and msg["content"]["execution_state"] == "idle"):
+                return
+
+    async def _setup_formatters(self) -> None:
+        """Execute the DuckHouse MIME formatter registration in the kernel.
+
+        Reads dataframe_formatter.py from the API venv and sends its source to
+        the kernel process as a silent execute.  This avoids importing from the
+        API venv package (which is not installed in the kernel venv).
+        """
+        if self.kc is None:
+            return
+        formatter_src = (pathlib.Path(__file__).parent / "dataframe_formatter.py").read_text()
+        setup_code = formatter_src + "\nregister_formatters()\n"
+        msg_id = self.kc.execute(setup_code, silent=True, store_history=False)
+        await self._wait_for_idle(msg_id)
 
     async def execute(self, code: str, timeout: float = 60.0) -> dict:
         async with self._lock:

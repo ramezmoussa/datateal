@@ -96,23 +96,38 @@ else
                 }
                 else if (output.Type is "execute_result" or "display_data")
                 {
-                    string? htmlText = GetDataText(output.Data, "text/html");
-                    string? plainText = GetDataText(output.Data, "text/plain") ?? output.Text;
                     string outLabel = $"Out[{output.ExecutionCount ?? entry.ExecutionCount}]:";
 
-                    @if (htmlText is not null)
+                    @if (output.Data is not null
+                         && output.Data.TryGetValue(DataFrameOutput.MimeType, out var dfRaw)
+                         && DataFrameOutput.TryParse(dfRaw) is { } dfOutput)
                     {
                         <div class="d-flex gap-2 mb-1 align-items-start">
                             <span class="text-info font-monospace small text-nowrap pt-1">@outLabel</span>
-                            <div class="flex-grow-1 border-start border-info ps-2 small">@((MarkupString)htmlText)</div>
+                            <div class="flex-grow-1 border-start border-info ps-2">
+                                <DataFrameView Data="dfOutput" />
+                            </div>
                         </div>
                     }
-                    else if (plainText is not null)
+                    else
                     {
-                        <div class="d-flex gap-2 mb-1 align-items-start">
-                            <span class="text-info font-monospace small text-nowrap pt-1">@outLabel</span>
-                            <pre class="kernel-pre font-monospace small flex-grow-1 border-start border-info ps-2">@plainText</pre>
-                        </div>
+                        string? htmlText = GetDataText(output.Data, "text/html");
+                        string? plainText = GetDataText(output.Data, "text/plain") ?? output.Text;
+
+                        @if (htmlText is not null)
+                        {
+                            <div class="d-flex gap-2 mb-1 align-items-start">
+                                <span class="text-info font-monospace small text-nowrap pt-1">@outLabel</span>
+                                <div class="flex-grow-1 border-start border-info ps-2 small">@((MarkupString)htmlText)</div>
+                            </div>
+                        }
+                        else if (plainText is not null)
+                        {
+                            <div class="d-flex gap-2 mb-1 align-items-start">
+                                <span class="text-info font-monospace small text-nowrap pt-1">@outLabel</span>
+                                <pre class="kernel-pre font-monospace small flex-grow-1 border-start border-info ps-2">@plainText</pre>
+                            </div>
+                        }
                     }
                 }
             }
@@ -134,7 +149,8 @@ else
                     <ExecutionTimer DurationMs="entry.Result.DurationMs" />
                     @if (ExtractRowCount(entry.Result) is { } rowCount)
                     {
-                        <span class="text-muted small">· @rowCount.ToString("N0") rows</span>
+                        bool atCap = rowCount == DataFrameOutput.RowCap;
+                        <span class="text-muted small">· @rowCount.ToString("N0")@(atCap ? "+" : "") rows</span>
                     }
                 </div>
             </div>
@@ -322,17 +338,17 @@ else
         return value?.ToString();
     }
 
-    /// <summary>
-    /// Tries to extract the row count from a kernel output.
-    /// Checks pandas plain-text format first ("[N rows x M columns]"),
-    /// then falls back to counting &lt;tr&gt; elements in an HTML tbody.
-    /// Returns null if the output does not appear to be a DataFrame.
-    /// </summary>
     private static int? ExtractRowCount(ExecutionResult result)
     {
         foreach (var output in result.Outputs)
         {
             if (output.Type is not ("execute_result" or "display_data")) continue;
+
+            // Prefer structured data — avoids regex and correctly returns 10 000 when cap was hit
+            if (output.Data is not null
+                && output.Data.TryGetValue(DataFrameOutput.MimeType, out var dfRaw)
+                && DataFrameOutput.TryParse(dfRaw) is { } df)
+                return df.TotalRows;
 
             // Pandas plain-text: "[100 rows x 5 columns]" (actual row count, even when truncated)
             string? plainText = GetDataText(output.Data, "text/plain") ?? output.Text;
