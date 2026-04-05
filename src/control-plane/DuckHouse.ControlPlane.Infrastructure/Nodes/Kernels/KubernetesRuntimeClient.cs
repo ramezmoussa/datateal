@@ -22,6 +22,7 @@ public sealed class KubernetesRuntimeClient : INodeRuntimeClient
     private readonly JsonSerializerOptions _jsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
+        Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() },
     };
 
     public KubernetesRuntimeClient(Kubernetes kubernetes, ITokenProvider? tokenProvider = null)

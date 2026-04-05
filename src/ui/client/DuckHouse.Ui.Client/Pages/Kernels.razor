@@ -67,7 +67,7 @@ else
                 {
                     var id = kernel.Id;
                     var busy = _busy == id;
-                    var isDead = kernel.Status == "dead";
+                    var isDead = kernel.Status == KernelStatus.Dead;
                     <tr>
                         <td class="font-monospace small">@id</td>
                         <td><span class="badge @StatusBadgeClass(kernel.Status)">@kernel.Status</span></td>
@@ -90,7 +90,7 @@ else
                                         <SvgIcon Icon="LucideIcon.RotateCw" />
                                     </Button>
                                 }
-                                @if (kernel.Status == "busy")
+                                @if (kernel.Status == KernelStatus.Busy)
                                 {
                                     <Button Size="ButtonSize.Small" Color="ButtonColor.Warning"
                                             Loading="busy" Disabled="busy"
@@ -206,12 +206,12 @@ else
         }
     }
 
-    private static string StatusBadgeClass(string status) => status switch
+    private static string StatusBadgeClass(KernelStatus status) => status switch
     {
-        "idle"                   => "bg-success",
-        "busy"                   => "bg-warning text-dark",
-        "starting" or "restarting" => "bg-info",
-        "dead"                   => "bg-danger",
-        _                        => "bg-secondary"
+        KernelStatus.Idle                                     => "bg-success",
+        KernelStatus.Busy                                     => "bg-warning text-dark",
+        KernelStatus.Starting or KernelStatus.Restarting     => "bg-info",
+        KernelStatus.Dead                                     => "bg-danger",
+        _                                                     => "bg-secondary"
     };
 }

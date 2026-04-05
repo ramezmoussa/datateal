@@ -1,3 +1,3 @@
 namespace DuckHouse.Core.Kernels;
 
-public record KernelInfo(string Id, string Status, DateTimeOffset CreatedAt, DateTimeOffset LastActivity);
+public record KernelInfo(string Id, KernelStatus Status, DateTimeOffset CreatedAt, DateTimeOffset LastActivity);

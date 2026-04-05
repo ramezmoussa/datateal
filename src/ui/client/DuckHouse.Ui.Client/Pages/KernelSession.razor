@@ -26,7 +26,7 @@
         }
     </div>
     <div class="d-flex gap-2">
-        @if (_kernel?.Status == "busy")
+        @if (_kernel?.Status == KernelStatus.Busy)
         {
             <Button Color="ButtonColor.Warning" Size="ButtonSize.Small"
                     Loading="_actionBusy" Disabled="_actionBusy"
@@ -175,7 +175,7 @@ else
     private ConfirmDialog _confirmDialog = default!;
 
     private string ShortId => KernelId.Length > 8 ? KernelId[..8] + "…" : KernelId;
-    private bool _isDead => _kernel?.Status == "dead";
+    private bool _isDead => _kernel?.Status == KernelStatus.Dead;
 
     protected override async Task OnInitializedAsync()
     {
@@ -304,12 +304,12 @@ else
     private static string StripAnsi(string text) =>
         Regex.Replace(text, @"\x1B\[[0-9;]*[a-zA-Z]", "");
 
-    private static string StatusBadgeClass(string status) => status switch
+    private static string StatusBadgeClass(KernelStatus status) => status switch
     {
-        "idle"                     => "bg-success",
-        "busy"                     => "bg-warning text-dark",
-        "starting" or "restarting" => "bg-info",
-        "dead"                     => "bg-danger",
-        _                          => "bg-secondary"
+        KernelStatus.Idle                                     => "bg-success",
+        KernelStatus.Busy                                     => "bg-warning text-dark",
+        KernelStatus.Starting or KernelStatus.Restarting     => "bg-info",
+        KernelStatus.Dead                                     => "bg-danger",
+        _                                                     => "bg-secondary"
     };
 }
