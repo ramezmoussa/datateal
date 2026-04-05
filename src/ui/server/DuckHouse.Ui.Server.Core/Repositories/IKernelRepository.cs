@@ -11,4 +11,6 @@ public interface IKernelRepository
     Task<ExecutionResult> ExecuteAsync(string nodeName, string kernelId, ExecuteRequest request, CancellationToken cancellationToken = default);
     Task<KernelInfo> RestartKernelAsync(string nodeName, string kernelId, CancellationToken cancellationToken = default);
     Task InterruptKernelAsync(string nodeName, string kernelId, CancellationToken cancellationToken = default);
+    Task<CompleteResponse> CompleteAsync(string nodeName, string kernelId, CompleteRequest request, CancellationToken cancellationToken = default);
+    Task<DiagnoseResponse> DiagnoseAsync(string nodeName, string kernelId, DiagnoseRequest request, CancellationToken cancellationToken = default);
 }

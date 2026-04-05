@@ -93,4 +93,24 @@ public sealed class KubernetesRuntimeClient : INodeRuntimeClient
         using var request = new HttpRequestMessage(HttpMethod.Post, ProxyUri(nodeName, $"kernels/{kernelId}/interrupt"));
         await SendAsync(request, cancellationToken);
     }
+
+    public async Task<CompleteResponse> CompleteAsync(string nodeName, string kernelId, CompleteRequest request, CancellationToken cancellationToken = default)
+    {
+        using var httpRequest = new HttpRequestMessage(HttpMethod.Post, ProxyUri(nodeName, $"kernels/{kernelId}/completions"))
+        {
+            Content = JsonContent.Create(request, options: _jsonOptions),
+        };
+        var response = await SendAsync(httpRequest, cancellationToken);
+        return (await response.Content.ReadFromJsonAsync<CompleteResponse>(_jsonOptions, cancellationToken))!;
+    }
+
+    public async Task<DiagnoseResponse> DiagnoseAsync(string nodeName, string kernelId, DiagnoseRequest request, CancellationToken cancellationToken = default)
+    {
+        using var httpRequest = new HttpRequestMessage(HttpMethod.Post, ProxyUri(nodeName, $"kernels/{kernelId}/diagnostics"))
+        {
+            Content = JsonContent.Create(request, options: _jsonOptions),
+        };
+        var response = await SendAsync(httpRequest, cancellationToken);
+        return (await response.Content.ReadFromJsonAsync<DiagnoseResponse>(_jsonOptions, cancellationToken))!;
+    }
 }

@@ -1,0 +1,164 @@
+@using BlazorMonaco
+@using BlazorMonaco.Languages
+@using BlazorMonaco.Editor
+@using DuckHouse.Core.Kernels
+@using System.Text.Json
+@inject IKernelService KernelService
+@inject IJSRuntime JsRuntime
+@implements IAsyncDisposable
+
+<CodeCell @ref="_codeCell"
+          Value="@Value"
+          ValueChanged="OnValueChangedAsync"
+          Height="@Height"
+          ReadOnly="@ReadOnly"
+          OnExecute="OnExecute"
+          OnEditorReady="OnEditorReadyAsync"
+          Class="@Class" />
+
+@code {
+    [Parameter, EditorRequired] public string NodeName { get; set; } = "";
+    [Parameter, EditorRequired] public string KernelId { get; set; } = "";
+    [Parameter] public string Value { get; set; } = "";
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+    [Parameter] public int Height { get; set; } = 0;
+    [Parameter] public bool ReadOnly { get; set; }
+    [Parameter] public EventCallback OnExecute { get; set; }
+    [Parameter] public string? Class { get; set; }
+
+    private CodeCell _codeCell = default!;
+    private TextModel? _model;
+    private string _currentCode = "";
+    private CancellationTokenSource? _diagCts;
+
+    private async Task OnEditorReadyAsync()
+    {
+        _model = await _codeCell.Editor!.GetModel();
+        await RegisterCompletionProviderAsync();
+        await RunDiagnosticsAsync(_currentCode);
+    }
+
+    private Task RegisterCompletionProviderAsync() =>
+        BlazorMonaco.Languages.Global.RegisterCompletionItemProvider(
+            JsRuntime,
+            "python",
+            new CompletionItemProvider(new List<string> { "." }, ProvideCompletionsAsync, null));
+
+    private async Task<CompletionList> ProvideCompletionsAsync(
+        string modelUri,
+        BlazorMonaco.Position position,
+        CompletionContext context)
+    {
+        try
+        {
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+
+            int startCol = position.Column;
+            if (_model is not null)
+            {
+                var wordInfo = await _model.GetWordUntilPosition(position);
+                startCol = wordInfo?.StartColumn ?? position.Column;
+            }
+
+            var response = await KernelService.CompleteAsync(
+                NodeName, KernelId,
+                new CompleteRequest(_currentCode, position.LineNumber, position.Column - 1),
+                cts.Token);
+
+            var range = JsonSerializer.SerializeToElement(new
+            {
+                startLineNumber = position.LineNumber,
+                startColumn = startCol,
+                endLineNumber = position.LineNumber,
+                endColumn = position.Column,
+            });
+
+            var suggestions = response.Items
+                .Select(item => new BlazorMonaco.Languages.CompletionItem
+                {
+                    Label = JsonSerializer.SerializeToElement(item.Label),
+                    Kind = MapKind(item.Kind),
+                    InsertText = item.InsertText,
+                    Detail = item.Detail,
+                    Range = range,
+                })
+                .ToList();
+
+            return new CompletionList { Suggestions = suggestions, Incomplete = false };
+        }
+        catch
+        {
+            return new CompletionList { Suggestions = [], Incomplete = false };
+        }
+    }
+
+    private async Task OnValueChangedAsync(string value)
+    {
+        Value = value;
+        _currentCode = value;
+        await ValueChanged.InvokeAsync(value);
+        await ScheduleDiagnosticsAsync(value);
+    }
+
+    private async Task ScheduleDiagnosticsAsync(string value)
+    {
+        _diagCts?.Cancel();
+        _diagCts = new CancellationTokenSource();
+        var ct = _diagCts.Token;
+        try
+        {
+            await Task.Delay(400, ct);
+            await RunDiagnosticsAsync(value, ct);
+        }
+        catch (OperationCanceledException) { }
+    }
+
+    private async Task RunDiagnosticsAsync(string value, CancellationToken ct = default)
+    {
+        if (_model is null) return;
+        try
+        {
+            var response = await KernelService.DiagnoseAsync(
+                NodeName, KernelId,
+                new DiagnoseRequest(value),
+                ct);
+
+            var markers = response.Diagnostics
+                .Select(d => new MarkerData
+                {
+                    StartLineNumber = d.Row,
+                    StartColumn = d.Col + 1,
+                    EndLineNumber = d.Row,
+                    EndColumn = 9999,
+                    Message = d.Message,
+                    Severity = d.Severity == "error" ? MarkerSeverity.Error : MarkerSeverity.Warning,
+                })
+                .ToList();
+
+            await BlazorMonaco.Editor.Global.SetModelMarkers(JsRuntime, _model!, "duckhouse-kernel", markers);
+        }
+        catch (OperationCanceledException) { }
+        catch { /* diagnostics are best-effort */ }
+    }
+
+    private static BlazorMonaco.Languages.CompletionItemKind MapKind(string jediType) => jediType switch
+    {
+        "function"  => BlazorMonaco.Languages.CompletionItemKind.Function,
+        "class"     => BlazorMonaco.Languages.CompletionItemKind.Class,
+        "module"    => BlazorMonaco.Languages.CompletionItemKind.Module,
+        "instance"  => BlazorMonaco.Languages.CompletionItemKind.Variable,
+        "keyword"   => BlazorMonaco.Languages.CompletionItemKind.Keyword,
+        "statement" => BlazorMonaco.Languages.CompletionItemKind.Variable,
+        "import"    => BlazorMonaco.Languages.CompletionItemKind.Module,
+        "param"     => BlazorMonaco.Languages.CompletionItemKind.Variable,
+        "property"  => BlazorMonaco.Languages.CompletionItemKind.Property,
+        "path"      => BlazorMonaco.Languages.CompletionItemKind.File,
+        _           => BlazorMonaco.Languages.CompletionItemKind.Text,
+    };
+
+    public async ValueTask DisposeAsync()
+    {
+        _diagCts?.Cancel();
+        _diagCts?.Dispose();
+    }
+}

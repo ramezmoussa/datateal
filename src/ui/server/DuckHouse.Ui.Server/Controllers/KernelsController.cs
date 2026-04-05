@@ -47,4 +47,12 @@ public class KernelsController(IMediator mediator) : ControllerBase
         await mediator.SendAsync(new Cmd.InterruptKernelRequest(nodeName, kernelId), ct);
         return NoContent();
     }
+
+    [HttpPost("{kernelId}/completions")]
+    public async Task<CompleteResponse> Complete(string nodeName, string kernelId, [FromBody] CompleteRequest body, CancellationToken ct) =>
+        await mediator.SendAsync(new Cmd.CompleteKernelRequest(nodeName, kernelId, body), ct);
+
+    [HttpPost("{kernelId}/diagnostics")]
+    public async Task<DiagnoseResponse> Diagnose(string nodeName, string kernelId, [FromBody] DiagnoseRequest body, CancellationToken ct) =>
+        await mediator.SendAsync(new Cmd.DiagnoseKernelRequest(nodeName, kernelId, body), ct);
 }

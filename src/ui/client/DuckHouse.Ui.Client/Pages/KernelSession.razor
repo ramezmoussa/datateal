@@ -149,11 +149,13 @@ else
         }
     </div>
 
-    <CodeCell @bind-Value="_code"
-              Height="160"
-              ReadOnly="@(_isDead || _executing)"
-              OnExecute="ExecuteAsync"
-              Class="border rounded p-1 mb-2" />
+    <KernelCodeCell @bind-Value="_code"
+                    NodeName="@Name"
+                    KernelId="@KernelId"
+                    Height="160"
+                    ReadOnly="@(_isDead || _executing)"
+                    OnExecute="ExecuteAsync"
+                    Class="border rounded p-1 mb-2" />
     <div class="d-flex align-items-center gap-2">
         <Button Color="ButtonColor.Primary"
                 Loading="_executing"

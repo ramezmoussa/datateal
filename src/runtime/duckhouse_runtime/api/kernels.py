@@ -2,6 +2,12 @@ from fastapi import APIRouter, HTTPException
 
 from duckhouse_runtime.kernels.manager import KernelConnection, registry
 from duckhouse_runtime.kernels.models import (
+    CompleteRequest,
+    CompleteResponse,
+    CompletionItem,
+    DiagnoseRequest,
+    DiagnoseResponse,
+    Diagnostic,
     ErrorInfo,
     ExecuteRequest,
     ExecutionResult,
@@ -83,3 +89,21 @@ async def interrupt_kernel(kernel_id: str):
     if not conn:
         raise HTTPException(status_code=404, detail="Kernel not found")
     await conn.interrupt()
+
+
+@router.post("/{kernel_id}/completions", response_model=CompleteResponse)
+async def complete(kernel_id: str, body: CompleteRequest):
+    conn = registry.get(kernel_id)
+    if not conn:
+        raise HTTPException(status_code=404, detail="Kernel not found")
+    items = await conn.complete(body.code, body.line, body.column)
+    return CompleteResponse(items=[CompletionItem(**i) for i in items])
+
+
+@router.post("/{kernel_id}/diagnostics", response_model=DiagnoseResponse)
+async def diagnose(kernel_id: str, body: DiagnoseRequest):
+    conn = registry.get(kernel_id)
+    if not conn:
+        raise HTTPException(status_code=404, detail="Kernel not found")
+    diagnostics = await conn.diagnose(body.code)
+    return DiagnoseResponse(diagnostics=[Diagnostic(**d) for d in diagnostics])

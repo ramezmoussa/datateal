@@ -93,6 +93,14 @@ public static class NodeEndpoints
         })
         .WithName("InterruptKernel");
 
+        kernels.MapPost("/{kernelId}/completions", async (string name, string kernelId, CompleteRequest request, IMediator mediator, CancellationToken ct) =>
+            Results.Ok(await mediator.SendAsync(new CompleteKernelRequest(name, kernelId, request), ct)))
+            .WithName("CompleteKernel");
+
+        kernels.MapPost("/{kernelId}/diagnostics", async (string name, string kernelId, DiagnoseRequest request, IMediator mediator, CancellationToken ct) =>
+            Results.Ok(await mediator.SendAsync(new DiagnoseKernelRequest(name, kernelId, request), ct)))
+            .WithName("DiagnoseKernel");
+
         return endpoints;
     }
 }

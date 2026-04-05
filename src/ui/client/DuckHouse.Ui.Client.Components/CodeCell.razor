@@ -4,7 +4,8 @@
                       CssClass="@(Class ?? "")"
                       ConstructionOptions="GetConstructionOptions"
                       OnDidChangeModelContent="OnContentChangedAsync"
-                      OnKeyDown="OnKeyDownAsync" />
+                      OnKeyDown="OnKeyDownAsync"
+                      OnDidInit="OnEditorInitAsync" />
 
 @code {
     [Parameter] public string Value { get; set; } = "";
@@ -13,7 +14,10 @@
     [Parameter] public string Language { get; set; } = "python";
     [Parameter] public int Height { get; set; } = 0; // 0 = auto-size from line count
     [Parameter] public EventCallback OnExecute { get; set; }
+    [Parameter] public EventCallback OnEditorReady { get; set; }
     [Parameter] public string? Class { get; set; }
+
+    public StandaloneCodeEditor? Editor => _editor;
 
     private readonly string _id = $"code-cell-{Guid.NewGuid():N}";
     private StandaloneCodeEditor _editor = default!;
@@ -50,6 +54,11 @@
     {
         if (!ReadOnly && e.CtrlKey && e.Code == "Enter")
             await OnExecute.InvokeAsync();
+    }
+
+    private async Task OnEditorInitAsync()
+    {
+        await OnEditorReady.InvokeAsync();
     }
 
     protected override async Task OnParametersSetAsync()

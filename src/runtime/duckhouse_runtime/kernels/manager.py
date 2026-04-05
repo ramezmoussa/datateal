@@ -1,10 +1,14 @@
 import asyncio
+import ast as _ast
 import os
 import sys
 import time
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
+import pyflakes.checker
+import jedi
+from jedi.api.environment import Environment as JediEnvironment
 
 from jupyter_client.manager import AsyncKernelManager
 from jupyter_client.asynchronous.client import AsyncKernelClient
@@ -126,6 +130,58 @@ class KernelConnection:
         self.kc.stop_channels()
         await self.km.shutdown_kernel(now=True)
         self.status = "dead"
+
+    async def complete(self, code: str, line: int, column: int) -> list[dict]:
+        """Return Jedi completions for code at the given 1-based line / 0-based column."""
+        kernel_python = os.environ.get("DUCKHOUSE_KERNEL_PYTHON", sys.executable)
+
+        def _run() -> list[dict]:
+            env = JediEnvironment(kernel_python)
+            script = jedi.Script(code, environment=env)
+            completions = script.complete(line, column)
+            return [
+                {
+                    "label": c.name,
+                    "kind": c.type,
+                    "detail": c.description or None,
+                    "documentation": None,
+                    "insert_text": c.name,
+                }
+                for c in completions
+            ]
+
+        return await asyncio.to_thread(_run)
+
+    async def diagnose(self, code: str) -> list[dict]:
+        """Return pyflakes diagnostics for the given code string."""
+        def _run() -> list[dict]:
+            diagnostics = []
+            try:
+                tree = compile(code, "<string>", "exec", _ast.PyCF_ONLY_AST)
+            except SyntaxError as exc:
+                diagnostics.append({
+                    "row": exc.lineno or 1,
+                    "col": max(0, (exc.offset or 1) - 1),
+                    "message": exc.msg,
+                    "severity": "error",
+                })
+                return diagnostics
+
+            try:
+                checker = pyflakes.checker.Checker(tree, "<string>")
+                for msg in checker.messages:
+                    diagnostics.append({
+                        "row": msg.lineno,
+                        "col": getattr(msg, "col", 0),
+                        "message": msg.message % msg.message_args,
+                        "severity": "warning",
+                    })
+            except ImportError:
+                pass
+
+            return diagnostics
+
+        return await asyncio.to_thread(_run)
 
 
 class KernelRegistry:

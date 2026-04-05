@@ -51,4 +51,18 @@ internal class KernelRepository(HttpClient httpClient) : IKernelRepository
         var response = await httpClient.PostAsync($"/nodes/{nodeName}/kernels/{kernelId}/interrupt", content: null, cancellationToken);
         response.EnsureSuccessStatusCode();
     }
+
+    public async Task<CompleteResponse> CompleteAsync(string nodeName, string kernelId, CompleteRequest request, CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.PostAsJsonAsync($"/nodes/{nodeName}/kernels/{kernelId}/completions", request, JsonOptions, cancellationToken);
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<CompleteResponse>(JsonOptions, cancellationToken))!;
+    }
+
+    public async Task<DiagnoseResponse> DiagnoseAsync(string nodeName, string kernelId, DiagnoseRequest request, CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.PostAsJsonAsync($"/nodes/{nodeName}/kernels/{kernelId}/diagnostics", request, JsonOptions, cancellationToken);
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<DiagnoseResponse>(JsonOptions, cancellationToken))!;
+    }
 }
