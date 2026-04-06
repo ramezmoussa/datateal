@@ -9,7 +9,7 @@
 </div>
 
 <Card Style="max-width: 480px;">
-    <p style="color: var(--ant-color-text-secondary); font-size: 0.875rem; font-weight: 600; margin-bottom: 12px;">Appearance</p>
+    <p style="font-size: 0.875rem; margin-bottom: 12px;"><Text Type="TextElementType.Secondary" Strong>Appearance</Text></p>
 
     <p style="font-size: 0.875rem; font-weight: 600; margin-bottom: 8px;">Theme</p>
     <Segmented TValue="AppTheme"
@@ -18,8 +18,8 @@
                Options="_themeOptions" />
     @if (_theme == AppTheme.Auto)
     {
-        <p style="font-size: 0.75rem; color: var(--ant-color-text-secondary); margin-top: 8px;">
-            Follows your system or browser color scheme preference.
+        <p style="font-size: 0.75rem; margin-top: 8px;">
+            <Text Type="TextElementType.Secondary">Follows your system or browser color scheme preference.</Text>
         </p>
     }
 </Card>

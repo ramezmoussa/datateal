@@ -51,7 +51,7 @@
 }
 else if (_kernels.Count == 0)
 {
-    <p style="color: var(--ant-color-text-secondary);">No kernels running on <strong>@Name</strong>. Create one to get started.</p>
+    <p><Text Type="TextElementType.Secondary">No kernels running on <strong>@Name</strong>. Create one to get started.</Text></p>
 }
 else
 {
@@ -63,10 +63,10 @@ else
             <Tag Color="@StatusTagColor(context.Status)">@context.Status</Tag>
         </PropertyColumn>
         <PropertyColumn Property="k => k.CreatedAt" Title="Created">
-            <span style="color: var(--ant-color-text-secondary); font-size: 0.875rem;">@context.CreatedAt.LocalDateTime.ToString("g")</span>
+            <Text Type="TextElementType.Secondary" Style="font-size: 0.875rem;">@context.CreatedAt.LocalDateTime.ToString("g")</Text>
         </PropertyColumn>
         <PropertyColumn Property="k => k.LastActivity" Title="Last Activity">
-            <span style="color: var(--ant-color-text-secondary); font-size: 0.875rem;">@context.LastActivity.LocalDateTime.ToString("g")</span>
+            <Text Type="TextElementType.Secondary" Style="font-size: 0.875rem;">@context.LastActivity.LocalDateTime.ToString("g")</Text>
         </PropertyColumn>
         <ActionColumn Title="Actions">
             @{

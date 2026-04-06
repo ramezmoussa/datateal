@@ -46,7 +46,7 @@
 }
 else if (_nodes.Count == 0)
 {
-    <p style="color: var(--ant-color-text-secondary);">No nodes yet. Create one to get started.</p>
+    <p><Text Type="TextElementType.Secondary">No nodes yet. Create one to get started.</Text></p>
 }
 else
 {
@@ -58,7 +58,7 @@ else
             <Tag Color="@StateTagColor(context.State)">@context.State</Tag>
         </PropertyColumn>
         <PropertyColumn Property="n => n.VmSize" Title="VM Size">
-            <span style="color: var(--ant-color-text-secondary); font-size: 0.875rem;">@(context.VmSize ?? "—")</span>
+            <Text Type="TextElementType.Secondary" Style="font-size: 0.875rem;">@(context.VmSize ?? "—")</Text>
         </PropertyColumn>
         <ActionColumn Title="Actions">
             <Space>

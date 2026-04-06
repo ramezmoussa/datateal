@@ -82,7 +82,7 @@
         <Icon Type="@IconType.Outline.CloudServer" />
     </SpaceItem>
     <SpaceItem>
-        <span style="font-size: 0.875rem; color: var(--ant-color-text-secondary);">Node:</span>
+        <Text Type="TextElementType.Secondary" Style="font-size: 0.875rem;">Node:</Text>
     </SpaceItem>
     @if (_loadingNodes)
     {
@@ -170,8 +170,8 @@
 
 @if (_notebook.Cells.Count == 0)
 {
-    <div style="color: var(--ant-color-text-secondary); font-style: italic; font-size: 0.875rem; text-align: center; padding: 32px 0;">
-        No cells yet — use the <strong>+</strong> buttons above to add your first cell.
+    <div style="font-style: italic; font-size: 0.875rem; text-align: center; padding: 32px 0;">
+        <Text Type="TextElementType.Secondary">No cells yet — use the <strong>+</strong> buttons above to add your first cell.</Text>
     </div>
 }
 

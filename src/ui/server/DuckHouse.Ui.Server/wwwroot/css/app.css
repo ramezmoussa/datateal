@@ -39,15 +39,10 @@
 }
 
 .df-table th {
-    background-color: var(--ant-color-bg-container-disabled);
     font-weight: 600;
     position: sticky;
     top: 0;
     z-index: 1;
-}
-
-.df-table tbody tr:nth-child(odd) {
-    background-color: var(--ant-color-fill-quaternary);
 }
 
 /* Monaco editor layout helpers */

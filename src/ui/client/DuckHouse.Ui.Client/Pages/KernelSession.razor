@@ -88,12 +88,12 @@ else
     <div style="margin-bottom: 12px;">
         @if (_history.Count == 0)
         {
-            <p style="color: var(--ant-color-text-secondary); font-style: italic; font-size: 0.875rem;">No executions yet.</p>
+            <p style="font-style: italic; font-size: 0.875rem;"><Text Type="TextElementType.Secondary">No executions yet.</Text></p>
         }
         @foreach (var entry in _history)
         {
             <div style="display: flex; gap: 8px; margin-bottom: 4px; align-items: flex-start;">
-                <span style="color: var(--ant-color-primary); font-family: monospace; font-size: 0.875rem; white-space: nowrap; padding-top: 4px;">In [@(entry.ExecutionCount?.ToString() ?? " ")]:</span>
+                <span style="font-family: monospace; font-size: 0.875rem; white-space: nowrap; padding-top: 4px;">In [@(entry.ExecutionCount?.ToString() ?? " ")]:</span>
                 <CodeCell Value="@entry.Code" ReadOnly="true" Class="editor-fill" />
             </div>
 
@@ -104,7 +104,14 @@ else
                     bool isStderr = output.Name == "stderr";
                     <div style="display: flex; gap: 8px; margin-bottom: 4px; align-items: flex-start;">
                         <span style="visibility: hidden; font-family: monospace; font-size: 0.875rem; white-space: nowrap; padding-top: 4px;">In [ ]:</span>
-                        <pre class="kernel-pre" style="font-family: monospace; font-size: 0.875rem; flex: 1 1 0%; border-left: 3px solid @(isStderr ? "var(--ant-color-warning)" : "var(--ant-color-border)"); padding-left: 8px; color: @(isStderr ? "var(--ant-color-warning)" : "inherit");">@output.Text</pre>
+                        @if (isStderr)
+                        {
+                            <pre class="kernel-pre" style="font-family: monospace; font-size: 0.875rem; flex: 1 1 0%; border-left: 3px solid var(--ant-color-warning); padding-left: 8px;"><Text Type="TextElementType.Warning">@output.Text</Text></pre>
+                        }
+                        else
+                        {
+                            <pre class="kernel-pre" style="font-family: monospace; font-size: 0.875rem; flex: 1 1 0%; border-left: 3px solid var(--ant-color-border); padding-left: 8px;">@output.Text</pre>
+                        }
                     </div>
                 }
                 else if (output.Type is "execute_result" or "display_data")
@@ -116,8 +123,8 @@ else
                          && DataFrameOutput.TryParse(dfRaw) is { } dfOutput)
                     {
                         <div style="display: flex; gap: 8px; margin-bottom: 4px; align-items: flex-start;">
-                            <span style="color: var(--ant-color-info); font-family: monospace; font-size: 0.875rem; white-space: nowrap; padding-top: 4px;">@outLabel</span>
-                            <div style="flex: 1 1 0%; border-left: 3px solid var(--ant-color-info); padding-left: 8px; min-width: 0;">
+                            <span style="font-family: monospace; font-size: 0.875rem; white-space: nowrap; padding-top: 4px;">@outLabel</span>
+                            <div style="flex: 1 1 0%; border-left: 3px solid; padding-left: 8px; min-width: 0;">
                                 <DataFrameView Data="dfOutput" />
                             </div>
                         </div>
@@ -130,15 +137,15 @@ else
                         @if (htmlText is not null)
                         {
                             <div style="display: flex; gap: 8px; margin-bottom: 4px; align-items: flex-start;">
-                                <span style="color: var(--ant-color-info); font-family: monospace; font-size: 0.875rem; white-space: nowrap; padding-top: 4px;">@outLabel</span>
-                                <div style="flex: 1 1 0%; border-left: 3px solid var(--ant-color-info); padding-left: 8px; font-size: 0.875rem;">@((MarkupString)htmlText)</div>
+                                <span style="font-family: monospace; font-size: 0.875rem; white-space: nowrap; padding-top: 4px;">@outLabel</span>
+                                <div style="flex: 1 1 0%; border-left: 3px solid; padding-left: 8px; font-size: 0.875rem;">@((MarkupString)htmlText)</div>
                             </div>
                         }
                         else if (plainText is not null)
                         {
                             <div style="display: flex; gap: 8px; margin-bottom: 4px; align-items: flex-start;">
-                                <span style="color: var(--ant-color-info); font-family: monospace; font-size: 0.875rem; white-space: nowrap; padding-top: 4px;">@outLabel</span>
-                                <pre class="kernel-pre" style="font-family: monospace; font-size: 0.875rem; flex: 1 1 0%; border-left: 3px solid var(--ant-color-info); padding-left: 8px;">@plainText</pre>
+                                <span style="font-family: monospace; font-size: 0.875rem; white-space: nowrap; padding-top: 4px;">@outLabel</span>
+                                <pre class="kernel-pre" style="font-family: monospace; font-size: 0.875rem; flex: 1 1 0%; border-left: 3px solid; padding-left: 8px;">@plainText</pre>
                             </div>
                         }
                     }
@@ -149,9 +156,9 @@ else
             {
                 <div style="display: flex; gap: 8px; margin-bottom: 4px; align-items: flex-start;">
                     <span style="visibility: hidden; font-family: monospace; font-size: 0.875rem; white-space: nowrap; padding-top: 4px;">In [ ]:</span>
-                    <div style="flex: 1 1 0%; border-left: 3px solid var(--ant-color-error); padding-left: 8px; background-color: var(--ant-color-error-bg); border-radius: 0 4px 4px 0; padding: 8px 8px 8px 12px;">
-                        <div style="color: var(--ant-color-error); font-weight: 700; font-size: 0.875rem; margin-bottom: 4px;">@err.Ename: @err.Evalue</div>
-                        <pre class="kernel-pre" style="font-family: monospace; font-size: 0.875rem; margin: 0; color: var(--ant-color-error-text);">@string.Join("\n", err.Traceback.Select(StripAnsi))</pre>
+                    <div style="flex: 1 1 0%; border-left: 3px solid; padding-left: 8px; border-radius: 0 4px 4px 0; padding: 8px 8px 8px 12px;">
+                        <Text Type="TextElementType.Danger" Strong Style="display: block; font-size: 0.875rem; margin-bottom: 4px;">@err.Ename: @err.Evalue</Text>
+                        <pre class="kernel-pre" style="font-family: monospace; font-size: 0.875rem; margin: 0;"><Text Type="TextElementType.Danger">@string.Join("\n", err.Traceback.Select(StripAnsi))</Text></pre>
                     </div>
                 </div>
             }
@@ -163,7 +170,7 @@ else
                     @if (ExtractRowCount(entry.Result) is { } rowCount)
                     {
                         bool atCap = rowCount == DataFrameOutput.RowCap;
-                        <span style="color: var(--ant-color-text-secondary); font-size: 0.875rem;">· @rowCount.ToString("N0")@(atCap ? "+" : "") rows</span>
+                        <span><Text Type="TextElementType.Secondary" Style="font-size: 0.875rem;">· @rowCount.ToString("N0")@(atCap ? "+" : "") rows</Text></span>
                     }
                 </div>
             </div>
@@ -174,7 +181,7 @@ else
         @if (_executingCode is not null)
         {
             <div style="display: flex; gap: 8px; margin-bottom: 4px; align-items: flex-start;">
-                <span style="color: var(--ant-color-primary); font-family: monospace; font-size: 0.875rem; white-space: nowrap; padding-top: 4px;">In [ ]:</span>
+                <span style="font-family: monospace; font-size: 0.875rem; white-space: nowrap; padding-top: 4px;">In [ ]:</span>
                 <CodeCell Value="@_executingCode" ReadOnly="true" Class="editor-fill" />
             </div>
             <div style="display: flex; gap: 8px; margin-bottom: 4px; align-items: flex-start;">
@@ -212,7 +219,7 @@ else
                 Run
             </Button>
         </SpaceItem>
-        <SpaceItem><span style="color: var(--ant-color-text-secondary); font-size: 0.875rem;">or Ctrl+Enter</span></SpaceItem>
+        <SpaceItem><Text Type="TextElementType.Secondary" Style="font-size: 0.875rem;">or Ctrl+Enter</Text></SpaceItem>
         @if (_isDead)
         {
             <SpaceItem><Tag Color='("error")'>Kernel is dead — restart to continue</Tag></SpaceItem>
