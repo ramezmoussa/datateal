@@ -29,7 +29,7 @@
 
     private int ComputedHeight => Height > 0
         ? Height
-        : Math.Max(1, (Value ?? "").TrimEnd().Split('\n').Length) * 20 + 20;
+        : Math.Max(1, (Value ?? "").Split('\n').Length) * 20 + 20;
 
     private StandaloneEditorConstructionOptions GetConstructionOptions(StandaloneCodeEditor _)
     {
