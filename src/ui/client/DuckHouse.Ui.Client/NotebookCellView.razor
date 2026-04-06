@@ -3,7 +3,7 @@
 @using System.Text.RegularExpressions
 @using Markdig
 
-<div style="margin-bottom: 12px;">
+<div>
     @* ── Cell header: label + language badge + toolbar ── *@
     <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
         @if (Cell.CellType == NotebookCellType.Code)
@@ -208,7 +208,9 @@
                     </SpaceItem>
                 }
                 <SpaceItem>
-                    <ExecutionTimer IsRunning="@Cell.IsExecuting" DurationMs="@(Cell.IsExecuting ? null : Cell.DurationMs)" />
+                    <Text Type="TextElementType.Secondary">
+                        <ExecutionTimer IsRunning="@Cell.IsExecuting" DurationMs="@(Cell.IsExecuting ? null : Cell.DurationMs)" />
+                    </Text>
                 </SpaceItem>
                 @if (!Cell.IsExecuting && ExtractRowCount() is { } rowCount)
                 {

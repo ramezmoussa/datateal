@@ -1,39 +1,58 @@
 @using DuckHouse.Core.Kernels
 
 <div class="df-view">
-<Table TItem="Dictionary<string, object>"
-       DataSource="@_dictRows"
-       Size="TableSize.Small"
-       Bordered
-       HidePagination="true">
-    @foreach (var col in Data.Columns)
-    {
-        var colName = col.Name;
-        <PropertyColumn Title="@colName"
-                        Property="@(r => r[colName])"
-                        Align="@(IsNumeric(col) ? ColumnAlign.Right : ColumnAlign.Left)">
-            <span style="font-family: monospace; white-space: nowrap;">@FormatCell(context[colName])</span>
-        </PropertyColumn>
-    }
-</Table>
+    <table class="df-table">
+        <thead>
+            <tr>
+                @foreach (var col in Data.Columns)
+                {
+                    <th style="@(IsNumeric(col) ? "text-align: right;" : "")">@col.Name</th>
+                }
+            </tr>
+        </thead>
+        <tbody>
+            <Virtualize Items="_rows" Context="row" ItemSize="33" SpacerElement="tr">
+                <tr>
+                    @for (int i = 0; i < Data.Columns.Count; i++)
+                    {
+                        var col = Data.Columns[i];
+                        var cell = i < row.Count ? row[i] : null;
+                        <td style="font-family: monospace; @(IsNumeric(col) ? "text-align: right;" : "")">@FormatCell(cell)</td>
+                    }
+                </tr>
+            </Virtualize>
+        </tbody>
+    </table>
 </div>
 
 @if (FooterLabel is { } label)
 {
-    <p style="font-size: 0.875rem; margin-bottom: 0; margin-top: 4px;"><Text Type="TextElementType.Secondary">@label</Text></p>
+    <p style="font-size: 0.875rem; margin-bottom: 0; margin-top: 4px;">
+        @label
+    </p>
 }
 
 @code {
     [Parameter, EditorRequired] public DataFrameOutput Data { get; set; } = default!;
 
-    private List<Dictionary<string, object?>> _dictRows = [];
+    private List<IReadOnlyList<object?>> _rows = [];
+    private DataFrameOutput? _lastData;
+    private bool _dataChanged;
 
     protected override void OnParametersSet()
-        => _dictRows = Data.Rows
-            .Select(row => Data.Columns
-                .Select((col, i) => (col.Name, Value: i < row.Count ? row[i] : null))
-                .ToDictionary(x => x.Name, x => x.Value))
-            .ToList();
+    {
+        if (ReferenceEquals(Data, _lastData)) return;
+        _lastData = Data;
+        _dataChanged = true;
+        _rows = [..Data.Rows];
+    }
+
+    protected override bool ShouldRender()
+    {
+        if (!_dataChanged) return false;
+        _dataChanged = false;
+        return true;
+    }
 
     private string? FooterLabel =>
         Data.TotalRows == DataFrameOutput.RowCap
