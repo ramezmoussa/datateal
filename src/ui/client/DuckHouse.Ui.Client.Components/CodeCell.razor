@@ -26,6 +26,7 @@
     private StandaloneCodeEditor _editor = default!;
     private bool _suppressChange;
     private bool _lastReadOnly;
+    private string _lastLanguage = "";
 
     private int ComputedHeight => Height > 0
         ? Height
@@ -80,6 +81,13 @@
         {
             _lastReadOnly = ReadOnly;
             await _editor.UpdateOptions(new EditorUpdateOptions { ReadOnly = ReadOnly });
+        }
+
+        if (_lastLanguage != Language)
+        {
+            _lastLanguage = Language;
+            try { await JS.InvokeVoidAsync("setMonacoEditorLanguage", _id, Language); }
+            catch { /* best effort */ }
         }
 
         _suppressChange = true;

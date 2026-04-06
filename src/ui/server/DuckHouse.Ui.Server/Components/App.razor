@@ -49,6 +49,13 @@
         window.getDuckhouseMonacoTheme = function () {
             return document.documentElement.getAttribute('data-bs-theme') === 'dark' ? 'vs-dark' : 'vs';
         };
+        window.setMonacoEditorLanguage = function (editorId, language) {
+            const holder = window.blazorMonaco?.editors?.find(h => h.id === editorId);
+            if (holder) {
+                const model = holder.editor.getModel();
+                if (model) monaco.editor.setModelLanguage(model, language);
+            }
+        };
 
         window.openFileAsText = function (inputElement) {
             return new Promise((resolve, reject) => {

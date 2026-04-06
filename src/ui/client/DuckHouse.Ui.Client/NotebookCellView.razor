@@ -9,19 +9,17 @@
         @if (Cell.CellType == NotebookCellType.Code)
         {
             <span class="text-primary font-monospace small text-nowrap">In [@(Cell.ExecutionCount?.ToString() ?? " ")]:</span>
-            @if (Cell.Language == NotebookCellLanguage.Sql)
-            {
-                <span class="badge bg-success-subtle text-success-emphasis">SQL</span>
-            }
-            else
-            {
-                <span class="badge bg-primary-subtle text-primary-emphasis">Python</span>
-            }
         }
-        else
-        {
-            <span class="badge bg-secondary-subtle text-secondary-emphasis">Markdown</span>
-        }
+
+        <select class="form-select form-select-sm py-0 d-inline-block"
+                style="width: auto; font-size: 0.75rem;"
+                disabled="@Cell.IsExecuting"
+                value="@CellTypeValue"
+                @onchange="OnCellTypeChanged">
+            <option value="python">Python</option>
+            <option value="sql">SQL</option>
+            <option value="markdown">Markdown</option>
+        </select>
 
         <div class="ms-auto d-flex gap-1">
             @if (Cell.CellType == NotebookCellType.Code)
@@ -219,6 +217,37 @@
     [Parameter] public EventCallback OnCellChanged { get; set; }
 
     private bool HasKernel => !string.IsNullOrEmpty(NodeName) && !string.IsNullOrEmpty(KernelId);
+
+    private string CellTypeValue => Cell.CellType == NotebookCellType.Markdown
+        ? "markdown"
+        : Cell.Language == NotebookCellLanguage.Sql ? "sql" : "python";
+
+    private async Task OnCellTypeChanged(ChangeEventArgs e)
+    {
+        var value = e.Value?.ToString();
+
+        var newType = value == "markdown" ? NotebookCellType.Markdown : NotebookCellType.Code;
+        var newLang = value == "sql" ? NotebookCellLanguage.Sql : NotebookCellLanguage.Python;
+
+        // Clear outputs when switching away from code, or between languages
+        if (Cell.CellType != newType || Cell.Language != newLang)
+        {
+            if (newType == NotebookCellType.Markdown)
+            {
+                Cell.ClearOutput();
+                Cell.IsEditingMarkdown = true;
+            }
+            else if (Cell.CellType == NotebookCellType.Markdown)
+            {
+                // Switching from markdown to code — start in edit mode makes no sense; just show the editor
+                Cell.IsEditingMarkdown = false;
+            }
+
+            Cell.CellType = newType;
+            Cell.Language = newLang;
+            await OnCellChanged.InvokeAsync();
+        }
+    }
 
     private void StartEditingMarkdown()
     {
