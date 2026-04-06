@@ -1,33 +1,45 @@
 @inject NavigationManager Navigation
 
-<div style="padding: 16px; font-weight: 600; font-size: 1rem; color: var(--ant-color-text);">
-    DuckHouse
-</div>
-
 <Menu Mode="MenuMode.Inline"
-      Theme="MenuTheme.Light"
+      Theme="MenuTheme.Dark"
       SelectedKeys="@_selectedKeys"
       Style="border-right: none;">
+    <div class="logo" />
     <MenuItem Key="home" OnClick="@(() => Navigation.NavigateTo("/"))">
-        <SvgIcon Icon="LucideIcon.House" />
+        <Icon Type="@IconType.Outline.Home" />
         <span>Home</span>
     </MenuItem>
     <MenuItem Key="nodes" OnClick="@(() => Navigation.NavigateTo("/nodes"))">
-        <SvgIcon Icon="LucideIcon.Server" />
+        <Icon Type="@IconType.Outline.CloudServer" />
         <span>Nodes</span>
     </MenuItem>
     <MenuItem Key="notebook" OnClick="@(() => Navigation.NavigateTo("/notebook"))">
-        <SvgIcon Icon="LucideIcon.Notebook" />
+        <Icon Type="@IconType.Outline.Snippets" />
         <span>Notebooks</span>
     </MenuItem>
     <MenuItem Key="settings" OnClick="@(() => Navigation.NavigateTo("/settings"))">
-        <SvgIcon Icon="LucideIcon.Settings" />
+        <Icon Type="@IconType.Outline.Setting" />
         <span>Settings</span>
     </MenuItem>
 </Menu>
 
+<style>
+    .logo {
+        height: 32px;
+        background: rgba(255, 255, 255, 0.2);
+        margin: 16px;
+    }
+</style>
+
 @code {
     private string[] _selectedKeys = [];
+    private bool _collapsed = false;
+
+    private void ToggleCollapsed()
+    {
+        _collapsed = !_collapsed;
+    }
+
 
     protected override void OnInitialized() => UpdateSelectedKey();
 
