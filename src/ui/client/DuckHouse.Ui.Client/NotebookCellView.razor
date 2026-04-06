@@ -1,0 +1,263 @@
+@using DuckHouse.Ui.Client.Notebook
+@using DuckHouse.Core.Kernels
+@using System.Text.RegularExpressions
+@using Markdig
+
+<div class="mb-3">
+    @* ── Cell header: label + language badge + toolbar ── *@
+    <div class="d-flex align-items-center gap-2 mb-1">
+        @if (Cell.CellType == NotebookCellType.Code)
+        {
+            <span class="text-primary font-monospace small text-nowrap">In [@(Cell.ExecutionCount?.ToString() ?? " ")]:</span>
+            @if (Cell.Language == NotebookCellLanguage.Sql)
+            {
+                <span class="badge bg-success-subtle text-success-emphasis">SQL</span>
+            }
+            else
+            {
+                <span class="badge bg-primary-subtle text-primary-emphasis">Python</span>
+            }
+        }
+        else
+        {
+            <span class="badge bg-secondary-subtle text-secondary-emphasis">Markdown</span>
+        }
+
+        <div class="ms-auto d-flex gap-1">
+            @if (Cell.CellType == NotebookCellType.Code)
+            {
+                @if (Cell.IsExecuting)
+                {
+                    <Button Size="ButtonSize.ExtraSmall" Color="ButtonColor.Warning"
+                            @onclick="OnInterrupt">
+                        <SvgIcon Icon="LucideIcon.CircleStop" />
+                    </Button>
+                }
+                else
+                {
+                    <Button Size="ButtonSize.ExtraSmall" Color="ButtonColor.Primary"
+                            Disabled="@(!HasKernel)"
+                            @onclick="OnExecute">
+                        <SvgIcon Icon="LucideIcon.Play" />
+                    </Button>
+                }
+            }
+            else
+            {
+                @if (Cell.IsEditingMarkdown)
+                {
+                    <Button Size="ButtonSize.ExtraSmall" Color="ButtonColor.Secondary"
+                            @onclick="StopEditingMarkdown">
+                        <SvgIcon Icon="LucideIcon.Check" />
+                        Done
+                    </Button>
+                }
+                else
+                {
+                    <Button Size="ButtonSize.ExtraSmall" Color="ButtonColor.Secondary"
+                            @onclick="StartEditingMarkdown">
+                        <SvgIcon Icon="LucideIcon.Code" />
+                    </Button>
+                }
+            }
+            <Button Size="ButtonSize.ExtraSmall" Color="ButtonColor.Light"
+                    Disabled="@(!CanMoveUp)" @onclick="OnMoveUp">
+                <SvgIcon Icon="LucideIcon.ChevronUp" />
+            </Button>
+            <Button Size="ButtonSize.ExtraSmall" Color="ButtonColor.Light"
+                    Disabled="@(!CanMoveDown)" @onclick="OnMoveDown">
+                <SvgIcon Icon="LucideIcon.ChevronDown" />
+            </Button>
+            <Button Size="ButtonSize.ExtraSmall" Color="ButtonColor.Danger"
+                    @onclick="OnDelete">
+                <SvgIcon Icon="LucideIcon.X" />
+            </Button>
+        </div>
+    </div>
+
+    @* ── Editor ── *@
+    @if (Cell.CellType == NotebookCellType.Code)
+    {
+        @if (HasKernel && Cell.Language == NotebookCellLanguage.Python)
+        {
+            <KernelCodeCell Value="@Cell.Source"
+                            ValueChanged="@(async v => { Cell.Source = v; await OnCellChanged.InvokeAsync(); })"
+                            NodeName="@(NodeName ?? "")"
+                            KernelId="@(KernelId ?? "")"
+                            ReadOnly="@Cell.IsExecuting"
+                            PriorContext="PriorContext"
+                            OnExecute="OnExecute"
+                            Class="border rounded p-1 mb-1" />
+        }
+        else
+        {
+            <CodeCell Value="@Cell.Source"
+                      ValueChanged="@(async v => { Cell.Source = v; await OnCellChanged.InvokeAsync(); })"
+                      Language="@(Cell.Language == NotebookCellLanguage.Sql ? "sql" : "python")"
+                      ReadOnly="@Cell.IsExecuting"
+                      OnExecute="@(Cell.Language != NotebookCellLanguage.Sql ? OnExecute : default)"
+                      Class="border rounded p-1 mb-1" />
+        }
+    }
+    else
+    {
+        @if (Cell.IsEditingMarkdown)
+        {
+            <CodeCell Value="@Cell.Source"
+                      ValueChanged="@(async v => { Cell.Source = v; await OnCellChanged.InvokeAsync(); })"
+                      Language="markdown"
+                      Class="border rounded p-1 mb-1" />
+        }
+        else
+        {
+            <div class="p-2 border rounded mb-1 markdown-rendered"
+                 style="cursor: pointer; min-height: 2.5rem;"
+                 @onclick="StartEditingMarkdown">
+                @if (string.IsNullOrWhiteSpace(Cell.Source))
+                {
+                    <span class="text-muted fst-italic small">Click to edit markdown…</span>
+                }
+                else
+                {
+                    @((MarkupString)Markdig.Markdown.ToHtml(Cell.Source, _mdPipeline))
+                }
+            </div>
+        }
+    }
+
+    @* ── Outputs (code cells only) ── *@
+    @if (Cell.CellType == NotebookCellType.Code)
+    {
+        @foreach (var output in Cell.Outputs)
+        {
+            @if (output.Type == "stream")
+            {
+                bool isStderr = output.Name == "stderr";
+                <div class="d-flex gap-2 mb-1 align-items-start">
+                    <span class="invisible font-monospace small text-nowrap pt-1">In [ ]:</span>
+                    <pre class="kernel-pre font-monospace small flex-grow-1 border-start ps-2 @(isStderr ? "border-warning text-warning" : "border-secondary text-body")">@output.Text</pre>
+                </div>
+            }
+            else if (output.Type is "execute_result" or "display_data")
+            {
+                string outLabel = $"Out[{output.ExecutionCount ?? Cell.ExecutionCount}]:";
+
+                @if (output.Data is not null
+                     && output.Data.TryGetValue(DataFrameOutput.MimeType, out var dfRaw)
+                     && DataFrameOutput.TryParse(dfRaw) is { } dfOutput)
+                {
+                    <div class="d-flex gap-2 mb-1 align-items-start">
+                        <span class="text-info font-monospace small text-nowrap pt-1">@outLabel</span>
+                        <div class="flex-grow-1 border-start border-info ps-2" style="min-width: 0;">
+                            <DataFrameView Data="dfOutput" />
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    string? htmlText = GetDataText(output.Data, "text/html");
+                    string? plainText = GetDataText(output.Data, "text/plain") ?? output.Text;
+
+                    @if (htmlText is not null)
+                    {
+                        <div class="d-flex gap-2 mb-1 align-items-start">
+                            <span class="text-info font-monospace small text-nowrap pt-1">@outLabel</span>
+                            <div class="flex-grow-1 border-start border-info ps-2 small">@((MarkupString)htmlText)</div>
+                        </div>
+                    }
+                    else if (plainText is not null)
+                    {
+                        <div class="d-flex gap-2 mb-1 align-items-start">
+                            <span class="text-info font-monospace small text-nowrap pt-1">@outLabel</span>
+                            <pre class="kernel-pre font-monospace small flex-grow-1 border-start border-info ps-2">@plainText</pre>
+                        </div>
+                    }
+                }
+            }
+        }
+
+        @if (Cell.Error is { } err)
+        {
+            <div class="d-flex gap-2 mb-1 align-items-start">
+                <span class="invisible font-monospace small text-nowrap pt-1">In [ ]:</span>
+                <div class="flex-grow-1 border-start border-danger ps-2 bg-danger bg-opacity-10 rounded-end p-2">
+                    <div class="text-danger fw-bold small mb-1">@err.Ename: @err.Evalue</div>
+                    <pre class="kernel-pre font-monospace small mb-0 text-danger-emphasis">@string.Join("\n", err.Traceback.Select(StripAnsi))</pre>
+                </div>
+            </div>
+        }
+
+        <div class="d-flex align-items-center gap-2 mb-1">
+            <span class="invisible font-monospace small text-nowrap">In [ ]:</span>
+            <ExecutionTimer IsRunning="@Cell.IsExecuting" DurationMs="@(Cell.IsExecuting ? null : Cell.DurationMs)" />
+            @if (!Cell.IsExecuting && ExtractRowCount() is { } rowCount)
+            {
+                bool atCap = rowCount == DataFrameOutput.RowCap;
+                <span class="text-muted small">· @rowCount.ToString("N0")@(atCap ? "+" : "") rows</span>
+            }
+        </div>
+    }
+
+    <hr class="my-2 border-secondary opacity-25" />
+</div>
+
+@code {
+    private static readonly MarkdownPipeline _mdPipeline =
+        new MarkdownPipelineBuilder().UseAdvancedExtensions().Build();
+
+    [Parameter, EditorRequired] public NotebookCell Cell { get; set; } = default!;
+    [Parameter] public string? NodeName { get; set; }
+    [Parameter] public string? KernelId { get; set; }
+    [Parameter] public bool CanMoveUp { get; set; }
+    [Parameter] public bool CanMoveDown { get; set; }
+    [Parameter] public Func<string>? PriorContext { get; set; }
+    [Parameter] public EventCallback OnExecute { get; set; }
+    [Parameter] public EventCallback OnInterrupt { get; set; }
+    [Parameter] public EventCallback OnDelete { get; set; }
+    [Parameter] public EventCallback OnMoveUp { get; set; }
+    [Parameter] public EventCallback OnMoveDown { get; set; }
+    [Parameter] public EventCallback OnCellChanged { get; set; }
+
+    private bool HasKernel => !string.IsNullOrEmpty(NodeName) && !string.IsNullOrEmpty(KernelId);
+
+    private void StartEditingMarkdown()
+    {
+        Cell.IsEditingMarkdown = true;
+    }
+
+    private void StopEditingMarkdown()
+    {
+        Cell.IsEditingMarkdown = false;
+    }
+
+    private static string? GetDataText(Dictionary<string, object>? data, string mimeType)
+    {
+        if (data?.TryGetValue(mimeType, out var value) != true) return null;
+        return value?.ToString();
+    }
+
+    private int? ExtractRowCount()
+    {
+        foreach (var output in Cell.Outputs)
+        {
+            if (output.Type is not ("execute_result" or "display_data")) continue;
+
+            if (output.Data is not null
+                && output.Data.TryGetValue(DataFrameOutput.MimeType, out var dfRaw)
+                && DataFrameOutput.TryParse(dfRaw) is { } df)
+                return df.TotalRows;
+
+            string? plainText = GetDataText(output.Data, "text/plain") ?? output.Text;
+            if (plainText is not null)
+            {
+                var m = Regex.Match(plainText, @"\[(\d[\d,]*)\s+rows?\s+[x×]");
+                if (m.Success && int.TryParse(m.Groups[1].Value.Replace(",", ""), out int n))
+                    return n;
+            }
+        }
+        return null;
+    }
+
+    private static string StripAnsi(string text) =>
+        Regex.Replace(text, @"\x1B\[[0-9;]*[a-zA-Z]", "");
+}

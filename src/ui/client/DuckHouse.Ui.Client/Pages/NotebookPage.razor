@@ -1,0 +1,374 @@
+@page "/notebook"
+
+@using DuckHouse.Ui.Client.Notebook
+@using DuckHouse.Core.Kernels
+@using DuckHouse.Core.Nodes
+@using DuckHouse.Ui.Shared.Kernels
+@inject IKernelService KernelService
+@inject INodeService NodeService
+@inject IJSRuntime JS
+@inject NavigationManager Navigation
+@implements IAsyncDisposable
+
+<PageTitle>Notebook — DuckHouse</PageTitle>
+
+<div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+    <div class="d-flex align-items-center gap-2">
+        <SvgIcon Icon="LucideIcon.Notebook" />
+        <h2 class="mb-0">
+            @if (_editingTitle)
+            {
+                <input class="form-control form-control-sm d-inline-block"
+                       style="width: 20ch;"
+                       value="@_notebook.Title"
+                       @onchange="@(e => { _notebook.Title = e.Value?.ToString() ?? "Untitled"; _notebook.IsDirty = true; _editingTitle = false; })"
+                       @onblur="@(() => _editingTitle = false)"
+                       @onkeydown="@(e => { if (e.Key == "Enter" || e.Key == "Escape") _editingTitle = false; })" />
+            }
+            else
+            {
+                <span style="cursor: pointer;" @onclick="@(() => _editingTitle = true)">
+                    @_notebook.Title@(_notebook.IsDirty ? " *" : "")
+                </span>
+            }
+        </h2>
+    </div>
+
+    @* File toolbar *@
+    <div class="d-flex gap-2 flex-wrap">
+        <label class="btn btn-sm btn-outline-secondary">
+            <SvgIcon Icon="LucideIcon.FolderOpen" /> Open
+            <InputFile style="display:none;" accept=".ipynb" OnChange="OnFileSelectedAsync" />
+        </label>
+        <Button Color="ButtonColor.Secondary" Size="ButtonSize.Small"
+                Disabled="@(!_notebook.IsDirty)"
+                @onclick="SaveAsync">
+            <SvgIcon Icon="LucideIcon.Save" /> Save
+        </Button>
+        <div class="vr"></div>
+        <Button Color="ButtonColor.Success" Size="ButtonSize.Small"
+                Disabled="@(!HasKernel || _runningAll)"
+                Loading="_runningAll"
+                @onclick="RunAllAsync">
+            <SvgIcon Icon="LucideIcon.Play" /> Run All
+        </Button>
+        <Button Color="ButtonColor.Warning" Size="ButtonSize.Small"
+                Disabled="@(!HasKernel || !AnyExecuting)"
+                @onclick="InterruptAsync">
+            <SvgIcon Icon="LucideIcon.CircleStop" /> Interrupt
+        </Button>
+        <Button Color="ButtonColor.Secondary" Size="ButtonSize.Small"
+                Disabled="@(!_notebook.Cells.Any())"
+                @onclick="ClearAllOutputs">
+            <SvgIcon Icon="LucideIcon.Eraser" /> Clear Outputs
+        </Button>
+    </div>
+</div>
+
+@* Kernel connection toolbar *@
+<div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
+    <SvgIcon Icon="LucideIcon.Plug" />
+    <span class="small text-muted">Node:</span>
+    @if (_loadingNodes)
+    {
+        <Spinner Size="SpinnerSize.Small" />
+    }
+    else
+    {
+        <select class="form-select form-select-sm" style="width: auto;"
+                disabled="@HasKernel"
+                @bind="_nodeName">
+            <option value="">— select node —</option>
+            @foreach (var node in _nodes.Where(n => n.State == NodeState.Running))
+            {
+                <option value="@node.Name">@node.Name</option>
+            }
+        </select>
+    }
+
+    @if (!HasKernel)
+    {
+        <Button Color="ButtonColor.Primary" Size="ButtonSize.Small"
+                Disabled="@(string.IsNullOrEmpty(_nodeName) || _connecting)"
+                Loading="_connecting"
+                @onclick="ConnectAsync">
+            <SvgIcon Icon="LucideIcon.Plug" /> Connect
+        </Button>
+    }
+    else
+    {
+        <span class="badge @StatusBadgeClass(_kernel!.Status)">@_kernel!.Status</span>
+        <Button Color="ButtonColor.Secondary" Size="ButtonSize.Small"
+                Disabled="_disconnecting"
+                Loading="_disconnecting"
+                @onclick="DisconnectAsync">
+            <SvgIcon Icon="LucideIcon.X" /> Disconnect
+        </Button>
+    }
+</div>
+
+@if (_error is not null)
+{
+    <div class="alert alert-danger alert-dismissible" role="alert">
+        @_error
+        <button type="button" class="btn-close" @onclick="() => _error = null"></button>
+    </div>
+}
+
+@* Cell list *@
+<AddCellBar OnAddPython="() => AddCell(0, NotebookCellType.Code, NotebookCellLanguage.Python)"
+            OnAddSql="() => AddCell(0, NotebookCellType.Code, NotebookCellLanguage.Sql)"
+            OnAddMarkdown="() => AddCell(0, NotebookCellType.Markdown)" />
+
+@for (int ci = 0; ci < _notebook.Cells.Count; ci++)
+{
+    var cell = _notebook.Cells[ci];
+    var index = ci; // capture for closure
+    <NotebookCellView Cell="cell"
+                      NodeName="@_nodeName"
+                      KernelId="@_kernelId"
+                      CanMoveUp="@(index > 0)"
+                      CanMoveDown="@(index < _notebook.Cells.Count - 1)"
+                      PriorContext="@(() => PriorContextFor(index))"
+                      OnExecute="@(() => _ = ExecuteCellAsync(cell))"
+                      OnInterrupt="InterruptAsync"
+                      OnDelete="@(() => DeleteCell(cell))"
+                      OnMoveUp="@(() => MoveCell(index, -1))"
+                      OnMoveDown="@(() => MoveCell(index, 1))"
+                      OnCellChanged="@(() => _notebook.IsDirty = true)" />
+    <AddCellBar OnAddPython="() => AddCell(index + 1, NotebookCellType.Code, NotebookCellLanguage.Python)"
+                OnAddSql="() => AddCell(index + 1, NotebookCellType.Code, NotebookCellLanguage.Sql)"
+                OnAddMarkdown="() => AddCell(index + 1, NotebookCellType.Markdown)" />
+}
+
+@if (_notebook.Cells.Count == 0)
+{
+    <div class="text-muted fst-italic small text-center py-4">
+        No cells yet — use the <strong>+</strong> buttons above to add your first cell.
+    </div>
+}
+
+@code {
+    private NotebookDocument _notebook = new();
+    private string? _nodeName;
+    private string? _kernelId;
+    private KernelInfo? _kernel;
+    private IReadOnlyList<NodeInfo> _nodes = [];
+    private bool _loadingNodes;
+    private bool _connecting;
+    private bool _disconnecting;
+    private bool _runningAll;
+    private string? _error;
+    private bool _editingTitle;
+
+    private bool HasKernel => !string.IsNullOrEmpty(_kernelId);
+    private bool AnyExecuting => _notebook.Cells.Any(c => c.IsExecuting);
+
+    protected override async Task OnInitializedAsync()
+    {
+        _loadingNodes = true;
+        try { _nodes = await NodeService.GetNodesAsync(); }
+        catch (Exception ex) { _error = $"Failed to load nodes: {ex.Message}"; }
+        finally { _loadingNodes = false; }
+    }
+
+    private async Task ConnectAsync()
+    {
+        if (string.IsNullOrEmpty(_nodeName)) return;
+        _connecting = true;
+        _error = null;
+        try
+        {
+            var kernel = await KernelService.CreateKernelAsync(_nodeName);
+            _kernelId = kernel.Id;
+            _kernel = kernel;
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to create kernel: {ex.Message}";
+        }
+        finally
+        {
+            _connecting = false;
+        }
+    }
+
+    private async Task DisconnectAsync()
+    {
+        if (!HasKernel || string.IsNullOrEmpty(_nodeName)) return;
+        _disconnecting = true;
+        _error = null;
+        try
+        {
+            await KernelService.DeleteKernelAsync(_nodeName, _kernelId!);
+            _kernelId = null;
+            _kernel = null;
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to disconnect: {ex.Message}";
+        }
+        finally
+        {
+            _disconnecting = false;
+        }
+    }
+
+    private async Task ExecuteCellAsync(NotebookCell cell)
+    {
+        if (!HasKernel || string.IsNullOrEmpty(_nodeName) || cell.IsExecuting) return;
+
+        cell.ClearOutput();
+        cell.IsExecuting = true;
+        _error = null;
+
+        string codeToRun = cell.Language == NotebookCellLanguage.Sql
+            ? $"import duckdb; duckdb.sql(\"\"\"{cell.Source}\"\"\")"
+            : cell.Source;
+
+        try
+        {
+            var handle = await KernelService.StartExecuteAsync(
+                _nodeName, _kernelId!, new ExecuteKernelRequest(codeToRun));
+            cell.ExecutionId = handle.ExecutionId;
+
+            PollExecutionResponse poll;
+            do
+            {
+                await Task.Delay(1000);
+                poll = await KernelService.PollExecutionAsync(_nodeName, _kernelId!, handle.ExecutionId);
+                StateHasChanged();
+            } while (!poll.IsComplete);
+
+            var result = poll.Result!;
+            cell.Outputs = result.Outputs.ToList();
+            cell.Error = result.Error;
+            cell.ExecutionCount = result.ExecutionCount;
+            cell.DurationMs = result.DurationMs;
+            _kernel = await KernelService.GetKernelAsync(_nodeName, _kernelId!);
+            _notebook.IsDirty = true;
+        }
+        catch (Exception ex)
+        {
+            _error = $"Execution failed: {ex.Message}";
+        }
+        finally
+        {
+            cell.IsExecuting = false;
+            cell.ExecutionId = null;
+        }
+    }
+
+    private async Task RunAllAsync()
+    {
+        _runningAll = true;
+        try
+        {
+            foreach (var cell in _notebook.Cells.Where(c => c.CellType == NotebookCellType.Code).ToList())
+            {
+                await ExecuteCellAsync(cell);
+                if (cell.Error is not null) break;
+            }
+        }
+        finally
+        {
+            _runningAll = false;
+        }
+    }
+
+    private async Task InterruptAsync()
+    {
+        if (!HasKernel || string.IsNullOrEmpty(_nodeName)) return;
+        try { await KernelService.InterruptKernelAsync(_nodeName, _kernelId!); }
+        catch (Exception ex) { _error = $"Interrupt failed: {ex.Message}"; }
+    }
+
+    private void ClearAllOutputs()
+    {
+        foreach (var cell in _notebook.Cells)
+            cell.ClearOutput();
+        _notebook.IsDirty = true;
+    }
+
+    private void AddCell(int index, NotebookCellType cellType, NotebookCellLanguage lang = NotebookCellLanguage.Python)
+    {
+        var cell = new NotebookCell { CellType = cellType, Language = lang };
+        if (cellType == NotebookCellType.Markdown)
+            cell.IsEditingMarkdown = true;
+        _notebook.Cells.Insert(index, cell);
+        _notebook.IsDirty = true;
+    }
+
+    private void DeleteCell(NotebookCell cell)
+    {
+        _notebook.Cells.Remove(cell);
+        _notebook.IsDirty = true;
+    }
+
+    private void MoveCell(int index, int direction)
+    {
+        int target = index + direction;
+        if (target < 0 || target >= _notebook.Cells.Count) return;
+        (_notebook.Cells[index], _notebook.Cells[target]) = (_notebook.Cells[target], _notebook.Cells[index]);
+        _notebook.IsDirty = true;
+    }
+
+    private string PriorContextFor(int cellIndex)
+    {
+        return string.Join("\n", _notebook.Cells
+            .Take(cellIndex)
+            .Where(c => c.CellType == NotebookCellType.Code)
+            .Select(c => c.Language == NotebookCellLanguage.Sql
+                ? $"import duckdb; duckdb.sql(\"\"\"{c.Source}\"\"\")"
+                : c.Source));
+    }
+
+    private async Task OnFileSelectedAsync(InputFileChangeEventArgs args)
+    {
+        try
+        {
+            using var stream = args.File.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024);
+            using var reader = new StreamReader(stream);
+            var json = await reader.ReadToEndAsync();
+            _notebook = NotebookSerializer.Deserialize(json);
+            _notebook.IsDirty = false;
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to open file: {ex.Message}";
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        try
+        {
+            var json = NotebookSerializer.Serialize(_notebook);
+            var filename = (_notebook.Title.Trim().Length > 0 ? _notebook.Title.Trim() : "notebook") + ".ipynb";
+            await JS.InvokeVoidAsync("downloadFile", filename, json);
+            _notebook.IsDirty = false;
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to save: {ex.Message}";
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (HasKernel && !string.IsNullOrEmpty(_nodeName))
+        {
+            try { await KernelService.DeleteKernelAsync(_nodeName, _kernelId!); }
+            catch { /* best effort */ }
+        }
+    }
+
+    private static string StatusBadgeClass(KernelStatus status) => status switch
+    {
+        KernelStatus.Idle                                 => "bg-success",
+        KernelStatus.Busy                                 => "bg-warning text-dark",
+        KernelStatus.Starting or KernelStatus.Restarting => "bg-info",
+        KernelStatus.Dead                                 => "bg-danger",
+        _                                                 => "bg-secondary"
+    };
+}
