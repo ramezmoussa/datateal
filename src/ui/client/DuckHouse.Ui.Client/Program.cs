@@ -10,4 +10,6 @@ builder.Services.AddHttpClient<INodeService, NodeService>(
 builder.Services.AddHttpClient<IKernelService, KernelService>(
     client => client.BaseAddress = new Uri(builder.HostEnvironment.BaseAddress));
 
+builder.Services.AddScoped<IThemeService, ThemeService>();
+
 await builder.Build().RunAsync();

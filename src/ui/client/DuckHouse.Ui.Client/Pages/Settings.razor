@@ -1,0 +1,58 @@
+@page "/settings"
+@using DuckHouse.Ui.Client.Services
+@inject IThemeService ThemeService
+
+<PageTitle>Settings — DuckHouse</PageTitle>
+
+<div class="mb-4">
+    <h2 class="mb-0">Settings</h2>
+</div>
+
+<div class="card" style="max-width: 480px;">
+    <div class="card-body">
+        <h6 class="card-subtitle mb-3 text-body-secondary">Appearance</h6>
+
+        <label class="form-label small fw-semibold">Theme</label>
+        <div class="btn-group d-flex" role="group" aria-label="Theme selection">
+            <button type="button"
+                    class="btn @(_theme == AppTheme.Light ? "btn-primary" : "btn-outline-secondary")"
+                    @onclick="() => SetThemeAsync(AppTheme.Light)">
+                <SvgIcon Icon="LucideIcon.Sun" />
+                Light
+            </button>
+            <button type="button"
+                    class="btn @(_theme == AppTheme.Dark ? "btn-primary" : "btn-outline-secondary")"
+                    @onclick="() => SetThemeAsync(AppTheme.Dark)">
+                <SvgIcon Icon="LucideIcon.Moon" />
+                Dark
+            </button>
+            <button type="button"
+                    class="btn @(_theme == AppTheme.Auto ? "btn-primary" : "btn-outline-secondary")"
+                    @onclick="() => SetThemeAsync(AppTheme.Auto)">
+                <SvgIcon Icon="LucideIcon.Monitor" />
+                Auto
+            </button>
+        </div>
+        <div class="form-text mt-2">
+            @if (_theme == AppTheme.Auto)
+            {
+                <span>Follows your system or browser color scheme preference.</span>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private AppTheme _theme = AppTheme.Auto;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _theme = await ThemeService.GetThemeAsync();
+    }
+
+    private async Task SetThemeAsync(AppTheme theme)
+    {
+        _theme = theme;
+        await ThemeService.SetThemeAsync(theme);
+    }
+}
