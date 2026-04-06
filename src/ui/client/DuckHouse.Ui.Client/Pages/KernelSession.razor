@@ -9,18 +9,24 @@
 <PageTitle>Kernel Session — DuckHouse</PageTitle>
 
 <Breadcrumb Style="margin-bottom: 12px;">
-    <BreadcrumbItem OnClick="@(() => Navigation.NavigateTo("/nodes"))" Href="">Nodes</BreadcrumbItem>
-    <BreadcrumbItem OnClick="@(() => Navigation.NavigateTo($"/nodes/{Name}/kernels"))" Href="">@Name</BreadcrumbItem>
+    <BreadcrumbItem Href="/nodes">Nodes</BreadcrumbItem>
+    <BreadcrumbItem Href="@($"/nodes/{Name}/kernels")">@Name</BreadcrumbItem>
     <BreadcrumbItem>@ShortId</BreadcrumbItem>
 </Breadcrumb>
 
-<Flex Justify="@("space-between")" Align="FlexAlign.Center" Style="margin-bottom: 12px;">
-    <Space Align="SpaceAlign.Center" Size="@("small")">
-        <SpaceItem><Icon Type="@IconType.Outline.Code" /></SpaceItem>
-        <SpaceItem><h2 style="margin: 0;">Kernel Session</h2></SpaceItem>
+<Flex Justify="FlexJustify.SpaceBetween" Align="FlexAlign.Center" Style="margin-bottom: 12px;">
+    <Space Align="SpaceAlign.End" Size="SpaceSize.Small">
+        <SpaceItem>
+            <Icon Height="24px" Width="24px" Type="@IconType.Outline.Code" />
+        </SpaceItem>
+        <SpaceItem>
+            <h2 style="margin: 0;">Kernel Session</h2>
+        </SpaceItem>
         @if (_kernel is not null)
         {
-            <SpaceItem><Tag Color="@StatusTagColor(_kernel.Status)">@_kernel.Status</Tag></SpaceItem>
+            <SpaceItem>
+                <Tag Color="@StatusTagColor(_kernel.Status)">@_kernel.Status</Tag>
+            </SpaceItem>
         }
     </Space>
     <Space>
@@ -53,7 +59,7 @@
                 <Button Danger Type="ButtonType.Primary" Size="ButtonSize.Small"
                         Loading="_actionBusy" Disabled="_actionBusy"
                         Icon="@IconType.Outline.Delete">
-                    Delete
+                    Delete...
                 </Button>
             </Popconfirm>
         </SpaceItem>

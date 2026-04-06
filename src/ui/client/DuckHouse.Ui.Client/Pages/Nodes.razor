@@ -5,10 +5,14 @@
 
 <PageTitle>Nodes — DuckHouse</PageTitle>
 
-<Flex Justify="@("space-between")" Align="FlexAlign.Center" Style="margin-bottom: 24px;">
-    <Space Align="SpaceAlign.Center" Size="@("small")">
-        <SpaceItem><Icon Type="@IconType.Outline.CloudServer" /></SpaceItem>
-        <SpaceItem><h2 style="margin: 0;">Nodes</h2></SpaceItem>
+<Flex Justify="FlexJustify.SpaceBetween" Align="FlexAlign.Center" Style="margin-bottom: 24px;" Gap="FlexGap.Small">
+    <Space Align="SpaceAlign.End" Size="SpaceSize.Middle">
+        <SpaceItem>
+            <Icon Height="24px" Width="24px" Type="@IconType.Outline.CloudServer" />
+        </SpaceItem>
+        <SpaceItem>
+            <h2 style="margin: 0;">Nodes</h2>
+        </SpaceItem>
     </Space>
     <Space>
         <SpaceItem>
@@ -73,7 +77,9 @@ else
                         <Button Size="ButtonSize.Small" Type="ButtonType.Primary"
                                 Loading="@(_busy == name)" Disabled="@(_busy == name)"
                                 Icon="@IconType.Outline.PlayCircle"
-                                OnClick="@(() => StartNodeAsync(name))" />
+                                OnClick="@(() => StartNodeAsync(name))">
+                            Start
+                        </Button>
                     </SpaceItem>
                 }
                 @if (context.State is NodeState.Running)
@@ -83,7 +89,9 @@ else
                         <Button Size="ButtonSize.Small"
                                 Loading="@(_busy == name)" Disabled="@(_busy == name)"
                                 Icon="@IconType.Outline.PauseCircle"
-                                OnClick="@(() => StopNodeAsync(name))" />
+                                OnClick="@(() => StopNodeAsync(name))">
+                            Stop
+                        </Button>
                     </SpaceItem>
                 }
                 @{
@@ -99,7 +107,9 @@ else
                                 OnConfirm="@(() => RemoveNodeAsync(context.Name))">
                         <Button Size="ButtonSize.Small" Danger Type="ButtonType.Primary"
                                 Loading="@nodeBusy" Disabled="@(nodeBusy || (_busy is not null && _busy != nodeName))"
-                                Icon="@IconType.Outline.Delete" />
+                                Icon="@IconType.Outline.Delete">
+                            Remove...
+                        </Button>
                     </Popconfirm>
                 </SpaceItem>
             </Space>

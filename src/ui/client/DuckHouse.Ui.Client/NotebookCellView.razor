@@ -11,14 +11,20 @@
             <span style="color: var(--ant-color-primary); font-family: monospace; font-size: 0.875rem; white-space: nowrap;">In [@(Cell.ExecutionCount?.ToString() ?? " ")]:</span>
         }
 
-        <select style="padding: 2px 6px; border: 1px solid var(--ant-color-border); border-radius: 6px; font-size: 0.75rem; height: auto;"
-                disabled="@Cell.IsExecuting"
-                value="@CellTypeValue"
-                @onchange="OnCellTypeChanged">
-            <option value="python">Python</option>
-            <option value="sql">SQL</option>
-            <option value="markdown">Markdown</option>
-        </select>
+        <Select TItemValue="string"
+                TItem="string"
+                Value="@CellTypeValue"
+                ValueChanged="OnCellTypeChanged"
+                Disabled="@Cell.IsExecuting"
+                Bordered="false"
+                Size="InputSize.Small"
+                Style="min-width: 90px;">
+            <SelectOptions>
+                <SelectOption TItemValue="string" TItem="string" Value="@("python")" Label="Python" />
+                <SelectOption TItemValue="string" TItem="string" Value="@("sql")" Label="SQL" />
+                <SelectOption TItemValue="string" TItem="string" Value="@("markdown")" Label="Markdown" />
+            </SelectOptions>
+        </Select>
 
         <Space Style="margin-left: auto;" Size="@("4")">
             @if (Cell.CellType == NotebookCellType.Code)
@@ -36,7 +42,7 @@
                 else
                 {
                     <SpaceItem>
-                        <Tooltip Title="Run cell">
+                        <Tooltip Title="Run cell (Ctrl+Enter)">
                             <Button Size="ButtonSize.Small" Type="ButtonType.Primary"
                                     Disabled="@(!HasKernel)"
                                     Icon="@IconType.Outline.PlayCircle"
@@ -164,34 +170,54 @@
     {
         @if (Cell.IsExecuting || Cell.DurationMs.HasValue)
         {
-            <div style="display: flex; align-items: flex-end; gap: 8px; margin-bottom: 4px;">
-                <span style="visibility: hidden; font-family: monospace; font-size: 0.875rem; white-space: nowrap;">In [ ]:</span>
+            <Space Size="SpaceSize.Small" Align="SpaceAlign.End">
+                <SpaceItem>
+                    <span style="visibility: hidden; font-family: monospace; font-size: 0.875rem; white-space: nowrap;">In [ ]:</span>
+                </SpaceItem>
                 @if (!Cell.IsExecuting)
                 {
                     @if (Cell.Error is not null)
                     {
-                        <Icon Type="@IconType.Outline.CloseCircle" Style="color: var(--ant-color-error);" />
+                        <SpaceItem>
+                            <Text Type="TextElementType.Danger">
+                                <Icon Type="@IconType.Outline.CloseCircle" />
+                            </Text>
+                        </SpaceItem>
                     }
                     else if (HasStderr)
                     {
-                        <Icon Type="@IconType.Outline.Warning" Style="color: var(--ant-color-warning);" />
+                        <SpaceItem>
+                            <Text Type="TextElementType.Warning">
+                                <Icon Type="@IconType.Outline.Warning" />
+                            </Text>
+                        </SpaceItem>
                     }
                     else
                     {
-                        <Icon Type="@IconType.Outline.CheckCircle" Style="color: var(--ant-color-success);" />
+                        <SpaceItem>
+                            <Text Type="TextElementType.Success">
+                                <Icon Type="@IconType.Outline.CheckCircle" />
+                            </Text>
+                        </SpaceItem>
                     }
                 }
                 else
                 {
-                    <Icon Type="@IconType.Outline.Sync" Style="color: var(--ant-color-text-secondary);" />
+                    <SpaceItem>
+                        <Icon Type="@IconType.Outline.Sync" Spin />
+                    </SpaceItem>
                 }
-                <ExecutionTimer IsRunning="@Cell.IsExecuting" DurationMs="@(Cell.IsExecuting ? null : Cell.DurationMs)" />
+                <SpaceItem>
+                    <ExecutionTimer IsRunning="@Cell.IsExecuting" DurationMs="@(Cell.IsExecuting ? null : Cell.DurationMs)" />
+                </SpaceItem>
                 @if (!Cell.IsExecuting && ExtractRowCount() is { } rowCount)
                 {
                     bool atCap = rowCount == DataFrameOutput.RowCap;
-                    <span style="color: var(--ant-color-text-secondary); font-size: 0.875rem;">· @rowCount.ToString("N0")@(atCap ? "+" : "") rows</span>
+                    <SpaceItem>
+                        <span style="color: var(--ant-color-text-secondary); font-size: 0.875rem;">· @rowCount.ToString("N0")@(atCap ? "+" : "") rows</span>
+                    </SpaceItem>
                 }
-            </div>
+            </Space>
         }
 
         @foreach (var output in Cell.Outputs)
@@ -282,10 +308,8 @@
         ? "markdown"
         : Cell.Language == NotebookCellLanguage.Sql ? "sql" : "python";
 
-    private async Task OnCellTypeChanged(ChangeEventArgs e)
+    private async Task OnCellTypeChanged(string value)
     {
-        var value = e.Value?.ToString();
-
         var newType = value == "markdown" ? NotebookCellType.Markdown : NotebookCellType.Code;
         var newLang = value == "sql" ? NotebookCellLanguage.Sql : NotebookCellLanguage.Python;
 

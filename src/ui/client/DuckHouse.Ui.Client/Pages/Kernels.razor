@@ -7,14 +7,18 @@
 <PageTitle>Kernels — DuckHouse</PageTitle>
 
 <Breadcrumb Style="margin-bottom: 12px;">
-    <BreadcrumbItem OnClick="@(() => Navigation.NavigateTo("/nodes"))" Href="">Nodes</BreadcrumbItem>
+    <BreadcrumbItem Href="/nodes">Nodes</BreadcrumbItem>
     <BreadcrumbItem>@Name — Kernels</BreadcrumbItem>
 </Breadcrumb>
 
-<Flex Justify="@("space-between")" Align="FlexAlign.Center" Style="margin-bottom: 24px;">
-    <Space Align="SpaceAlign.Center" Size="@("small")">
-        <SpaceItem><Icon Type="@IconType.Outline.Code" /></SpaceItem>
-        <SpaceItem><h2 style="margin: 0;">Kernels</h2></SpaceItem>
+<Flex Justify="FlexJustify.SpaceBetween" Align="FlexAlign.Center" Style="margin-bottom: 24px;">
+    <Space Align="SpaceAlign.End" Size="SpaceSize.Middle">
+        <SpaceItem>
+            <Icon Height="24px" Width="24px" Type="@IconType.Outline.Code" />
+        </SpaceItem>
+        <SpaceItem>
+            <h2 style="margin: 0;">Kernels</h2>
+        </SpaceItem>
     </Space>
     <Space>
         <SpaceItem>
@@ -84,7 +88,9 @@ else
                         <Button Size="ButtonSize.Small" Type="ButtonType.Primary"
                                 Loading="@busy" Disabled="@busy"
                                 Icon="@IconType.Outline.Sync"
-                                OnClick="@(() => RestartKernelAsync(id))" />
+                                OnClick="@(() => RestartKernelAsync(id))">
+                            Restart
+                        </Button>
                     </SpaceItem>
                 }
                 @if (context.Status == KernelStatus.Busy)
@@ -93,7 +99,9 @@ else
                         <Button Size="ButtonSize.Small"
                                 Loading="@busy" Disabled="@busy"
                                 Icon="@IconType.Outline.PauseCircle"
-                                OnClick="@(() => InterruptKernelAsync(id))" />
+                                OnClick="@(() => InterruptKernelAsync(id))">
+                            Interrupt
+                        </Button>
                     </SpaceItem>
                 }
                 <SpaceItem>
@@ -105,7 +113,9 @@ else
                                 OnConfirm="@(() => DeleteKernelAsync(id))">
                         <Button Size="ButtonSize.Small" Danger Type="ButtonType.Primary"
                                 Loading="@busy" Disabled="@(busy || (_busy is not null && _busy != id))"
-                                Icon="@IconType.Outline.Delete" />
+                                Icon="@IconType.Outline.Delete">
+                            Delete...
+                        </Button>
                     </Popconfirm>
                 </SpaceItem>
             </Space>

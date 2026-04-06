@@ -12,9 +12,11 @@
 
 <PageTitle>Notebook — DuckHouse</PageTitle>
 
-<Flex Justify="@("space-between")" Align="FlexAlign.Center" Style="margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
-    <Space Align="SpaceAlign.Center" Size="@("small")">
-        <SpaceItem><Icon Type="@IconType.Outline.FileText" /></SpaceItem>
+<Flex Justify="FlexJustify.SpaceBetween" Align="FlexAlign.Center" Style="margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+    <Space Align="SpaceAlign.End" Size="SpaceSize.Middle">
+        <SpaceItem>
+            <Icon Height="24px" Width="24px" Type="@IconType.Outline.FileText" />
+        </SpaceItem>
         <SpaceItem>
             <h2 style="margin: 0;">
                 @if (_editingTitle)
@@ -35,7 +37,7 @@
     </Space>
 
     @* File toolbar *@
-    <Space Size="@("small")" Style="flex-wrap: wrap;">
+    <Space Size="SpaceSize.Small" Style="flex-wrap: wrap;">
         <SpaceItem>
             <Button OnClick="OpenFileDialogAsync" Icon="@IconType.Outline.FolderOpen">
                 Open
@@ -49,7 +51,7 @@
         </SpaceItem>
         <SpaceItem><Divider Type="DividerType.Vertical" /></SpaceItem>
         <SpaceItem>
-            <Button Type="ButtonType.Primary" Size="ButtonSize.Small"
+            <Button Type="ButtonType.Primary"
                     Disabled="@(!HasKernel || _runningAll)"
                     Loading="_runningAll"
                     Icon="@IconType.Outline.PlayCircle"
@@ -58,16 +60,14 @@
             </Button>
         </SpaceItem>
         <SpaceItem>
-            <Button Size="ButtonSize.Small"
-                    Disabled="@(!HasKernel || !AnyExecuting)"
+            <Button Disabled="@(!HasKernel || !AnyExecuting)"
                     Icon="@IconType.Outline.PauseCircle"
                     OnClick="InterruptAsync">
                 Interrupt
             </Button>
         </SpaceItem>
         <SpaceItem>
-            <Button Size="ButtonSize.Small"
-                    Disabled="@(!_notebook.Cells.Any())"
+            <Button Disabled="@(!_notebook.Cells.Any())"
                     Icon="@IconType.Outline.Clear"
                     OnClick="ClearAllOutputs">
                 Clear Outputs
@@ -77,9 +77,13 @@
 </Flex>
 
 @* Kernel connection toolbar *@
-<Space Align="SpaceAlign.Center" Style="margin-bottom: 12px; flex-wrap: wrap;" Size="@("small")">
-    <SpaceItem><Icon Type="@IconType.Outline.Api" /></SpaceItem>
-    <SpaceItem><span style="font-size: 0.875rem; color: var(--ant-color-text-secondary);">Node:</span></SpaceItem>
+<Space Align="SpaceAlign.Center" Style="margin-bottom: 12px; flex-wrap: wrap;" Size="SpaceSize.Small">
+    <SpaceItem>
+        <Icon Type="@IconType.Outline.CloudServer" />
+    </SpaceItem>
+    <SpaceItem>
+        <span style="font-size: 0.875rem; color: var(--ant-color-text-secondary);">Node:</span>
+    </SpaceItem>
     @if (_loadingNodes)
     {
         <SpaceItem><Spin Size="SpinSize.Small" /></SpaceItem>
@@ -87,15 +91,19 @@
     else
     {
         <SpaceItem>
-            <select style="padding: 4px 8px; border: 1px solid var(--ant-color-border); border-radius: 6px; font-size: 0.875rem;"
-                    disabled="@HasKernel"
-                    @bind="_nodeName">
-                <option value="">— select node —</option>
-                @foreach (var node in _nodes.Where(n => n.State == NodeState.Running))
-                {
-                    <option value="@node.Name">@node.Name</option>
-                }
-            </select>
+            <SimpleSelect Value="@(_nodeName ?? string.Empty)"
+                          OnSelectedItemChanged="@((string v) => _nodeName = string.IsNullOrEmpty(v) ? null : v)"
+                          Placeholder="— select node —"
+                          Disabled="@HasKernel"
+                          AllowClear
+                          Style="min-width: 150px;">
+                <SelectOptions>
+                    @foreach (var node in _nodes.Where(n => n.State == NodeState.Running))
+                    {
+                        <SimpleSelectOption Value="@node.Name" Label="@node.Name" />
+                    }
+                </SelectOptions>
+            </SimpleSelect>
         </SpaceItem>
     }
 
