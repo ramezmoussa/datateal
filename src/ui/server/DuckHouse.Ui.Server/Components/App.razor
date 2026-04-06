@@ -21,6 +21,7 @@
             if (effective === 'dark') {
                 var link = document.getElementById('ant-theme-css');
                 if (link) link.href = '_content/AntDesign/css/ant-design-blazor.dark.css';
+                document.documentElement.classList.add('ant-dark');
             }
         })();
     </script>
@@ -45,6 +46,7 @@
                     ? '_content/AntDesign/css/ant-design-blazor.dark.css'
                     : '_content/AntDesign/css/ant-design-blazor.css';
             }
+            document.documentElement.classList.toggle('ant-dark', effective === 'dark');
             var monacoTheme = effective === 'dark' ? 'vs-dark' : 'vs';
             if (typeof monaco !== 'undefined') {
                 monaco.editor.setTheme(monacoTheme);

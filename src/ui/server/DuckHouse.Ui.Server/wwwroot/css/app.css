@@ -1,48 +1,8 @@
-/* Lucide icons */
-.lucide {
-    width: 16px;
-    height: 16px;
-}
-
-.lucide-sm .lucide {
-    width: 14px;
-    height: 14px;
-}
-
-.ant-btn .lucide {
-    margin-top: 2.5px;
-    margin-bottom: 1.75px;
-    margin-left: 1px;
-    margin-right: 1px;
-    vertical-align: text-bottom;
-}
-
 /* Kernel session REPL */
 .kernel-pre {
     white-space: pre-wrap;
     word-break: break-word;
     margin-bottom: 0;
-}
-
-/* DataFrame table (uses native <table> + Virtualize) */
-.df-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.8125rem;
-}
-
-.df-table th,
-.df-table td {
-    padding: 4px 8px;
-    border: 1px solid var(--ant-color-border);
-    white-space: nowrap;
-}
-
-.df-table th {
-    font-weight: 600;
-    position: sticky;
-    top: 0;
-    z-index: 1;
 }
 
 /* Monaco editor layout helpers */
@@ -52,17 +12,18 @@
 }
 
 .editor-cell {
-    border: 1px solid var(--ant-color-border);
-    border-radius: 6px;
-    padding: 4px;
+    border: 1px solid #d9d9d9;
     margin-bottom: 4px;
 }
 
 .editor-cell-mb2 {
-    border: 1px solid var(--ant-color-border);
-    border-radius: 6px;
-    padding: 4px;
+    border: 1px solid #d9d9d9;
     margin-bottom: 8px;
+}
+
+html.ant-dark .editor-cell,
+html.ant-dark .editor-cell-mb2 {
+    border-color: #434343;
 }
 
 /* Blazor error component */
@@ -80,7 +41,7 @@
 }
 
 #blazor-error-ui a {
-    color: var(--ant-color-error-text);
+    color: #ff4d4f;
     font-weight: 600;
     margin-left: 8px;
     text-decoration: underline;
