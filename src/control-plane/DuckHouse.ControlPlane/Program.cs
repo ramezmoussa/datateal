@@ -1,4 +1,5 @@
 using DuckHouse.ControlPlane.Application;
+using DuckHouse.ControlPlane.Application.InactivityEviction;
 using DuckHouse.ControlPlane.Endpoints;
 using DuckHouse.ControlPlane.Infrastructure;
 using System.Text.Json.Serialization;
@@ -8,6 +9,9 @@ var builder = WebApplication.CreateBuilder(args);
 builder.AddServiceDefaults();
 
 builder.Services.AddOpenApi();
+
+builder.Services.Configure<InactivityEvictionOptions>(
+    builder.Configuration.GetSection("InactivityEviction"));
 
 builder.Services.AddApplicationServices();
 builder.Services.AddInfrastructureServices(builder.Configuration);
