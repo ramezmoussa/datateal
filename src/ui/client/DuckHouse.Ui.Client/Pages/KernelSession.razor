@@ -26,7 +26,7 @@
         }
     </div>
     <div class="d-flex gap-2">
-        @if (_kernel?.Status == KernelStatus.Busy)
+        @if (_executing)
         {
             <Button Color="ButtonColor.Warning" Size="ButtonSize.Small"
                     Loading="_actionBusy" Disabled="_actionBusy"
@@ -166,7 +166,15 @@ else
             </div>
             <div class="d-flex gap-2 mb-1 align-items-start">
                 <span class="invisible font-monospace small text-nowrap pt-1">In [ ]:</span>
-                <ExecutionTimer IsRunning="true" />
+                <div class="d-flex align-items-center gap-2">
+                    <ExecutionTimer IsRunning="true" />
+                    <Button Color="ButtonColor.Warning" Size="ButtonSize.ExtraSmall"
+                            Loading="_actionBusy" Disabled="_actionBusy"
+                            @onclick="InterruptAsync">
+                        <SvgIcon Icon="LucideIcon.CircleStop" />
+                        Interrupt
+                    </Button>
+                </div>
             </div>
         }
     </div>
