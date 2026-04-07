@@ -77,6 +77,16 @@ html.ant-dark .editor-cell-mb2 {
     border-color: #434343;
 }
 
+.markdown-cell {
+    background: #fff;
+    border: 1px solid #d9d9d9;
+}
+
+html.ant-dark .markdown-cell {
+    background: #1e1e1e;
+    border: 1px solid #434343;
+}
+
 /* Blazor error component */
 #blazor-error-ui {
     bottom: 0;
