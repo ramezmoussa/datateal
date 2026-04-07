@@ -51,20 +51,23 @@
         </SpaceItem>
         <SpaceItem><Divider Type="DividerType.Vertical" /></SpaceItem>
         <SpaceItem>
-            <Button Type="ButtonType.Primary"
-                    Disabled="@(!HasKernel || _runningAll)"
-                    Loading="_runningAll"
-                    Icon="@IconType.Outline.PlayCircle"
-                    OnClick="RunAllAsync">
-                Run all
-            </Button>
-        </SpaceItem>
-        <SpaceItem>
-            <Button Disabled="@(!HasKernel || !AnyExecuting)"
-                    Icon="@IconType.Outline.PauseCircle"
-                    OnClick="InterruptAsync">
-                Interrupt
-            </Button>
+            @if (AnyExecuting)
+            {
+                <Button Disabled="@(!HasKernel || !AnyExecuting)"
+                        Icon="@IconType.Outline.Loading"
+                        OnClick="InterruptAsync">
+                    Interrupt
+                </Button>
+            }
+            else
+            {
+                <Button Type="ButtonType.Primary"
+                        Disabled="@(!HasKernel)"
+                        Icon="@IconType.Outline.PlayCircle"
+                        OnClick="RunAllAsync">
+                    Run all
+                </Button>
+            }
         </SpaceItem>
         <SpaceItem>
             <Button Disabled="@(!_notebook.Cells.Any())"
@@ -184,7 +187,6 @@
     private bool _loadingNodes;
     private bool _connecting;
     private bool _disconnecting;
-    private bool _runningAll;
     private string? _error;
     private bool _editingTitle;
     private string _editingTitleValue = "";
@@ -306,21 +308,13 @@
 
     private async Task RunAllAsync()
     {
-        _runningAll = true;
-        try
-        {
-            var cells = _notebook.Cells.Where(c => c.CellType == NotebookCellType.Code).ToList();
-            foreach (var c in cells) c.ClearOutput();
+        var cells = _notebook.Cells.Where(c => c.CellType == NotebookCellType.Code).ToList();
+        foreach (var c in cells) c.ClearOutput();
 
-            foreach (var cell in cells)
-            {
-                await ExecuteCellAsync(cell);
-                if (cell.Error is not null) break;
-            }
-        }
-        finally
+        foreach (var cell in cells)
         {
-            _runningAll = false;
+            await ExecuteCellAsync(cell);
+            if (cell.Error is not null) break;
         }
     }
 
@@ -333,18 +327,10 @@
 
         foreach (var c in cells) c.ClearOutput();
 
-        _runningAll = true;
-        try
+        foreach (var c in cells)
         {
-            foreach (var c in cells)
-            {
-                await ExecuteCellAsync(c);
-                if (c.Error is not null) break;
-            }
-        }
-        finally
-        {
-            _runningAll = false;
+            await ExecuteCellAsync(c);
+            if (c.Error is not null) break;
         }
     }
 
@@ -357,18 +343,10 @@
 
         foreach (var c in cells) c.ClearOutput();
 
-        _runningAll = true;
-        try
+        foreach (var c in cells)
         {
-            foreach (var c in cells)
-            {
-                await ExecuteCellAsync(c);
-                if (c.Error is not null) break;
-            }
-        }
-        finally
-        {
-            _runningAll = false;
+            await ExecuteCellAsync(c);
+            if (c.Error is not null) break;
         }
     }
 
