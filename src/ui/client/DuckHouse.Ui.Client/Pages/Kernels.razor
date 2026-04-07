@@ -55,7 +55,7 @@ else if (_kernels.Count == 0)
 }
 else
 {
-    <Table TItem="KernelInfo" DataSource="@_kernels" Bordered>
+    <Table TItem="KernelInfo" DataSource="@_kernels" Bordered PageSize="int.MaxValue" PaginationPosition="none">
         <PropertyColumn Property="k => k.Id" Title="ID">
             <span style="font-family: monospace; font-size: 0.875rem;">@context.Id</span>
         </PropertyColumn>

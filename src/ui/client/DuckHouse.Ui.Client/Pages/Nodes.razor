@@ -50,7 +50,7 @@ else if (_nodes.Count == 0)
 }
 else
 {
-    <Table TItem="NodeInfo" DataSource="@_nodes" Bordered>
+    <Table TItem="NodeInfo" DataSource="@_nodes" Bordered PageSize="int.MaxValue" PaginationPosition="none">
         <PropertyColumn Property="n => n.Name" Title="Name">
             <span style="font-weight: 600;">@context.Name</span>
         </PropertyColumn>
