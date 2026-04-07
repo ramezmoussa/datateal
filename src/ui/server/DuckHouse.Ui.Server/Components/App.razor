@@ -11,7 +11,7 @@
     <link rel="stylesheet" href="@Assets["css/app.css"]" />
     <link rel="stylesheet" href="@Assets["_content/DuckHouse.Ui.Components/defaults.css"]" />
     <ImportMap/>
-    <HeadOutlet @rendermode="InteractiveWebAssembly"/>
+    <HeadOutlet @rendermode="_renderMode"/>
     <script>
         // Apply stored theme immediately to prevent flash of unstyled content.
         (function () {
@@ -28,7 +28,7 @@
 </head>
 
 <body>
-    <Routes @rendermode="InteractiveWebAssembly"/>
+    <Routes @rendermode="_renderMode"/>
     <script src="_content/AntDesign/js/ant-design-blazor.js"></script>
     <script src="_content/BlazorMonaco/jsInterop.js"></script>
     <script src="_content/BlazorMonaco/lib/monaco-editor/min/vs/loader.js"></script>
@@ -97,3 +97,7 @@
 </body>
 
 </html>
+
+@code {
+    private readonly IComponentRenderMode _renderMode = new InteractiveWebAssemblyRenderMode(prerender: false);
+}
