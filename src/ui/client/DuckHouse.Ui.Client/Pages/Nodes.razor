@@ -26,7 +26,7 @@
             <Button Type="ButtonType.Primary"
                     Icon="@IconType.Outline.Plus"
                     OnClick="OpenCreateDrawer">
-                New Node
+                New node
             </Button>
         </SpaceItem>
     </Space>
@@ -117,7 +117,7 @@ else
     </Table>
 }
 
-<Drawer @bind-Visible="_createOpen" Title='("New Node")' Placement="DrawerPlacement.Right" Width="400" OnClose="CloseCreateDrawer">
+<Drawer @bind-Visible="_createOpen" Title='("New node")' Placement="DrawerPlacement.Right" Width="400" OnClose="CloseCreateDrawer">
     <div style="margin-bottom: 16px;">
         <label style="display: block; font-weight: 600; margin-bottom: 4px;">Name</label>
         <Input @bind-Value="_createName" Placeholder="my-node" />
