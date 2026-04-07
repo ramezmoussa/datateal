@@ -13,7 +13,7 @@
 
         @if (Cell.CellType == NotebookCellType.Code)
         {
-            <Space Size="SpaceSize.Small">
+            <Space Size="SpaceSize.Small" Align="SpaceAlign.End">
                 @if (Cell.IsExecuting)
                 {
                     <SpaceItem>
@@ -23,6 +23,7 @@
                                 Interrupt
                         </Button>
                     </SpaceItem>
+                    
                 }
                 else
                 {
@@ -57,6 +58,48 @@
                             </Unbound>
                         </DropdownButton>
                     </SpaceItem>
+                }
+                @if (Cell.IsExecuting || Cell.DurationMs.HasValue)
+                {
+                    @if (!Cell.IsExecuting)
+                    {
+                        @if (Cell.Error is not null)
+                        {
+                            <SpaceItem>
+                                <Text Type="TextElementType.Danger">
+                                    <Icon Type="@IconType.Outline.CloseCircle" />
+                                </Text>
+                            </SpaceItem>
+                        }
+                        else if (HasStderr)
+                        {
+                            <SpaceItem>
+                                <Text Type="TextElementType.Warning">
+                                    <Icon Type="@IconType.Outline.Warning" />
+                                </Text>
+                            </SpaceItem>
+                        }
+                        else
+                        {
+                            <SpaceItem>
+                                <Text Type="TextElementType.Success">
+                                    <Icon Type="@IconType.Outline.CheckCircle" />
+                                </Text>
+                            </SpaceItem>
+                        }
+                    }
+                    <SpaceItem>
+                        <Text Type="TextElementType.Secondary">
+                            <ExecutionTimer IsRunning="@Cell.IsExecuting" DurationMs="@(Cell.IsExecuting ? null : Cell.DurationMs)" />
+                        </Text>
+                    </SpaceItem>
+                    @if (!Cell.IsExecuting && ExtractRowCount() is { } rowCount)
+                    {
+                        bool atCap = rowCount == DataFrameOutput.RowCap;
+                        <SpaceItem>
+                            <Text Type="TextElementType.Secondary" Style="font-size: 0.875rem;">· @rowCount.ToString("N0")@(atCap ? "+" : "") rows</Text>
+                        </SpaceItem>
+                    }
                 }
             </Space>
         }
@@ -188,60 +231,6 @@
     @* ── Outputs (code cells only) ── *@
     @if (Cell.CellType == NotebookCellType.Code)
     {
-        @if (Cell.IsExecuting || Cell.DurationMs.HasValue)
-        {
-            <Space Size="SpaceSize.Small" Align="SpaceAlign.End">
-                <SpaceItem>
-                    <span style="visibility: hidden; font-family: monospace; font-size: 0.875rem; white-space: nowrap;">In [ ]:</span>
-                </SpaceItem>
-                @if (!Cell.IsExecuting)
-                {
-                    @if (Cell.Error is not null)
-                    {
-                        <SpaceItem>
-                            <Text Type="TextElementType.Danger">
-                                <Icon Type="@IconType.Outline.CloseCircle" />
-                            </Text>
-                        </SpaceItem>
-                    }
-                    else if (HasStderr)
-                    {
-                        <SpaceItem>
-                            <Text Type="TextElementType.Warning">
-                                <Icon Type="@IconType.Outline.Warning" />
-                            </Text>
-                        </SpaceItem>
-                    }
-                    else
-                    {
-                        <SpaceItem>
-                            <Text Type="TextElementType.Success">
-                                <Icon Type="@IconType.Outline.CheckCircle" />
-                            </Text>
-                        </SpaceItem>
-                    }
-                }
-                else
-                {
-                    <SpaceItem>
-                        <Icon Type="@IconType.Outline.Sync" Spin />
-                    </SpaceItem>
-                }
-                <SpaceItem>
-                    <Text Type="TextElementType.Secondary">
-                        <ExecutionTimer IsRunning="@Cell.IsExecuting" DurationMs="@(Cell.IsExecuting ? null : Cell.DurationMs)" />
-                    </Text>
-                </SpaceItem>
-                @if (!Cell.IsExecuting && ExtractRowCount() is { } rowCount)
-                {
-                    bool atCap = rowCount == DataFrameOutput.RowCap;
-                    <SpaceItem>
-                        <Text Type="TextElementType.Secondary" Style="font-size: 0.875rem;">· @rowCount.ToString("N0")@(atCap ? "+" : "") rows</Text>
-                    </SpaceItem>
-                }
-            </Space>
-        }
-
         @foreach (var output in Cell.Outputs)
         {
             @if (output.Type == "stream")
