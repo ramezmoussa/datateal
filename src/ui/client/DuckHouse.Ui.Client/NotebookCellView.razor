@@ -11,63 +11,76 @@
             <span style="font-family: monospace; font-size: 0.875rem; white-space: nowrap;">In [@(Cell.ExecutionCount?.ToString() ?? " ")]:</span>
         }
 
-        <Select TItemValue="string"
-                TItem="string"
-                Value="@CellTypeValue"
-                ValueChanged="OnCellTypeChanged"
-                Disabled="@Cell.IsExecuting"
-                Bordered="false"
-                Size="InputSize.Small"
-                Style="min-width: 90px;">
-            <SelectOptions>
-                <SelectOption TItemValue="string" TItem="string" Value="@("python")" Label="Python" />
-                <SelectOption TItemValue="string" TItem="string" Value="@("sql")" Label="SQL" />
-                <SelectOption TItemValue="string" TItem="string" Value="@("markdown")" Label="Markdown" />
-            </SelectOptions>
-        </Select>
-
-        <Space Style="margin-left: auto;" Size="@("4")">
-            @if (Cell.CellType == NotebookCellType.Code)
-            {
+        @if (Cell.CellType == NotebookCellType.Code)
+        {
+            <Space Size="SpaceSize.Small">
                 @if (Cell.IsExecuting)
                 {
                     <SpaceItem>
-                        <Tooltip Title="Interrupt execution">
-                            <Button Size="ButtonSize.Small"
-                                    OnClick="OnInterrupt"
-                                    Icon="@IconType.Outline.PauseCircle" />
-                        </Tooltip>
+                        <Button Size="ButtonSize.Small"
+                                OnClick="OnInterrupt"
+                                Icon="@IconType.Outline.Stop">
+                                Interrupt
+                        </Button>
                     </SpaceItem>
                 }
                 else
                 {
                     <SpaceItem>
-                        <Tooltip Title="Run cell (Ctrl+Enter)">
-                            <Button Size="ButtonSize.Small" Type="ButtonType.Primary"
-                                    Disabled="@(!HasKernel)"
-                                    Icon="@IconType.Outline.PlayCircle"
-                                    OnClick="OnExecute" />
-                        </Tooltip>
-                    </SpaceItem>
-                    <SpaceItem>
-                        <Tooltip Title="Run above cells">
-                            <Button Size="ButtonSize.Small"
-                                    Disabled="@(!HasKernel || !CanMoveUp)"
-                                    Icon="@IconType.Outline.ArrowUp"
-                                    OnClick="OnRunAbove" />
-                        </Tooltip>
-                    </SpaceItem>
-                    <SpaceItem>
-                        <Tooltip Title="Run cell and below">
-                            <Button Size="ButtonSize.Small"
-                                    Disabled="@(!HasKernel)"
-                                    Icon="@IconType.Outline.VerticalAlignBottom"
-                                    OnClick="OnRunBelow" />
-                        </Tooltip>
+                        <DropdownButton Disabled="@(!HasKernel)"
+                                        OnClick="OnExecute"
+                                        Size="ButtonSize.Small"
+                                        Trigger="[Trigger.Click]"
+                                        Type="(ButtonType.Primary, ButtonType.Default)">
+                            <Overlay>
+                                <Menu>
+                                    <MenuItem Disabled="@(!HasKernel)" OnClick="OnExecute">
+                                        Run cell (Ctrl+Enter)
+                                    </MenuItem>
+                                    <MenuItem Disabled="@(!HasKernel || !CanMoveUp)" OnClick="OnRunAbove">
+                                        Run above cells
+                                    </MenuItem>
+                                    <MenuItem Disabled="@(!HasKernel)" OnClick="OnRunBelow">
+                                        Run cell and below
+                                    </MenuItem>
+                                </Menu>
+                            </Overlay>
+                            <Unbound>
+                                <Tooltip Title="Run cell (Ctrl+Enter)">
+                                    <Unbound Context="tooltip">
+                                        <span @ref="tooltip.Current">
+                                            <Icon Type="@IconType.Outline.PlayCircle" />
+                                            Run
+                                        </span>
+                                    </Unbound>
+                                </Tooltip>
+                            </Unbound>
+                        </DropdownButton>
                     </SpaceItem>
                 }
-            }
-            else
+            </Space>
+        }
+
+        <Space Style="margin-left: auto;">
+
+            <SpaceItem>
+                <Select TItemValue="string"
+                        TItem="string"
+                        Value="@CellTypeValue"
+                        ValueChanged="OnCellTypeChanged"
+                        Disabled="@Cell.IsExecuting"
+                        Bordered="false"
+                        Size="InputSize.Small"
+                        Style="min-width: 90px;">
+                    <SelectOptions>
+                        <SelectOption TItemValue="string" TItem="string" Value="@("python")" Label="Python" />
+                        <SelectOption TItemValue="string" TItem="string" Value="@("sql")" Label="SQL" />
+                        <SelectOption TItemValue="string" TItem="string" Value="@("markdown")" Label="Markdown" />
+                    </SelectOptions>
+                </Select>
+            </SpaceItem>
+
+            @if (Cell.CellType == NotebookCellType.Markdown)
             {
                 @if (Cell.IsEditingMarkdown)
                 {
@@ -107,9 +120,16 @@
                 </Tooltip>
             </SpaceItem>
             <SpaceItem>
+                <Tooltip Title="Clear cell output">
+                    <Button Size="ButtonSize.Small" Type="ButtonType.Default"
+                            Icon="@IconType.Outline.Clear"
+                            OnClick="Cell.ClearOutput" />
+                </Tooltip>
+            </SpaceItem>
+            <SpaceItem>
                 <Tooltip Title="Delete cell">
-                    <Button Size="ButtonSize.Small" Danger Type="ButtonType.Primary"
-                            Icon="@IconType.Outline.Close"
+                    <Button Size="ButtonSize.Small" Type="ButtonType.Default"
+                            Icon="@IconType.Outline.Delete"
                             OnClick="OnDelete" />
                 </Tooltip>
             </SpaceItem>
