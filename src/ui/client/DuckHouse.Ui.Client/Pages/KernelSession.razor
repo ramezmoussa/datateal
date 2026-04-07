@@ -275,6 +275,8 @@ else
         var codeToRun = _code;
         _code = "";
         _executingCode = codeToRun;
+        if (_kernel is not null)
+            _kernel = _kernel with { Status = KernelStatus.Busy };
         try
         {
             var handle = await KernelService.StartExecuteAsync(Name, KernelId, new ExecuteKernelRequest(codeToRun));

@@ -264,6 +264,8 @@
         cell.ClearOutput();
         cell.IsExecuting = true;
         _error = null;
+        if (_kernel is not null)
+            _kernel = _kernel with { Status = KernelStatus.Busy };
 
         string codeToRun = cell.Language == NotebookCellLanguage.Sql
             ? $"import duckdb; duckdb.sql(\"\"\"{cell.Source}\"\"\")"
