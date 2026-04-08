@@ -4,123 +4,175 @@ applyTo: src/ui/**
 
 # DuckHouse UI
 
-Blazor Web App with a server host and an interactive WebAssembly client. Uses Bootstrap (compiled from SCSS with SASS), BlazorBootstrap for ready-made components, and Lucide icons via a custom Roslyn source generator.
+Blazor Web App with a server host and an interactive WebAssembly client. Uses **Ant Design Blazor** (`AntDesign`) for UI components, **BlazorMonaco** for code editing, and **Markdig** for Markdown rendering.
 
 The solution is split into three top-level folders: `server/`, `client/`, and `DuckHouse.Ui.Shared/`.
 
 ## Project structure
 
 ### Shared
-| Project | SDK / Target | Role |
-|---|---|---|
-| `DuckHouse.Ui.Shared` | `Microsoft.NET.Sdk` / net10.0 | Shared type definitions between server and client (e.g. API request/response models) |
+
+| Project               | SDK / Target                  | Role                                                                                                     |
+| --------------------- | ----------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `DuckHouse.Ui.Shared` | `Microsoft.NET.Sdk` / net10.0 | Shared request/response DTOs between server API and WASM client. Has `Nodes/` and `Kernels/` subfolders. |
 
 ### Server (`server/`)
 
 The server follows Clean Architecture with four layers:
 
-| Project | SDK / Target | Role |
-|---|---|---|
-| `DuckHouse.Ui.Server` | `Microsoft.NET.Sdk.Web` / net10.0 | ASP.NET Core host; serves static assets, bootstraps WASM, wires DI |
-| `DuckHouse.Ui.Server.Application` | `Microsoft.NET.Sdk` / net10.0 | Use-case layer; mediator pattern, commands, queries, `AddApplicationServices()` |
-| `DuckHouse.Ui.Server.Core` | `Microsoft.NET.Sdk` / net10.0 | Domain layer; repository interfaces (no implementations) |
-| `DuckHouse.Ui.Server.Infrastructure` | `Microsoft.NET.Sdk` / net10.0 | Infrastructure layer; concrete repository implementations, `AddInfrastructureServices()` |
+| Project                              | SDK / Target                      | Role                                                                                             |
+| ------------------------------------ | --------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `DuckHouse.Ui.Server`                | `Microsoft.NET.Sdk.Web` / net10.0 | ASP.NET Core host; serves static assets, bootstraps WASM, exposes REST API controllers, wires DI |
+| `DuckHouse.Ui.Server.Application`    | `Microsoft.NET.Sdk` / net10.0     | Use-case layer; mediator pattern, commands, queries, `AddApplicationServices()`                  |
+| `DuckHouse.Ui.Server.Core`           | `Microsoft.NET.Sdk` / net10.0     | Domain layer; repository interfaces (no implementations)                                         |
+| `DuckHouse.Ui.Server.Infrastructure` | `Microsoft.NET.Sdk` / net10.0     | Infrastructure layer; concrete repository implementations, `AddInfrastructureServices()`         |
 
 ### Client (`client/`)
 
-| Project | SDK / Target | Role |
-|---|---|---|
-| `DuckHouse.Ui.Client` | `Microsoft.NET.Sdk.BlazorWebAssembly` / net10.0 | Interactive WASM client; pages, layouts, routing |
-| `DuckHouse.Ui.Client.Components` | `Microsoft.NET.Sdk.Razor` / browser | Razor Class Library; shared components, icon generation target |
-| `DuckHouse.Ui.Client.Icons` | `Microsoft.NET.Sdk` / netstandard2.0 | `GenerateIconsAttribute` and `Svg` wrapper — no dependencies |
-| `DuckHouse.Ui.Client.SourceGeneration` | `Microsoft.NET.Sdk` / netstandard2.0 | Roslyn `IIncrementalGenerator`; generates typed icon properties at compile time |
+| Project                          | SDK / Target                                    | Role                                                                  |
+| -------------------------------- | ----------------------------------------------- | --------------------------------------------------------------------- |
+| `DuckHouse.Ui.Client`            | `Microsoft.NET.Sdk.BlazorWebAssembly` / net10.0 | Interactive WASM client; pages, layouts, routing, HTTP services       |
+| `DuckHouse.Ui.Client.Components` | `Microsoft.NET.Sdk.Razor` / browser             | Razor Class Library; shared components (`CodeCell`, `ExecutionTimer`) |
 
 ## Hosting model
 
-`DuckHouse.Ui.Server` is the HTTP host. Its `App.razor` renders `<Routes>` and `<HeadOutlet>` with `@rendermode="InteractiveWebAssembly"`. All interactive pages live in `DuckHouse.Ui.Client`. Routing is defined in `DuckHouse.Ui.Client/Routes.razor` using `<Router AppAssembly="typeof(Program).Assembly">`.
+`DuckHouse.Ui.Server` is the HTTP host. Its `App.razor` renders `<Routes>` with `new InteractiveWebAssemblyRenderMode(prerender: false)`. All interactive pages live in `DuckHouse.Ui.Client`. Routing is defined in `DuckHouse.Ui.Client/Routes.razor`.
+
+The server also integrates with **.NET Aspire**: `Program.cs` calls `builder.AddServiceDefaults()` and `app.MapDefaultEndpoints()`.
 
 ## Server Clean Architecture
 
-- **Core** — defines repository contracts (e.g. `INodeRepository`, `IKernelRepository`). No implementation details.
+- **Core** — defines repository contracts (`INodeRepository`, `IKernelRepository`). No implementation details.
 - **Application** — use cases implemented via a custom mediator pattern (`IMediator`, `IRequest<T>`, `IRequestHandler<TReq, TRes>`, `MediatorImpl`). Commands and queries live in `Mediator/Commands/` and `Mediator/Queries/`. Register with `services.AddApplicationServices()`.
-- **Infrastructure** — implements Core interfaces (e.g. `NodeRepository : INodeRepository`). Register with `services.AddInfrastructureServices()`.
-- **Server host** — `Program.cs` calls both service extension methods and bootstraps the Blazor+WASM pipeline.
+- **Infrastructure** — implements Core interfaces (`NodeRepository`, `KernelRepository`). Register with `services.AddInfrastructureServices()`.
+- **Server host** — `Program.cs` calls both service extension methods, registers MVC controllers (`AddControllers()`), and bootstraps the Blazor+WASM pipeline.
+
+### REST API controllers
+
+The server exposes a REST API consumed by the WASM client:
+
+| Controller          | Route                          | Key endpoints                                                                                                                                                                                                   |
+| ------------------- | ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `NodesController`   | `api/nodes`                    | GET (list), GET `/{name}`, POST (create), DELETE `/{name}`, POST `/{name}/stop`, POST `/{name}/start`                                                                                                           |
+| `KernelsController` | `api/nodes/{nodeName}/kernels` | GET (list), POST (create), GET `/{id}`, DELETE `/{id}`, POST `/{id}/execute`, GET `/{id}/executions/{execId}`, POST `/{id}/restart`, POST `/{id}/interrupt`, POST `/{id}/completions`, POST `/{id}/diagnostics` |
+
+Execution is **asynchronous and poll-based**: `POST .../execute` returns an `ExecutionHandle` (with `ExecutionId`); the client polls `GET .../executions/{executionId}` for a `PollExecutionResponse` until `IsComplete` is true.
+
+### Mediator commands and queries
+
+**Commands** (`Mediator/Commands/`): `CreateNode`, `RemoveNode`, `StopNode`, `StartNode`, `CreateKernel`, `DeleteKernel`, `ExecuteKernel`, `CompleteKernel`, `DiagnoseKernel`, `InterruptKernel`, `RestartKernel`
+
+**Queries** (`Mediator/Queries/`): `GetNodes`, `GetNode`, `GetKernels`, `GetKernel`, `PollExecution`
 
 ## Shared project
 
-`DuckHouse.Ui.Shared` is intended for types shared between the server REST API and the WASM client — e.g. API request/response DTOs. Both `DuckHouse.Ui.Server` and `DuckHouse.Ui.Client` reference it.
+`DuckHouse.Ui.Shared` contains DTOs shared between the server REST API and the WASM client:
 
-## Styling — Bootstrap + SASS
+- `Nodes/CreateNodeRequest.cs`
+- `Kernels/ExecuteKernelRequest.cs`
 
-The app stylesheet is generated from SCSS. **Never edit `bootstrap.custom.css` directly** — always edit the SCSS source and recompile.
+## Styling
 
-- **Source**: `server/DuckHouse.Ui.Server/wwwroot/css/bootstrap.custom.scss`
-  - Imports Bootstrap from `../lib/bootstrap/scss/bootstrap`
-  - Contains Lucide icon sizing rules (`.lucide`, `.lucide-sm`) and `.btn .lucide` alignment tweaks
-  - Contains Blazor error UI (`#blazor-error-ui`) positioning
-- **Compiled output**: `server/DuckHouse.Ui.Server/wwwroot/css/bootstrap.custom.css`
-- **Compile command** (from the `css/` folder):
-  ```
-  sass bootstrap.custom.scss:bootstrap.custom.css
-  ```
+The app uses Ant Design Blazor's CSS. Custom styles go in `server/DuckHouse.Ui.Server/wwwroot/css/app.css`.
 
-## BlazorBootstrap
+Assets loaded in `App.razor`:
 
-`Blazor.Bootstrap` is referenced from `DuckHouse.Ui.Client`. It is registered in `DuckHouse.Ui.Client/Program.cs`:
+- `_content/AntDesign/css/ant-design-blazor.css` (or `.dark.css` for dark mode, switched via JS)
+- `css/app.css`
+- `_content/DuckHouse.Ui.Components/defaults.css`
+
+## Ant Design Blazor
+
+`AntDesign` is referenced from both `DuckHouse.Ui.Server` and `DuckHouse.Ui.Client`. It is registered in both `Program.cs` files:
 
 ```csharp
-builder.Services.AddBlazorBootstrap();
+builder.Services.AddAntDesign();
 ```
 
-Its CSS and JS are loaded from `_content/Blazor.Bootstrap/` in `App.razor`. Use BlazorBootstrap components (e.g. `<Button>`, `<Modal>`, `<Grid>`) in WASM client pages and components.
+Its JS is loaded from `_content/AntDesign/js/ant-design-blazor.js` in `App.razor`. Use Ant Design components (e.g. `<Button>`, `<Table>`, `<Drawer>`, `<Alert>`, `<Tag>`, `<Flex>`, `<Space>`, `<Icon>`) in WASM client pages and components.
 
-## Lucide icon source generation
+For icons, use `<Icon Type="@IconType.Outline.X" />` where `X` is an Ant Design icon name.
 
-Icons are Lucide SVG files. At compile time the source generator reads the SVG files and generates a static `partial class` with one property per icon. **Do not add icons by hand** — drop `.svg` files into the `Icons/lucide/` folder in `DuckHouse.Ui.Client.Components` and rebuild.
+## Theme system
 
-### How it works
+Dark/light/auto theming is handled by `IThemeService` / `ThemeService` in `DuckHouse.Ui.Client/Services/`. The `AppTheme` enum has `Auto`, `Light`, and `Dark` values.
 
-1. **`DuckHouse.Ui.Client.Icons`** defines two types:
-   - `GenerateIconsAttribute(string? cssClass, params string[] iconsLocationPathSegments)` — marks a `public static partial class` for generation.
-   - `Svg(string svg)` — wraps raw SVG markup.
+Theme is persisted in `localStorage` as `duckhouse-theme`. JS interop functions are defined in `App.razor`:
 
-2. **`DuckHouse.Ui.Client.SourceGeneration`** contains `IconSourceGenerator : IIncrementalGenerator`:
-   - Finds classes annotated with `[GenerateIcons]` (must be `public static partial`).
-   - Reads `.svg` files registered as `<AdditionalFiles>` whose path contains the declared path segments.
-   - Injects the `cssClass` into each SVG's `class` attribute (merging if already present).
-   - Emits `{ClassName}.g.cs` with a property per icon; property names are the kebab-case filename converted to PascalCase.
+- `setDuckhouseTheme(theme)` — switches Ant Design CSS and Monaco editor theme
+- `getStoredDuckhouseTheme()` — reads stored preference
+- `getDuckhouseMonacoTheme()` — returns `"vs"` or `"vs-dark"` for Monaco
 
-3. **`DuckHouse.Ui.Client.Components`** is the consumer. `DuckHouse.Ui.Client.Icons` and `DuckHouse.Ui.Client.SourceGeneration` are both referenced as `OutputItemType="Analyzer"`. The `Icons/lucide/` folder is declared as `<AdditionalFiles>`.
+A FOUC-prevention script in `<head>` applies the theme before page paint by swapping the Ant Design CSS `href`.
 
-4. **`LucideIcon`** is the generated class:
-   ```csharp
-   [GenerateIcons(cssClass: "lucide", "Icons", "lucide")]
-   public static partial class LucideIcon;
-   // Generated:
-   // public static Svg Info => new Svg("<svg class=\"lucide\" .../>"); 
-   // public static Svg OctagonX => new Svg("<svg class=\"lucide\" .../>"); 
-   ```
+## Client services
 
-5. **`SvgIcon`** is a Blazor component that renders an `Svg` value:
-   ```razor
-   <SvgIcon Icon="LucideIcon.Info" />
-   ```
+The WASM client communicates with the server REST API via typed `HttpClient` services registered in `DuckHouse.Ui.Client/Program.cs`:
+
+| Interface        | Implementation  | Base path                      |
+| ---------------- | --------------- | ------------------------------ |
+| `INodeService`   | `NodeService`   | `api/nodes`                    |
+| `IKernelService` | `KernelService` | `api/nodes/{nodeName}/kernels` |
+| `IThemeService`  | `ThemeService`  | (JS interop only)              |
+
+## Notebook feature
+
+`NotebookPage.razor` (`/notebook`) is a full notebook UI. It owns a `NotebookDocument` (title + list of `NotebookCell`s) and manages kernel connectivity.
+
+### Notebook model (`DuckHouse.Ui.Client/Notebook/`)
+
+- `NotebookDocument` — title, list of cells, dirty flag
+- `NotebookCell` — cell type (`Code`/`Markdown`), language (`Python`/`Sql`), source, outputs, error, execution count, duration, UI state (IsExecuting, ExecutionId, IsEditingMarkdown)
+- `NotebookSerializer` — serialises/deserialises to/from `.ipynb` JSON format
+
+### Notebook UI components
+
+- `NotebookCellView.razor` — renders a single cell; delegates to `KernelCodeCell` or markdown view
+- `KernelCodeCell.razor` — code cell wrapper with run/interrupt/delete/move toolbar
+- `AddCellBar.razor` — `+` bar between cells; lets user add Python, SQL, or Markdown cell
+- `DataFrameView.razor` — renders tabular output from kernel results
+- `CodeCell.razor` (in `DuckHouse.Ui.Client.Components`) — Monaco editor wrapper; auto-sizes, supports `Ctrl+Enter` to execute, language switching via JS interop
+- `ExecutionTimer.razor` (in `DuckHouse.Ui.Client.Components`) — live elapsed timer while a cell is running
+
+SQL cells are wrapped as `import duckdb; duckdb.sql("""...""")` before sending to the kernel.
+
+## Client pages
+
+| Page                  | Route                              | Description                               |
+| --------------------- | ---------------------------------- | ----------------------------------------- |
+| `Home.razor`          | `/`                                | Welcome page                              |
+| `Nodes.razor`         | `/nodes`                           | List, create, start/stop/remove nodes     |
+| `Kernels.razor`       | `/nodes/{Name}/kernels`            | List and manage kernels on a node         |
+| `KernelSession.razor` | `/nodes/{Name}/kernels/{KernelId}` | Interactive kernel REPL session           |
+| `NotebookPage.razor`  | `/notebook`                        | Notebook editor with open/save (`.ipynb`) |
+| `Settings.razor`      | `/settings`                        | App settings (theme toggle, etc.)         |
+| `NotFound.razor`      | —                                  | 404 page                                  |
+
+## Monaco editor JS interop
+
+`App.razor` loads BlazorMonaco's JS (`_content/BlazorMonaco/...`). Additional helpers defined there:
+
+- `setMonacoEditorLanguage(editorId, language)` — switches language on an existing editor model
+- `getDuckhouseMonacoTheme()` — used by `CodeCell` to pick the correct theme on init
+- `openFileAsText(inputElement)` — reads a file input as text (used by notebook open)
+- `downloadFile(filename, content)` — triggers a file download (used by notebook save)
+- `clickElement(element)` — programmatically clicks an element (used to open the file picker)
 
 ## Key files
 
 ```
 src/ui/
   DuckHouse.Ui.Shared/
-    DuckHouse.Ui.Shared.csproj         — shared API models (server ↔ client)
+    Nodes/CreateNodeRequest.cs         — shared node creation DTO
+    Kernels/ExecuteKernelRequest.cs    — shared kernel execution DTO
   server/
     DuckHouse.Ui.Server/
-      Program.cs                       — server startup; MapRazorComponents, MapStaticAssets
-      Components/
-        App.razor                      — HTML shell; loads Bootstrap CSS/JS, BlazorBootstrap assets
-        Pages/Error.razor              — server-side error page
-      wwwroot/css/
-        bootstrap.custom.scss          — SCSS source (edit this)
-        bootstrap.custom.css           — compiled output (do not edit)
+      Program.cs                       — server startup; Aspire, AddControllers, MapRazorComponents
+      Components/App.razor             — HTML shell; loads AntDesign CSS/JS, BlazorMonaco JS
+      Controllers/
+        NodesController.cs             — REST API: api/nodes
+        KernelsController.cs           — REST API: api/nodes/{nodeName}/kernels
+      wwwroot/css/app.css              — custom styles
     DuckHouse.Ui.Server.Core/
       Repositories/
         INodeRepository.cs             — node repository interface
@@ -129,31 +181,42 @@ src/ui/
       ServiceExtensions.cs             — AddApplicationServices()
       Mediator/
         IMediator.cs / IRequest.cs / IRequestHandler.cs / MediatorImpl.cs
-        Commands/CreateNode.cs         — CreateNodeRequest + handler
-        Queries/GetNodes.cs            — GetNodesRequest + handler
+        Commands/                      — CreateNode, RemoveNode, StopNode, StartNode,
+                                         CreateKernel, DeleteKernel, ExecuteKernel,
+                                         CompleteKernel, DiagnoseKernel, InterruptKernel, RestartKernel
+        Queries/                       — GetNodes, GetNode, GetKernels, GetKernel, PollExecution
     DuckHouse.Ui.Server.Infrastructure/
       ServiceExtensions.cs             — AddInfrastructureServices()
-      Repositories/NodeRepository.cs   — INodeRepository implementation
+      Repositories/
+        NodeRepository.cs              — INodeRepository implementation
+        KernelRepository.cs            — IKernelRepository implementation
   client/
     DuckHouse.Ui.Client/
-      Program.cs                       — AddBlazorBootstrap(), WebAssemblyHostBuilder
+      Program.cs                       — AddAntDesign(), typed HttpClient services
       Routes.razor                     — client-side router
-      Layout/MainLayout.razor          — default layout
+      Layout/MainLayout.razor          — default layout with NavMenu
       Pages/
         Home.razor                     — home page
+        Nodes.razor                    — node management
+        Kernels.razor                  — kernel management per node
+        KernelSession.razor            — interactive kernel REPL
+        NotebookPage.razor             — notebook editor (/notebook)
+        Settings.razor                 — theme and app settings
         NotFound.razor                 — 404 page
+      Notebook/
+        NotebookDocument.cs            — document model (title, cells, dirty flag)
+        NotebookCell.cs                — cell model + NotebookCellType/Language enums
+        NotebookSerializer.cs          — .ipynb JSON serialisation
+      Services/
+        INodeService.cs / NodeService.cs     — REST client for api/nodes
+        IKernelService.cs / KernelService.cs — REST client for api/nodes/{n}/kernels
+        IThemeService.cs / ThemeService.cs   — theme management via JS interop
+      AddCellBar.razor                 — + bar to add cells between existing cells
+      DataFrameView.razor              — tabular output renderer
+      KernelCodeCell.razor             — code cell with toolbar
+      NotebookCellView.razor           — cell container (code or markdown)
     DuckHouse.Ui.Client.Components/
-      LucideIcon.cs                    — [GenerateIcons] partial class (generation target)
-      SvgIcon.cs                       — ComponentBase that renders Svg.Text as markup
-      Icons/lucide/                    — Lucide SVG source files (AdditionalFiles for generator)
+      CodeCell.razor                   — Monaco editor wrapper component
+      ExecutionTimer.razor             — live elapsed time display
       wwwroot/defaults.css             — component-scoped CSS
-    DuckHouse.Ui.Client.Icons/
-      GenerateIconsAttribute.cs        — attribute definition
-      Svg.cs                           — SVG wrapper record
-    DuckHouse.Ui.Client.SourceGeneration/
-      IconSourceGenerator.cs           — IIncrementalGenerator implementation
-      Extensions.cs                    — kebab-case → PascalCase helper
-      IconData.cs                      — SVG file path + text
-      IconsClassData.cs                — decorated class metadata
-      DiagnosticDescriptors.cs         — ICON001: incorrect class modifiers
 ```
