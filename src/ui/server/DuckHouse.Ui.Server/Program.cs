@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using DuckHouse.Ui.Server;
 using DuckHouse.Ui.Server.Application;
 using DuckHouse.Ui.Server.Components;
 using DuckHouse.Ui.Server.Infrastructure;
@@ -15,6 +16,9 @@ builder.Services.AddControllers()
 	.AddJsonOptions(options =>
 		options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 
+builder.Services.AddExceptionHandler<UpstreamExceptionHandler>();
+builder.Services.AddProblemDetails();
+
 builder.Services.AddApplicationServices();
 builder.Services.AddInfrastructureServices(builder.Configuration);
 
@@ -26,10 +30,11 @@ var app = builder.Build();
 if (app.Environment.IsDevelopment())
 {
 	app.UseWebAssemblyDebugging();
+	app.UseExceptionHandler(); // picks up UpstreamExceptionHandler
 }
 else
 {
-	app.UseExceptionHandler("/Error", createScopeForErrors: true);
+	app.UseExceptionHandler("/Error", createScopeForErrors: true); // picks up UpstreamExceptionHandler, then falls back to /Error
 	// The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
 	app.UseHsts();
 }

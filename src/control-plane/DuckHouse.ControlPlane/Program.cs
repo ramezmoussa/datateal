@@ -1,3 +1,4 @@
+using DuckHouse.ControlPlane;
 using DuckHouse.ControlPlane.Application;
 using DuckHouse.ControlPlane.Application.InactivityEviction;
 using DuckHouse.ControlPlane.Endpoints;
@@ -9,6 +10,9 @@ var builder = WebApplication.CreateBuilder(args);
 builder.AddServiceDefaults();
 
 builder.Services.AddOpenApi();
+
+builder.Services.AddExceptionHandler<RuntimeProxyExceptionHandler>();
+builder.Services.AddProblemDetails();
 
 builder.Services.Configure<InactivityEvictionOptions>(
     builder.Configuration.GetSection("InactivityEviction"));
@@ -28,6 +32,7 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
+app.UseExceptionHandler();
 app.UseHttpsRedirection();
 
 app.MapDefaultEndpoints();
