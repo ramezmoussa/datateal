@@ -130,6 +130,10 @@ else
                                     OnClick="() => StartRenameNotebook(context.Notebook!)">Rename</Button>
                         </SpaceItem>
                         <SpaceItem>
+                            <Button Size="ButtonSize.Small" Icon="@IconType.Outline.Copy"
+                                    OnClick="() => CloneNotebookAsync(context.Notebook!)">Clone</Button>
+                        </SpaceItem>
+                        <SpaceItem>
                             <Popconfirm Title="Delete this notebook?"
                                         OnConfirm="@(() => DeleteNotebookAsync(context.Notebook!))"
                                         OkText="@("Delete")" OkType="ButtonType.Primary"
@@ -395,6 +399,21 @@ else
             await LoadAsync();
         }
         catch (Exception ex) { _error = $"Failed to move notebook: {ex.Message}"; }
+    }
+
+    // ── Clone Notebook ────────────────────────────────────────────────
+
+    private async Task CloneNotebookAsync(NotebookSummary notebook)
+    {
+        try
+        {
+            var detail = await WorkspaceService.GetNotebookAsync(notebook.Id);
+            if (detail is not null)
+                await WorkspaceService.CreateNotebookAsync(
+                    new CreateNotebookRequest($"{notebook.Title} - Copy", detail.Content, notebook.FolderId));
+            await LoadAsync();
+        }
+        catch (Exception ex) { _error = $"Failed to clone notebook: {ex.Message}"; }
     }
 
     // ── Delete ────────────────────────────────────────────────────────
