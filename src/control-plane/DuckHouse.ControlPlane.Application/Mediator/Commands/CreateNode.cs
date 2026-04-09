@@ -21,10 +21,6 @@ internal class CreateNodeHandler(
 {
     public async Task<NodeInfo> Handle(CreateNodeRequest request, CancellationToken cancellationToken)
     {
-        var node = await nodeService.CreateNodeAsync(
-            new DuckHouse.Core.Nodes.CreateNodeRequest(request.Name, request.VmSize),
-            cancellationToken);
-
         var opts = evictionOptions.Value;
         var config = new NodeConfig
         {
@@ -34,6 +30,10 @@ internal class CreateNodeHandler(
         };
 
         await nodeConfigRepository.UpsertAsync(config, cancellationToken);
+
+        var node = await nodeService.CreateNodeAsync(
+            new DuckHouse.Core.Nodes.CreateNodeRequest(request.Name, request.VmSize),
+            cancellationToken);
 
         return node;
     }
