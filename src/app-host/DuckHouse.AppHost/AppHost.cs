@@ -1,6 +1,8 @@
 var builder = DistributedApplication.CreateBuilder(args);
 
-var postgres = builder.AddPostgres("postgres");
+var postgres = builder.AddPostgres("postgres")
+    .WithDataVolume()
+    .WithLifetime(ContainerLifetime.Persistent);
 var controlPlaneDb = postgres.AddDatabase("duckhouse-control-plane");
 
 var controlPlane = builder.AddProject<Projects.DuckHouse_ControlPlane>("control-plane")

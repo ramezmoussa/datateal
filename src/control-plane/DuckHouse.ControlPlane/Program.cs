@@ -34,7 +34,7 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<ControlPlaneDbContext>();
-    await db.Database.MigrateAsync();
+    await db.Database.CreateExecutionStrategy().ExecuteAsync(() => db.Database.MigrateAsync());
 }
 
 if (app.Environment.IsDevelopment())
