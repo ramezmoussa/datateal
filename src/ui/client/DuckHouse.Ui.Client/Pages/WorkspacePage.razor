@@ -71,80 +71,72 @@ else
         </Flex>
     }
 
-    @* Folders *@
-    @if (_listing.Folders.Count > 0 || _addingFolder)
+    @* Combined folders + notebooks table *@
+    @if (_items.Count > 0 || _addingFolder)
     {
-        <h3 style="font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.05em; color: #888; margin-bottom: 8px;">Folders</h3>
-        <Table TItem="FolderSummary" DataSource="_listing.Folders" Bordered="false"
-               PageSize="int.MaxValue" PaginationPosition="none" Style="margin-bottom: 24px;">
-            <PropertyColumn Property="f => f.Name" Title="Name">
-                <a @onclick="() => OpenFolder(context)" @onclick:preventDefault style="cursor: pointer; font-weight: 500;">
-                    <Icon Type="@IconType.Outline.Folder" Style="color: #faad14; margin-right: 6px;" />
-                    @context.Name
-                </a>
+        <Table TItem="WorkspaceItem" DataSource="_items" Bordered="false"
+               PageSize="int.MaxValue" PaginationPosition="none">
+            <PropertyColumn Property="i => i.Name" Title="Name">
+                @if (context.IsFolder)
+                {
+                    <a @onclick="() => OpenFolder(context.Folder!)" @onclick:preventDefault style="cursor: pointer; font-weight: 500;">
+                        <Icon Type="@IconType.Outline.Folder" Style="color: #faad14; margin-right: 6px;" />
+                        @context.Name
+                    </a>
+                }
+                else
+                {
+                    <a @onclick="() => OpenNotebook(context.Notebook!)" @onclick:preventDefault style="cursor: pointer; font-weight: 500;">
+                        <Icon Type="@IconType.Outline.FileText" Style="margin-right: 6px; color: #1677ff;" />
+                        @context.Name
+                    </a>
+                }
             </PropertyColumn>
-            <PropertyColumn Property="f => f.CreatedAt" Title="Created" Width="160">
-                <Text Type="TextElementType.Secondary" Style="font-size: 0.85rem;">@FormatDate(context.CreatedAt)</Text>
+            <PropertyColumn Property="i => i.Date" Title="Date" Width="160">
+                <Text Type="TextElementType.Secondary" Style="font-size: 0.85rem;">@FormatDate(context.Date)</Text>
             </PropertyColumn>
             <ActionColumn Title="" Width="130">
-                <Space Size="SpaceSize.Small">
-                    <SpaceItem>
-                        <Button Size="ButtonSize.Small" Icon="@IconType.Outline.Edit"
-                                OnClick="() => StartRenameFolder(context)">Rename</Button>
-                    </SpaceItem>
-                    <SpaceItem>
-                        <Popconfirm Title="Delete this folder and all its contents?"
-                                    OnConfirm="@(() => DeleteFolderAsync(context))"
-                                    OkText="@("Delete")" OkType="ButtonType.Primary"
-                                    OkButtonProps="new ButtonProps { Danger = true }"
-                                    CancelText="Cancel">
-                            <Button Size="ButtonSize.Small" Danger Icon="@IconType.Outline.Delete">Delete</Button>
-                        </Popconfirm>
-                    </SpaceItem>
-                </Space>
+                @if (context.IsFolder)
+                {
+                    <Space Size="SpaceSize.Small">
+                        <SpaceItem>
+                            <Button Size="ButtonSize.Small" Icon="@IconType.Outline.Edit"
+                                    OnClick="() => StartRenameFolder(context.Folder!)">Rename</Button>
+                        </SpaceItem>
+                        <SpaceItem>
+                            <Popconfirm Title="Delete this folder and all its contents?"
+                                        OnConfirm="@(() => DeleteFolderAsync(context.Folder!))"
+                                        OkText="@("Delete")" OkType="ButtonType.Primary"
+                                        OkButtonProps="new ButtonProps { Danger = true }"
+                                        CancelText="Cancel">
+                                <Button Size="ButtonSize.Small" Danger Icon="@IconType.Outline.Delete">Delete</Button>
+                            </Popconfirm>
+                        </SpaceItem>
+                    </Space>
+                }
+                else
+                {
+                    <Space Size="SpaceSize.Small">
+                        <SpaceItem>
+                            <Button Size="ButtonSize.Small" Icon="@IconType.Outline.Edit"
+                                    OnClick="() => StartRenameNotebook(context.Notebook!)">Rename</Button>
+                        </SpaceItem>
+                        <SpaceItem>
+                            <Popconfirm Title="Delete this notebook?"
+                                        OnConfirm="@(() => DeleteNotebookAsync(context.Notebook!))"
+                                        OkText="@("Delete")" OkType="ButtonType.Primary"
+                                        OkButtonProps="new ButtonProps { Danger = true }"
+                                        CancelText="Cancel">
+                                <Button Size="ButtonSize.Small" Danger Icon="@IconType.Outline.Delete">Delete</Button>
+                            </Popconfirm>
+                        </SpaceItem>
+                    </Space>
+                }
             </ActionColumn>
         </Table>
     }
 
-    @* Notebooks *@
-    @if (_listing.Notebooks.Count > 0)
-    {
-        <h3 style="font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.05em; color: #888; margin-bottom: 8px;">Notebooks</h3>
-        <Table TItem="NotebookSummary" DataSource="_listing.Notebooks" Bordered="false"
-               PageSize="int.MaxValue" PaginationPosition="none">
-            <PropertyColumn Property="n => n.Title" Title="Title">
-                <Icon Type="@IconType.Outline.FileText" Style="margin-right: 6px; color: #1677ff;" />
-                <span style="font-weight: 500;">@context.Title</span>
-            </PropertyColumn>
-            <PropertyColumn Property="n => n.UpdatedAt" Title="Last saved" Width="160">
-                <Text Type="TextElementType.Secondary" Style="font-size: 0.85rem;">@FormatDate(context.UpdatedAt)</Text>
-            </PropertyColumn>
-            <ActionColumn Title="" Width="200">
-                <Space Size="SpaceSize.Small">
-                    <SpaceItem>
-                        <Button Size="ButtonSize.Small" Type="ButtonType.Primary"
-                                Icon="@IconType.Outline.PlayCircle"
-                                OnClick="() => OpenNotebook(context)">Open</Button>
-                    </SpaceItem>
-                    <SpaceItem>
-                        <Button Size="ButtonSize.Small" Icon="@IconType.Outline.Edit"
-                                OnClick="() => StartRenameNotebook(context)">Rename</Button>
-                    </SpaceItem>
-                    <SpaceItem>
-                        <Popconfirm Title="Delete this notebook?"
-                                    OnConfirm="@(() => DeleteNotebookAsync(context))"
-                                    OkText="@("Delete")" OkType="ButtonType.Primary"
-                                    OkButtonProps="new ButtonProps { Danger = true }"
-                                    CancelText="Cancel">
-                            <Button Size="ButtonSize.Small" Danger Icon="@IconType.Outline.Delete">Delete</Button>
-                        </Popconfirm>
-                    </SpaceItem>
-                </Space>
-            </ActionColumn>
-        </Table>
-    }
-
-    @if (_listing.Folders.Count == 0 && _listing.Notebooks.Count == 0 && !_addingFolder)
+    @if (_items.Count == 0 && !_addingFolder)
     {
         <div style="text-align: center; padding: 40px 0;">
             <Icon Type="@IconType.Outline.Inbox" Style="font-size: 48px; color: #d9d9d9;" />
@@ -181,7 +173,15 @@ else
 </Modal>
 
 @code {
+    private sealed record WorkspaceItem(FolderSummary? Folder, NotebookSummary? Notebook)
+    {
+        public bool IsFolder => Folder is not null;
+        public string Name => Folder?.Name ?? Notebook!.Title;
+        public DateTime Date => Folder?.CreatedAt ?? Notebook!.UpdatedAt;
+    }
+
     private WorkspaceListing _listing = new([], []);
+    private List<WorkspaceItem> _items = [];
     private List<(Guid? Id, string Name)> _breadcrumbs = [( null, "Workspace")];
     private bool _loading;
     private string? _error;
@@ -221,7 +221,14 @@ else
         {
             _error = $"Failed to load workspace: {ex.Message}";
         }
-        finally { _loading = false; }
+        finally
+        {
+            _items = [
+                .._listing.Folders.Select(f => new WorkspaceItem(f, null)),
+                .._listing.Notebooks.Select(n => new WorkspaceItem(null, n)),
+            ];
+            _loading = false;
+        }
     }
 
     private async Task OpenFolder(FolderSummary folder)
