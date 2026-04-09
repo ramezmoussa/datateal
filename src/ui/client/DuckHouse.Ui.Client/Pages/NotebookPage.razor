@@ -63,7 +63,7 @@
         else
         {
             <SpaceItem>
-                <Button Disabled="@(!_notebook.IsDirty)" Icon="@IconType.Outline.CloudUpload" OnClick="SaveToWorkspaceAsync">
+                <Button Disabled="@(!_notebook.IsDirty)" Icon="@IconType.Outline.CloudUpload" OnClick="OpenFolderPickerAsync">
                     Save to workspace
                 </Button>
             </SpaceItem>
@@ -218,6 +218,55 @@
     </div>
 }
 
+@* Folder picker modal — shown when saving to workspace for the first time *@
+<Modal Title="@("Choose folder to save in")"
+       Visible="_showFolderPicker"
+       OnOk="ConfirmSaveToFolderAsync"
+       OnCancel="@(() => _showFolderPicker = false)"
+       OkText="@("Save here")"
+       Width="480">
+    <Breadcrumb Style="margin-bottom: 12px;">
+        @foreach (var (crumb, index) in _pickerBreadcrumbs.Select((c, i) => (c, i)))
+        {
+            if (index < _pickerBreadcrumbs.Count - 1)
+            {
+                <BreadcrumbItem>
+                    <a @onclick="() => PickerNavigateToCrumbAsync(index)" @onclick:preventDefault style="cursor: pointer;">
+                        @crumb.Name
+                    </a>
+                </BreadcrumbItem>
+            }
+            else
+            {
+                <BreadcrumbItem>@crumb.Name</BreadcrumbItem>
+            }
+        }
+    </Breadcrumb>
+    @if (_pickerLoading)
+    {
+        <Flex Justify="@("center")" Style="padding: 20px 0;"><Spin /></Flex>
+    }
+    else if (_pickerFolders.Count == 0)
+    {
+        <span style="color: rgba(0,0,0,.45); font-style: italic;">No subfolders here.</span>
+    }
+    else
+    {
+        @foreach (var folder in _pickerFolders)
+        {
+            var f = folder;
+            <div @onclick="() => PickerNavigateToFolderAsync(f)"
+                 style="padding: 7px 10px; cursor: pointer; border-radius: 6px; display: flex; align-items: center; gap: 8px;"
+                 @onmouseenter="@(e => _pickerHoveredId = f.Id)" @onmouseleave="@(e => _pickerHoveredId = null)"
+                 class="@(_pickerHoveredId == f.Id ? "picker-row-hover" : "picker-row")">
+                <Icon Type="@IconType.Outline.Folder" Style="color: #faad14;" />
+                <span>@f.Name</span>
+                <Icon Type="@IconType.Outline.Right" Style="margin-left: auto; color: #bbb; font-size: 0.75rem;" />
+            </div>
+        }
+    }
+</Modal>
+
 @code {
     [Parameter] public Guid Id { get; set; }
 
@@ -237,6 +286,14 @@
     private string _editingTitleValue = "";
     private InputFile _fileInput = default!;
     private CancellationTokenSource? _kernelPollingCts;
+
+    // Folder picker (first-time workspace save)
+    private bool _showFolderPicker;
+    private bool _pickerLoading;
+    private Guid? _pickerCurrentFolderId;
+    private List<(Guid? Id, string Name)> _pickerBreadcrumbs = [(null, "Workspace")];
+    private List<FolderSummary> _pickerFolders = [];
+    private Guid? _pickerHoveredId;
 
     private bool HasKernel => !string.IsNullOrEmpty(_kernelId);
     private bool AnyExecuting => _notebook.Cells.Any(c => c.IsExecuting);
@@ -548,23 +605,81 @@
 
     private async Task SaveToWorkspaceAsync()
     {
+        if (!_workspaceNotebookId.HasValue) return;
         try
         {
             var json = NotebookSerializer.Serialize(_notebook);
-            if (_workspaceNotebookId.HasValue)
+            await WorkspaceService.UpdateNotebookAsync(_workspaceNotebookId.Value,
+                new UpdateNotebookRequest(_notebook.Title, json, _workspaceNotebookFolderId));
+            _notebook.IsDirty = false;
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to save to workspace: {ex.Message}";
+        }
+    }
+
+    // ── Folder picker (first-time save) ───────────────────────────────
+
+    private async Task OpenFolderPickerAsync()
+    {
+        _pickerCurrentFolderId = null;
+        _pickerBreadcrumbs = [(null, "Workspace")];
+        _showFolderPicker = true;
+        await LoadPickerFoldersAsync();
+    }
+
+    private async Task LoadPickerFoldersAsync()
+    {
+        _pickerLoading = true;
+        try
+        {
+            var listing = _pickerCurrentFolderId.HasValue
+                ? await WorkspaceService.GetFolderAsync(_pickerCurrentFolderId.Value)
+                : await WorkspaceService.GetRootAsync();
+            _pickerFolders = listing.Folders.ToList();
+        }
+        catch (Exception ex) { _error = $"Failed to load folders: {ex.Message}"; }
+        finally { _pickerLoading = false; }
+    }
+
+    private async Task PickerNavigateToFolderAsync(FolderSummary folder)
+    {
+        _pickerCurrentFolderId = folder.Id;
+        _pickerBreadcrumbs.Add(((Guid?)folder.Id, folder.Name));
+        await LoadPickerFoldersAsync();
+    }
+
+    private async Task PickerNavigateToCrumbAsync(int index)
+    {
+        _pickerBreadcrumbs = _pickerBreadcrumbs.Take(index + 1).ToList();
+        _pickerCurrentFolderId = _pickerBreadcrumbs[^1].Id;
+        await LoadPickerFoldersAsync();
+    }
+
+    private async Task ConfirmSaveToFolderAsync()
+    {
+        _showFolderPicker = false;
+        try
+        {
+            var json = NotebookSerializer.Serialize(_notebook);
+            var summary = await WorkspaceService.CreateNotebookAsync(
+                new CreateNotebookRequest(_notebook.Title, json, _pickerCurrentFolderId));
+            _workspaceNotebookId = summary.Id;
+            _workspaceNotebookFolderId = _pickerCurrentFolderId;
+
+            if (_pickerCurrentFolderId is not null)
             {
-                await WorkspaceService.UpdateNotebookAsync(_workspaceNotebookId.Value,
-                    new UpdateNotebookRequest(_notebook.Title, json, _workspaceNotebookFolderId));
+                var ancestors = await WorkspaceService.GetFolderAncestorsAsync(_pickerCurrentFolderId.Value);
+                _breadcrumbs = [(null, "Workspace"), ..ancestors.Select(f => ((Guid?)f.Id, f.Name))];
             }
             else
             {
-                var summary = await WorkspaceService.CreateNotebookAsync(
-                    new CreateNotebookRequest(_notebook.Title, json));
-                _workspaceNotebookId = summary.Id;
-                // Update the URL to reflect the workspace ID without reloading the page
-                Navigation.NavigateTo($"/notebook/{_workspaceNotebookId}", replace: true);
+                _breadcrumbs = [(null, "Workspace")];
             }
+
             _notebook.IsDirty = false;
+            Navigation.NavigateTo($"/notebook/{_workspaceNotebookId}", replace: true);
         }
         catch (Exception ex)
         {
