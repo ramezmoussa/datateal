@@ -13,7 +13,7 @@
         <Icon Type="@IconType.Outline.CloudServer" />
         <span>Nodes</span>
     </MenuItem>
-    <MenuItem Key="notebook" OnClick="@(() => Navigation.NavigateTo("/notebook"))">
+    <MenuItem Key="notebook" OnClick="@(() => Navigation.NavigateTo("/workspace"))">
         <Icon Type="@IconType.Outline.Snippets" />
         <span>Notebooks</span>
     </MenuItem>
@@ -52,6 +52,7 @@
         {
             "" or "/" => ["home"],
             _ when path.StartsWith("/nodes") => ["nodes"],
+            _ when path.StartsWith("/workspace") => ["notebook"],
             _ when path.StartsWith("/notebook") => ["notebook"],
             _ when path.StartsWith("/settings") => ["settings"],
             _ => []

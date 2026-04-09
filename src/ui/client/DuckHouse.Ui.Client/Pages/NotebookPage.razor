@@ -1,11 +1,14 @@
 @page "/notebook"
+@page "/notebook/{Id:guid}"
 
 @using DuckHouse.Ui.Client.Notebook
 @using DuckHouse.Core.Kernels
 @using DuckHouse.Core.Nodes
 @using DuckHouse.Ui.Shared.Kernels
+@using DuckHouse.Ui.Shared.Workspace
 @inject IKernelService KernelService
 @inject INodeService NodeService
+@inject IWorkspaceService WorkspaceService
 @inject IJSRuntime JS
 @inject NavigationManager Navigation
 @implements IAsyncDisposable
@@ -39,14 +42,35 @@
     @* File toolbar *@
     <Space Size="SpaceSize.Small" Style="flex-wrap: wrap;">
         <SpaceItem>
-            <Button OnClick="OpenFileDialogAsync" Icon="@IconType.Outline.FolderOpen">
-                Open
+            <Button OnClick="@(() => Navigation.NavigateTo("/workspace"))" Icon="@IconType.Outline.FolderOpen">
+                Browse workspace
+            </Button>
+        </SpaceItem>
+        <SpaceItem>
+            <Button OnClick="OpenFileDialogAsync" Icon="@IconType.Outline.Upload">
+                Open from file
             </Button>
             <InputFile @ref="_fileInput" style="display:none;" accept=".ipynb" OnChange="OnFileSelectedAsync" />
         </SpaceItem>
+        @if (_workspaceNotebookId.HasValue)
+        {
+            <SpaceItem>
+                <Button Disabled="@(!_notebook.IsDirty)" Icon="@IconType.Outline.Save" OnClick="SaveToWorkspaceAsync">
+                    Save
+                </Button>
+            </SpaceItem>
+        }
+        else
+        {
+            <SpaceItem>
+                <Button Disabled="@(!_notebook.IsDirty)" Icon="@IconType.Outline.CloudUpload" OnClick="SaveToWorkspaceAsync">
+                    Save to workspace
+                </Button>
+            </SpaceItem>
+        }
         <SpaceItem>
-            <Button Disabled="@(!_notebook.IsDirty)" Icon="@IconType.Outline.Save" OnClick="SaveAsync">
-                Save
+            <Button Icon="@IconType.Outline.Download" OnClick="ExportFileAsync">
+                Export
             </Button>
         </SpaceItem>
         <SpaceItem><Divider Type="DividerType.Vertical" /></SpaceItem>
@@ -179,7 +203,10 @@
 }
 
 @code {
+    [Parameter] public Guid Id { get; set; }
+
     private NotebookDocument _notebook = new();
+    private Guid? _workspaceNotebookId;
     private string? _nodeName;
     private string? _kernelId;
     private KernelInfo? _kernel;
@@ -211,6 +238,29 @@
 
     protected override async Task OnInitializedAsync()
     {
+        // Load notebook from workspace if an Id was provided
+        if (Id != Guid.Empty)
+        {
+            try
+            {
+                var detail = await WorkspaceService.GetNotebookAsync(Id);
+                if (detail is not null)
+                {
+                    _notebook = NotebookSerializer.Deserialize(detail.Content);
+                    _notebook.IsDirty = false;
+                    _workspaceNotebookId = detail.Id;
+                }
+                else
+                {
+                    _error = "Notebook not found in workspace.";
+                }
+            }
+            catch (Exception ex)
+            {
+                _error = $"Failed to load notebook: {ex.Message}";
+            }
+        }
+
         _loadingNodes = true;
         try { _nodes = await NodeService.GetNodesAsync(); }
         catch (Exception ex) { _error = $"Failed to load nodes: {ex.Message}"; }
@@ -464,18 +514,43 @@
         }
     }
 
-    private async Task SaveAsync()
+    private async Task SaveToWorkspaceAsync()
+    {
+        try
+        {
+            var json = NotebookSerializer.Serialize(_notebook);
+            if (_workspaceNotebookId.HasValue)
+            {
+                await WorkspaceService.UpdateNotebookAsync(_workspaceNotebookId.Value,
+                    new UpdateNotebookRequest(_notebook.Title, json));
+            }
+            else
+            {
+                var summary = await WorkspaceService.CreateNotebookAsync(
+                    new CreateNotebookRequest(_notebook.Title, json));
+                _workspaceNotebookId = summary.Id;
+                // Update the URL to reflect the workspace ID without reloading the page
+                Navigation.NavigateTo($"/notebook/{_workspaceNotebookId}", replace: true);
+            }
+            _notebook.IsDirty = false;
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to save to workspace: {ex.Message}";
+        }
+    }
+
+    private async Task ExportFileAsync()
     {
         try
         {
             var json = NotebookSerializer.Serialize(_notebook);
             var filename = (_notebook.Title.Trim().Length > 0 ? _notebook.Title.Trim() : "notebook") + ".ipynb";
             await JS.InvokeVoidAsync("downloadFile", filename, json);
-            _notebook.IsDirty = false;
         }
         catch (Exception ex)
         {
-            _error = $"Failed to save: {ex.Message}";
+            _error = $"Failed to export: {ex.Message}";
         }
     }
 

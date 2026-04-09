@@ -1,0 +1,400 @@
+@page "/workspace"
+
+@using DuckHouse.Ui.Shared.Workspace
+@inject IWorkspaceService WorkspaceService
+@inject NavigationManager Navigation
+
+<PageTitle>Workspace — DuckHouse</PageTitle>
+
+<Flex Justify="FlexJustify.SpaceBetween" Align="FlexAlign.Center" Style="margin-bottom: 16px; flex-wrap: wrap; gap: 8px;">
+    <Space Align="SpaceAlign.Center" Size="SpaceSize.Small">
+        <SpaceItem>
+            <Icon Height="24px" Width="24px" Type="@IconType.Outline.FolderOpen" />
+        </SpaceItem>
+        <SpaceItem>
+            <h2 style="margin: 0;">Workspace</h2>
+        </SpaceItem>
+    </Space>
+    <Space Size="SpaceSize.Small">
+        <SpaceItem>
+            <Button Icon="@IconType.Outline.FolderAdd" OnClick="StartNewFolder">New Folder</Button>
+        </SpaceItem>
+        <SpaceItem>
+            <Button Type="ButtonType.Primary" Icon="@IconType.Outline.FileAdd" OnClick="StartNewNotebook">New Notebook</Button>
+        </SpaceItem>
+    </Space>
+</Flex>
+
+@* Breadcrumb *@
+<Breadcrumb Style="margin-bottom: 16px;">
+    @foreach (var (crumb, index) in _breadcrumbs.Select((c, i) => (c, i)))
+    {
+        if (index < _breadcrumbs.Count - 1)
+        {
+            <BreadcrumbItem>
+                <a @onclick="() => NavigateToCrumb(index)" @onclick:preventDefault style="cursor: pointer;">
+                    @(crumb.Name)
+                </a>
+            </BreadcrumbItem>
+        }
+        else
+        {
+            <BreadcrumbItem>@crumb.Name</BreadcrumbItem>
+        }
+    }
+</Breadcrumb>
+
+@if (_error is not null)
+{
+    <Alert Type="AlertType.Error" Message="@_error" Closable ShowIcon="true"
+           OnClose="@(() => _error = null)" Style="margin-bottom: 16px;" />
+}
+
+@if (_loading)
+{
+    <Flex Justify="@("center")" Style="padding: 40px 0;"><Spin /></Flex>
+}
+else
+{
+    @* Inline new-folder row *@
+    @if (_addingFolder)
+    {
+        <Flex Align="FlexAlign.Center" Gap="FlexGap.Small" Style="margin-bottom: 12px;">
+            <Icon Type="@IconType.Outline.Folder" Style="color: #faad14;" />
+            <Input @ref="_newFolderInput"
+                   @bind-Value="_newFolderName"
+                   Placeholder="Folder name"
+                   Style="width: 220px;"
+                   OnPressEnter="@(_ => ConfirmNewFolderAsync())" />
+            <Button Size="ButtonSize.Small" Type="ButtonType.Primary" OnClick="ConfirmNewFolderAsync">Create</Button>
+            <Button Size="ButtonSize.Small" OnClick="CancelNewFolder">Cancel</Button>
+        </Flex>
+    }
+
+    @* Folders *@
+    @if (_listing.Folders.Count > 0 || _addingFolder)
+    {
+        <h3 style="font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.05em; color: #888; margin-bottom: 8px;">Folders</h3>
+        <Table TItem="FolderSummary" DataSource="_listing.Folders" Bordered="false"
+               PageSize="int.MaxValue" PaginationPosition="none" Style="margin-bottom: 24px;">
+            <PropertyColumn Property="f => f.Name" Title="Name">
+                <a @onclick="() => OpenFolder(context)" @onclick:preventDefault style="cursor: pointer; font-weight: 500;">
+                    <Icon Type="@IconType.Outline.Folder" Style="color: #faad14; margin-right: 6px;" />
+                    @context.Name
+                </a>
+            </PropertyColumn>
+            <PropertyColumn Property="f => f.CreatedAt" Title="Created" Width="160">
+                <Text Type="TextElementType.Secondary" Style="font-size: 0.85rem;">@FormatDate(context.CreatedAt)</Text>
+            </PropertyColumn>
+            <ActionColumn Title="" Width="130">
+                <Space Size="SpaceSize.Small">
+                    <SpaceItem>
+                        <Button Size="ButtonSize.Small" Icon="@IconType.Outline.Edit"
+                                OnClick="() => StartRenameFolder(context)">Rename</Button>
+                    </SpaceItem>
+                    <SpaceItem>
+                        <Popconfirm Title="Delete this folder and all its contents?"
+                                    OnConfirm="@(() => DeleteFolderAsync(context))"
+                                    OkText="@("Delete")" OkType="ButtonType.Primary"
+                                    OkButtonProps="new ButtonProps { Danger = true }"
+                                    CancelText="Cancel">
+                            <Button Size="ButtonSize.Small" Danger Icon="@IconType.Outline.Delete">Delete</Button>
+                        </Popconfirm>
+                    </SpaceItem>
+                </Space>
+            </ActionColumn>
+        </Table>
+    }
+
+    @* Notebooks *@
+    @if (_listing.Notebooks.Count > 0)
+    {
+        <h3 style="font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.05em; color: #888; margin-bottom: 8px;">Notebooks</h3>
+        <Table TItem="NotebookSummary" DataSource="_listing.Notebooks" Bordered="false"
+               PageSize="int.MaxValue" PaginationPosition="none">
+            <PropertyColumn Property="n => n.Title" Title="Title">
+                <Icon Type="@IconType.Outline.FileText" Style="margin-right: 6px; color: #1677ff;" />
+                <span style="font-weight: 500;">@context.Title</span>
+            </PropertyColumn>
+            <PropertyColumn Property="n => n.UpdatedAt" Title="Last saved" Width="160">
+                <Text Type="TextElementType.Secondary" Style="font-size: 0.85rem;">@FormatDate(context.UpdatedAt)</Text>
+            </PropertyColumn>
+            <ActionColumn Title="" Width="200">
+                <Space Size="SpaceSize.Small">
+                    <SpaceItem>
+                        <Button Size="ButtonSize.Small" Type="ButtonType.Primary"
+                                Icon="@IconType.Outline.PlayCircle"
+                                OnClick="() => OpenNotebook(context)">Open</Button>
+                    </SpaceItem>
+                    <SpaceItem>
+                        <Button Size="ButtonSize.Small" Icon="@IconType.Outline.Edit"
+                                OnClick="() => StartRenameNotebook(context)">Rename</Button>
+                    </SpaceItem>
+                    <SpaceItem>
+                        <Popconfirm Title="Delete this notebook?"
+                                    OnConfirm="@(() => DeleteNotebookAsync(context))"
+                                    OkText="@("Delete")" OkType="ButtonType.Primary"
+                                    OkButtonProps="new ButtonProps { Danger = true }"
+                                    CancelText="Cancel">
+                            <Button Size="ButtonSize.Small" Danger Icon="@IconType.Outline.Delete">Delete</Button>
+                        </Popconfirm>
+                    </SpaceItem>
+                </Space>
+            </ActionColumn>
+        </Table>
+    }
+
+    @if (_listing.Folders.Count == 0 && _listing.Notebooks.Count == 0 && !_addingFolder)
+    {
+        <div style="text-align: center; padding: 40px 0;">
+            <Icon Type="@IconType.Outline.Inbox" Style="font-size: 48px; color: #d9d9d9;" />
+            <p style="margin-top: 12px;"><Text Type="TextElementType.Secondary">This folder is empty. Create a folder or notebook to get started.</Text></p>
+        </div>
+    }
+}
+
+@* Rename folder modal *@
+<Modal Title="@("Rename Folder")"
+       Visible="_renameFolderTarget is not null"
+       OnOk="ConfirmRenameFolderAsync"
+       OnCancel="CancelRenameFolder"
+       OkText="@("Rename")">
+    <Input @bind-Value="_renameFolderName" Placeholder="Folder name" />
+</Modal>
+
+@* Rename notebook modal *@
+<Modal Title="@("Rename Notebook")"
+       Visible="_renameNotebookTarget is not null"
+       OnOk="ConfirmRenameNotebookAsync"
+       OnCancel="CancelRenameNotebook"
+       OkText="@("Rename")">
+    <Input @bind-Value="_renameNotebookName" Placeholder="Notebook title" />
+</Modal>
+
+@* New notebook modal *@
+<Modal Title="@("New Notebook")"
+       Visible="_addingNotebook"
+       OnOk="ConfirmNewNotebookAsync"
+       OnCancel="CancelNewNotebook"
+       OkText="@("Create")">
+    <Input @bind-Value="_newNotebookTitle" Placeholder="Notebook title" />
+</Modal>
+
+@code {
+    private WorkspaceListing _listing = new([], []);
+    private List<(Guid? Id, string Name)> _breadcrumbs = [( null, "Workspace")];
+    private bool _loading;
+    private string? _error;
+
+    // New folder
+    private bool _addingFolder;
+    private string _newFolderName = "";
+    private AntDesign.Input<string>? _newFolderInput;
+
+    // New notebook
+    private bool _addingNotebook;
+    private string _newNotebookTitle = "";
+
+    // Rename folder
+    private FolderSummary? _renameFolderTarget;
+    private string _renameFolderName = "";
+
+    // Rename notebook
+    private NotebookSummary? _renameNotebookTarget;
+    private string _renameNotebookName = "";
+
+    private Guid? CurrentFolderId => _breadcrumbs[^1].Id;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            _listing = CurrentFolderId.HasValue
+                ? await WorkspaceService.GetFolderAsync(CurrentFolderId.Value)
+                : await WorkspaceService.GetRootAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to load workspace: {ex.Message}";
+        }
+        finally { _loading = false; }
+    }
+
+    private async Task OpenFolder(FolderSummary folder)
+    {
+        _breadcrumbs.Add((folder.Id, folder.Name));
+        await LoadAsync();
+    }
+
+    private async Task NavigateToCrumb(int index)
+    {
+        _breadcrumbs = _breadcrumbs.Take(index + 1).ToList();
+        await LoadAsync();
+    }
+
+    private void OpenNotebook(NotebookSummary notebook) =>
+        Navigation.NavigateTo($"/notebook/{notebook.Id}");
+
+    // ── New Folder ────────────────────────────────────────────────────
+
+    private void StartNewFolder()
+    {
+        _newFolderName = "";
+        _addingFolder = true;
+    }
+
+    private async Task ConfirmNewFolderAsync()
+    {
+        var name = _newFolderName.Trim();
+        if (string.IsNullOrEmpty(name)) { CancelNewFolder(); return; }
+        try
+        {
+            await WorkspaceService.CreateFolderAsync(new CreateFolderRequest(name, CurrentFolderId));
+            _addingFolder = false;
+            await LoadAsync();
+        }
+        catch (Exception ex) { _error = $"Failed to create folder: {ex.Message}"; }
+    }
+
+    private void CancelNewFolder()
+    {
+        _addingFolder = false;
+        _newFolderName = "";
+    }
+
+    // ── New Notebook ──────────────────────────────────────────────────
+
+    private void StartNewNotebook()
+    {
+        _newNotebookTitle = "Untitled";
+        _addingNotebook = true;
+    }
+
+    private async Task ConfirmNewNotebookAsync()
+    {
+        var title = _newNotebookTitle.Trim();
+        if (string.IsNullOrEmpty(title)) title = "Untitled";
+        try
+        {
+            var notebook = await WorkspaceService.CreateNotebookAsync(
+                new CreateNotebookRequest(title, EmptyNotebookContent(title), CurrentFolderId));
+            _addingNotebook = false;
+            Navigation.NavigateTo($"/notebook/{notebook.Id}");
+        }
+        catch (Exception ex) { _error = $"Failed to create notebook: {ex.Message}"; }
+    }
+
+    private void CancelNewNotebook()
+    {
+        _addingNotebook = false;
+        _newNotebookTitle = "";
+    }
+
+    // ── Rename Folder ─────────────────────────────────────────────────
+
+    private void StartRenameFolder(FolderSummary folder)
+    {
+        _renameFolderTarget = folder;
+        _renameFolderName = folder.Name;
+    }
+
+    private async Task ConfirmRenameFolderAsync()
+    {
+        if (_renameFolderTarget is null) return;
+        var name = _renameFolderName.Trim();
+        if (string.IsNullOrEmpty(name)) { CancelRenameFolder(); return; }
+        try
+        {
+            await WorkspaceService.UpdateFolderAsync(_renameFolderTarget.Id,
+                new UpdateFolderRequest(name, _renameFolderTarget.ParentId));
+            _renameFolderTarget = null;
+            await LoadAsync();
+        }
+        catch (Exception ex) { _error = $"Failed to rename folder: {ex.Message}"; }
+    }
+
+    private void CancelRenameFolder() => _renameFolderTarget = null;
+
+    // ── Rename Notebook ───────────────────────────────────────────────
+
+    private void StartRenameNotebook(NotebookSummary notebook)
+    {
+        _renameNotebookTarget = notebook;
+        _renameNotebookName = notebook.Title;
+    }
+
+    private async Task ConfirmRenameNotebookAsync()
+    {
+        if (_renameNotebookTarget is null) return;
+        var title = _renameNotebookName.Trim();
+        if (string.IsNullOrEmpty(title)) { CancelRenameNotebook(); return; }
+        try
+        {
+            // Content is preserved — fetch current content first so we don't overwrite it with empty
+            var detail = await WorkspaceService.GetNotebookAsync(_renameNotebookTarget.Id);
+            if (detail is not null)
+            {
+                await WorkspaceService.UpdateNotebookAsync(_renameNotebookTarget.Id,
+                    new UpdateNotebookRequest(title, detail.Content, _renameNotebookTarget.FolderId));
+            }
+            _renameNotebookTarget = null;
+            await LoadAsync();
+        }
+        catch (Exception ex) { _error = $"Failed to rename notebook: {ex.Message}"; }
+    }
+
+    private void CancelRenameNotebook() => _renameNotebookTarget = null;
+
+    // ── Delete ────────────────────────────────────────────────────────
+
+    private async Task DeleteFolderAsync(FolderSummary folder)
+    {
+        try
+        {
+            await WorkspaceService.DeleteFolderAsync(folder.Id);
+            await LoadAsync();
+        }
+        catch (Exception ex) { _error = $"Failed to delete folder: {ex.Message}"; }
+    }
+
+    private async Task DeleteNotebookAsync(NotebookSummary notebook)
+    {
+        try
+        {
+            await WorkspaceService.DeleteNotebookAsync(notebook.Id);
+            await LoadAsync();
+        }
+        catch (Exception ex) { _error = $"Failed to delete notebook: {ex.Message}"; }
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────
+
+    private static string FormatDate(DateTime dt)
+    {
+        var diff = DateTime.UtcNow - dt.ToUniversalTime();
+        return diff.TotalSeconds < 60  ? "just now"
+             : diff.TotalMinutes < 60  ? $"{(int)diff.TotalMinutes}m ago"
+             : diff.TotalHours < 24    ? $"{(int)diff.TotalHours}h ago"
+             : diff.TotalDays < 7      ? $"{(int)diff.TotalDays}d ago"
+             : dt.ToLocalTime().ToString("yyyy-MM-dd");
+    }
+
+    private static string EmptyNotebookContent(string title)
+    {
+        return $$"""
+            {
+              "nbformat": 4,
+              "nbformat_minor": 5,
+              "metadata": {
+                "kernelspec": { "display_name": "DuckHouse", "language": "python", "name": "duckhouse" },
+                "duckhouse": { "version": "1", "title": "{{title}}" }
+              },
+              "cells": []
+            }
+            """;
+    }
+}

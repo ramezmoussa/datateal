@@ -1,0 +1,73 @@
+using System.Net;
+using System.Net.Http.Json;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using DuckHouse.Ui.Shared.Workspace;
+
+namespace DuckHouse.Ui.Client.Services;
+
+internal class WorkspaceService(HttpClient httpClient) : IWorkspaceService
+{
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
+    {
+        Converters = { new JsonStringEnumConverter() }
+    };
+
+    public async Task<WorkspaceListing> GetRootAsync(CancellationToken cancellationToken = default) =>
+        await httpClient.GetFromJsonAsync<WorkspaceListing>("api/workspace", JsonOptions, cancellationToken)
+        ?? new WorkspaceListing([], []);
+
+    public async Task<WorkspaceListing> GetFolderAsync(Guid folderId, CancellationToken cancellationToken = default) =>
+        await httpClient.GetFromJsonAsync<WorkspaceListing>($"api/workspace/folders/{folderId}", JsonOptions, cancellationToken)
+        ?? new WorkspaceListing([], []);
+
+    public async Task<NotebookDetail?> GetNotebookAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.GetAsync($"api/workspace/notebooks/{id}", cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound) return null;
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<NotebookDetail>(JsonOptions, cancellationToken);
+    }
+
+    public async Task<FolderSummary> CreateFolderAsync(CreateFolderRequest request, CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.PostAsJsonAsync("api/workspace/folders", request, JsonOptions, cancellationToken);
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<FolderSummary>(JsonOptions, cancellationToken))!;
+    }
+
+    public async Task<FolderSummary?> UpdateFolderAsync(Guid id, UpdateFolderRequest request, CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.PutAsJsonAsync($"api/workspace/folders/{id}", request, JsonOptions, cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound) return null;
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<FolderSummary>(JsonOptions, cancellationToken);
+    }
+
+    public async Task DeleteFolderAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.DeleteAsync($"api/workspace/folders/{id}", cancellationToken);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task<NotebookSummary> CreateNotebookAsync(CreateNotebookRequest request, CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.PostAsJsonAsync("api/workspace/notebooks", request, JsonOptions, cancellationToken);
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<NotebookSummary>(JsonOptions, cancellationToken))!;
+    }
+
+    public async Task<NotebookSummary?> UpdateNotebookAsync(Guid id, UpdateNotebookRequest request, CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.PutAsJsonAsync($"api/workspace/notebooks/{id}", request, JsonOptions, cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound) return null;
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<NotebookSummary>(JsonOptions, cancellationToken);
+    }
+
+    public async Task DeleteNotebookAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.DeleteAsync($"api/workspace/notebooks/{id}", cancellationToken);
+        response.EnsureSuccessStatusCode();
+    }
+}
