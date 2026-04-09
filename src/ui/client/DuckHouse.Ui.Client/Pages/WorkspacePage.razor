@@ -118,6 +118,10 @@ else
                 {
                     <Space Size="SpaceSize.Small">
                         <SpaceItem>
+                            <Button Size="ButtonSize.Small" Icon="@IconType.Outline.FolderOpen"
+                                    OnClick="() => StartMoveNotebook(context.Notebook!)">Move</Button>
+                        </SpaceItem>
+                        <SpaceItem>
                             <Button Size="ButtonSize.Small" Icon="@IconType.Outline.Edit"
                                     OnClick="() => StartRenameNotebook(context.Notebook!)">Rename</Button>
                         </SpaceItem>
@@ -163,6 +167,13 @@ else
     <Input @bind-Value="_renameNotebookName" Placeholder="Notebook title" />
 </Modal>
 
+@* Move notebook folder picker *@
+<FolderPickerModal Visible="_moveNotebookTarget is not null"
+                   Title="@("Move notebook to folder")"
+                   OkText="@("Move here")"
+                   OnConfirm="ConfirmMoveNotebookAsync"
+                   OnCancel="@(() => _moveNotebookTarget = null)" />
+
 @code {
     [Parameter, SupplyParameterFromQuery(Name = "folder")]
     public Guid? Folder { get; set; }
@@ -193,6 +204,9 @@ else
     // Rename notebook
     private NotebookSummary? _renameNotebookTarget;
     private string _renameNotebookName = "";
+
+    // Move notebook
+    private NotebookSummary? _moveNotebookTarget;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -330,6 +344,26 @@ else
     }
 
     private void CancelRenameNotebook() => _renameNotebookTarget = null;
+
+    // ── Move Notebook ─────────────────────────────────────────────────
+
+    private void StartMoveNotebook(NotebookSummary notebook) => _moveNotebookTarget = notebook;
+
+    private async Task ConfirmMoveNotebookAsync(Guid? folderId)
+    {
+        if (_moveNotebookTarget is null) return;
+        var target = _moveNotebookTarget;
+        _moveNotebookTarget = null;
+        try
+        {
+            var detail = await WorkspaceService.GetNotebookAsync(target.Id);
+            if (detail is not null)
+                await WorkspaceService.UpdateNotebookAsync(target.Id,
+                    new UpdateNotebookRequest(target.Title, detail.Content, folderId));
+            await LoadAsync();
+        }
+        catch (Exception ex) { _error = $"Failed to move notebook: {ex.Message}"; }
+    }
 
     // ── Delete ────────────────────────────────────────────────────────
 
