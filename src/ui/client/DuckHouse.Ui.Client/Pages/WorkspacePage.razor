@@ -173,6 +173,9 @@ else
 </Modal>
 
 @code {
+    [Parameter, SupplyParameterFromQuery(Name = "folder")]
+    public Guid? Folder { get; set; }
+
     private sealed record WorkspaceItem(FolderSummary? Folder, NotebookSummary? Notebook)
     {
         public bool IsFolder => Folder is not null;
@@ -182,7 +185,8 @@ else
 
     private WorkspaceListing _listing = new([], []);
     private List<WorkspaceItem> _items = [];
-    private List<(Guid? Id, string Name)> _breadcrumbs = [( null, "Workspace")];
+    private List<(Guid? Id, string Name)> _breadcrumbs = [(null, "Workspace")];
+    private Guid? _lastLoadedFolder = Guid.Empty; // sentinel — differs from null (root)
     private bool _loading;
     private string? _error;
 
@@ -203,9 +207,12 @@ else
     private NotebookSummary? _renameNotebookTarget;
     private string _renameNotebookName = "";
 
-    private Guid? CurrentFolderId => _breadcrumbs[^1].Id;
-
-    protected override async Task OnInitializedAsync() => await LoadAsync();
+    protected override async Task OnParametersSetAsync()
+    {
+        if (Folder == _lastLoadedFolder) return;
+        _lastLoadedFolder = Folder;
+        await LoadAsync();
+    }
 
     private async Task LoadAsync()
     {
@@ -213,9 +220,17 @@ else
         _error = null;
         try
         {
-            _listing = CurrentFolderId.HasValue
-                ? await WorkspaceService.GetFolderAsync(CurrentFolderId.Value)
-                : await WorkspaceService.GetRootAsync();
+            if (Folder is null)
+            {
+                _breadcrumbs = [(null, "Workspace")];
+                _listing = await WorkspaceService.GetRootAsync();
+            }
+            else
+            {
+                var ancestors = await WorkspaceService.GetFolderAncestorsAsync(Folder.Value);
+                _breadcrumbs = [(null, "Workspace"), ..ancestors.Select(f => ((Guid?)f.Id, f.Name))];
+                _listing = await WorkspaceService.GetFolderAsync(Folder.Value);
+            }
         }
         catch (Exception ex)
         {
@@ -231,16 +246,13 @@ else
         }
     }
 
-    private async Task OpenFolder(FolderSummary folder)
-    {
-        _breadcrumbs.Add((folder.Id, folder.Name));
-        await LoadAsync();
-    }
+    private void OpenFolder(FolderSummary folder) =>
+        Navigation.NavigateTo($"/workspace?folder={folder.Id}");
 
-    private async Task NavigateToCrumb(int index)
+    private void NavigateToCrumb(int index)
     {
-        _breadcrumbs = _breadcrumbs.Take(index + 1).ToList();
-        await LoadAsync();
+        var crumb = _breadcrumbs[index];
+        Navigation.NavigateTo(crumb.Id is null ? "/workspace" : $"/workspace?folder={crumb.Id}");
     }
 
     private void OpenNotebook(NotebookSummary notebook) =>
@@ -260,7 +272,7 @@ else
         if (string.IsNullOrEmpty(name)) { CancelNewFolder(); return; }
         try
         {
-            await WorkspaceService.CreateFolderAsync(new CreateFolderRequest(name, CurrentFolderId));
+            await WorkspaceService.CreateFolderAsync(new CreateFolderRequest(name, Folder));
             _addingFolder = false;
             await LoadAsync();
         }
@@ -288,7 +300,7 @@ else
         try
         {
             var notebook = await WorkspaceService.CreateNotebookAsync(
-                new CreateNotebookRequest(title, EmptyNotebookContent(title), CurrentFolderId));
+                new CreateNotebookRequest(title, EmptyNotebookContent(title), Folder));
             _addingNotebook = false;
             Navigation.NavigateTo($"/notebook/{notebook.Id}");
         }

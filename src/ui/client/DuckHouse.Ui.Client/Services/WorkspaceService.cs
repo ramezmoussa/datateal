@@ -21,6 +21,10 @@ internal class WorkspaceService(HttpClient httpClient) : IWorkspaceService
         await httpClient.GetFromJsonAsync<WorkspaceListing>($"api/workspace/folders/{folderId}", JsonOptions, cancellationToken)
         ?? new WorkspaceListing([], []);
 
+    public async Task<IReadOnlyList<FolderSummary>> GetFolderAncestorsAsync(Guid folderId, CancellationToken cancellationToken = default) =>
+        await httpClient.GetFromJsonAsync<IReadOnlyList<FolderSummary>>($"api/workspace/folders/{folderId}/ancestors", JsonOptions, cancellationToken)
+        ?? [];
+
     public async Task<NotebookDetail?> GetNotebookAsync(Guid id, CancellationToken cancellationToken = default)
     {
         var response = await httpClient.GetAsync($"api/workspace/notebooks/{id}", cancellationToken);

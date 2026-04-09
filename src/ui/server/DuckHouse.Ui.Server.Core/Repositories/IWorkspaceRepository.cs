@@ -8,6 +8,8 @@ public interface IWorkspaceRepository
     Task<IReadOnlyList<Notebook>> GetNotebooksInAsync(Guid? folderId, CancellationToken cancellationToken = default);
     Task<Folder?> GetFolderAsync(Guid id, CancellationToken cancellationToken = default);
     Task<Notebook?> GetNotebookAsync(Guid id, CancellationToken cancellationToken = default);
+    /// <summary>Returns the ancestor chain from root down to the folder with <paramref name="id"/>, inclusive.</summary>
+    Task<IReadOnlyList<Folder>> GetFolderAncestorsAsync(Guid id, CancellationToken cancellationToken = default);
 
     Task<Folder> CreateFolderAsync(string name, Guid? parentId, CancellationToken cancellationToken = default);
     Task<Folder?> UpdateFolderAsync(Guid id, string name, Guid? parentId, CancellationToken cancellationToken = default);

@@ -6,6 +6,7 @@ public interface IWorkspaceService
 {
     Task<WorkspaceListing> GetRootAsync(CancellationToken cancellationToken = default);
     Task<WorkspaceListing> GetFolderAsync(Guid folderId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<FolderSummary>> GetFolderAncestorsAsync(Guid folderId, CancellationToken cancellationToken = default);
     Task<NotebookDetail?> GetNotebookAsync(Guid id, CancellationToken cancellationToken = default);
 
     Task<FolderSummary> CreateFolderAsync(CreateFolderRequest request, CancellationToken cancellationToken = default);

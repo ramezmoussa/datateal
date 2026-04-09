@@ -27,6 +27,20 @@ internal class WorkspaceRepository(UiDbContext db) : IWorkspaceRepository
     public Task<Folder?> GetFolderAsync(Guid id, CancellationToken cancellationToken = default) =>
         db.Folders.FirstOrDefaultAsync(f => f.Id == id, cancellationToken);
 
+    public async Task<IReadOnlyList<Folder>> GetFolderAncestorsAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        var chain = new List<Folder>();
+        var currentId = (Guid?)id;
+        while (currentId.HasValue)
+        {
+            var folder = await db.Folders.FirstOrDefaultAsync(f => f.Id == currentId, cancellationToken);
+            if (folder is null) break;
+            chain.Insert(0, folder);
+            currentId = folder.ParentId;
+        }
+        return chain;
+    }
+
     public Task<Notebook?> GetNotebookAsync(Guid id, CancellationToken cancellationToken = default) =>
         db.Notebooks.FirstOrDefaultAsync(n => n.Id == id, cancellationToken);
 

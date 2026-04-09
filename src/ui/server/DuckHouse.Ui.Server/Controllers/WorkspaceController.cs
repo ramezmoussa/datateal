@@ -19,6 +19,10 @@ public class WorkspaceController(IMediator mediator) : ControllerBase
     public async Task<WorkspaceListing> GetFolder(Guid id, CancellationToken ct) =>
         await mediator.SendAsync(new Qry.GetWorkspaceRequest(id), ct);
 
+    [HttpGet("folders/{id:guid}/ancestors")]
+    public async Task<IReadOnlyList<FolderSummary>> GetFolderAncestors(Guid id, CancellationToken ct) =>
+        await mediator.SendAsync(new Qry.GetFolderAncestorsRequest(id), ct);
+
     [HttpPost("folders")]
     public async Task<IActionResult> CreateFolder(SharedWorkspace.CreateFolderRequest body, CancellationToken ct)
     {
