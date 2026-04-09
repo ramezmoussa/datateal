@@ -1,4 +1,5 @@
 using DuckHouse.Ui.Server.Core.Repositories;
+using DuckHouse.Ui.Server.Infrastructure.Data;
 using DuckHouse.Ui.Server.Infrastructure.Repositories;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -16,5 +17,7 @@ public static class ServiceExtensions
             client => client.BaseAddress = new Uri(baseAddress));
         services.AddHttpClient<IKernelRepository, KernelRepository>(
             client => client.BaseAddress = new Uri(baseAddress));
+
+        services.AddScoped<IWorkspaceRepository, WorkspaceRepository>();
     }
 }

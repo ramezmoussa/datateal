@@ -1,0 +1,36 @@
+using DuckHouse.Ui.Server.Core.Workspace;
+using Microsoft.EntityFrameworkCore;
+
+namespace DuckHouse.Ui.Server.Infrastructure.Data;
+
+public class UiDbContext(DbContextOptions<UiDbContext> options) : DbContext(options)
+{
+    public DbSet<Folder> Folders => Set<Folder>();
+    public DbSet<Notebook> Notebooks => Set<Notebook>();
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<Folder>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).HasMaxLength(256).IsRequired();
+            entity.HasOne(e => e.Parent)
+                .WithMany(e => e.Children)
+                .HasForeignKey(e => e.ParentId)
+                .IsRequired(false)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<Notebook>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Title).HasMaxLength(512).IsRequired();
+            entity.Property(e => e.Content).IsRequired();
+            entity.HasOne(e => e.Folder)
+                .WithMany(e => e.Notebooks)
+                .HasForeignKey(e => e.FolderId)
+                .IsRequired(false)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+    }
+}

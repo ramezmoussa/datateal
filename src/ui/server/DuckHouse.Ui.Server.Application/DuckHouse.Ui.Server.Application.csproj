@@ -11,6 +11,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\DuckHouse.Ui.Server.Core\DuckHouse.Ui.Server.Core.csproj" />
+    <ProjectReference Include="..\..\DuckHouse.Ui.Shared\DuckHouse.Ui.Shared.csproj" />
   </ItemGroup>
 
 </Project>

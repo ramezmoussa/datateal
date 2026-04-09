@@ -3,6 +3,8 @@ using DuckHouse.Ui.Server;
 using DuckHouse.Ui.Server.Application;
 using DuckHouse.Ui.Server.Components;
 using DuckHouse.Ui.Server.Infrastructure;
+using DuckHouse.Ui.Server.Infrastructure.Data;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -22,9 +24,17 @@ builder.Services.AddProblemDetails();
 builder.Services.AddApplicationServices();
 builder.Services.AddInfrastructureServices(builder.Configuration);
 
+builder.AddNpgsqlDbContext<UiDbContext>("duckhouse-ui");
+
 builder.Services.AddAntDesign();
 
 var app = builder.Build();
+
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<UiDbContext>();
+    await db.Database.CreateExecutionStrategy().ExecuteAsync(() => db.Database.MigrateAsync());
+}
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
