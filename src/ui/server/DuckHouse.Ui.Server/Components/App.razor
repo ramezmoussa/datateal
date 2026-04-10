@@ -93,6 +93,40 @@
         window.clickElement = function (element) {
             element.click();
         };
+
+        window.initQueryPageSplitter = function (topPaneId, handleId, dotNetRef) {
+            const topPane = document.getElementById(topPaneId);
+            const handle = document.getElementById(handleId);
+            if (!topPane || !handle) return;
+
+            let dragging = false;
+            let startY = 0;
+            let startHeight = 0;
+
+            handle.addEventListener('mousedown', function (e) {
+                dragging = true;
+                startY = e.clientY;
+                startHeight = topPane.offsetHeight;
+                document.body.style.cursor = 'ns-resize';
+                document.body.style.userSelect = 'none';
+                e.preventDefault();
+            });
+
+            document.addEventListener('mousemove', function (e) {
+                if (!dragging) return;
+                const delta = e.clientY - startY;
+                const newHeight = Math.max(80, startHeight + delta);
+                topPane.style.height = newHeight + 'px';
+            });
+
+            document.addEventListener('mouseup', function (e) {
+                if (!dragging) return;
+                dragging = false;
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
+                dotNetRef.invokeMethodAsync('OnSplitterDragEnd', topPane.offsetHeight);
+            });
+        };
     </script>
 </body>
 

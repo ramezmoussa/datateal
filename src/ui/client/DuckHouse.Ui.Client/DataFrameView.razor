@@ -1,6 +1,6 @@
 @using DuckHouse.Core.Kernels
 
-<div class="df-view">
+<div class="df-view @(Fill ? "df-view-fill" : "")">
     <table class="df-table">
         <thead>
             <tr>
@@ -34,6 +34,7 @@
 
 @code {
     [Parameter, EditorRequired] public DataFrameOutput Data { get; set; } = default!;
+    [Parameter] public bool Fill { get; set; }
 
     private List<IReadOnlyList<object?>> _rows = [];
     private DataFrameOutput? _lastData;

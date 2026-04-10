@@ -11,10 +11,14 @@
 @inject NavigationManager Navigation
 @implements IAsyncDisposable
 
+@inject IJSRuntime JS
+
 <PageTitle>Query — DuckHouse</PageTitle>
 
+<div class="qp-page">
+
 @* ── Title row ── *@
-<Flex Justify="FlexJustify.SpaceBetween" Align="FlexAlign.Center" Style="margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+<Flex Justify="FlexJustify.SpaceBetween" Align="FlexAlign.Center" Style="margin-bottom: 12px; flex-wrap: wrap; gap: 8px; flex-shrink: 0;">
     <Space Align="SpaceAlign.End" Size="SpaceSize.Middle">
         <SpaceItem>
             <Icon Height="24px" Width="24px" Type="@IconType.Outline.Code" />
@@ -145,12 +149,12 @@
 }
 
 @* ── Split layout ── *@
-<div style="display: flex; flex-direction: column; height: calc(100vh - 240px); min-height: 400px;">
+<div class="qp-split">
 
-    @* Top half: editor + run toolbar *@
-    <div style="flex: 1 1 0%; display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--ant-color-border); border-radius: 8px 8px 0 0; padding: 8px;">
-        <Flex Justify="FlexJustify.SpaceBetween" Align="FlexAlign.Center" Style="margin-bottom: 8px;">
-            <Text Strong Style="font-size: 0.875rem; color: var(--ant-color-text-secondary);">SQL</Text>
+    @* Top pane: editor + run toolbar *@
+    <div id="qp-top-pane" class="qp-top-pane" style="height: @(_topHeightPx)px;">
+        <Flex Justify="FlexJustify.SpaceBetween" Align="FlexAlign.Center" Style="margin-bottom: 8px; flex-shrink: 0;">
+            <Text Type="TextElementType.Secondary" Strong Style="font-size: 0.875rem;">SQL</Text>
             <Space Size="SpaceSize.Small">
                 @if (_isExecuting)
                 {
@@ -196,45 +200,58 @@
         </div>
     </div>
 
-    @* Bottom half: results *@
-    <div style="flex: 1 1 0%; overflow: auto; border: 1px solid var(--ant-color-border); border-top: none; border-radius: 0 0 8px 8px; padding: 8px;">
+    @* Drag handle *@
+    <div id="qp-drag-handle" class="qp-drag-handle">
+        <div class="qp-drag-handle-inner"></div>
+    </div>
+
+    @* Bottom pane: results *@
+    <div class="qp-bottom-pane">
         @if (_isExecuting)
         {
             <Flex Justify="@("center")" Style="padding: 40px 0;"><Spin /></Flex>
         }
         else if (_resultDf is not null)
         {
-            <Flex Justify="FlexJustify.SpaceBetween" Align="FlexAlign.Center" Style="margin-bottom: 8px;">
+            <div style="flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                 <Text Type="TextElementType.Secondary" Style="font-size: 0.875rem;">
                     @_resultDf.TotalRows.ToString("N0")@(_resultDf.TotalRows == DataFrameOutput.RowCap ? "+" : "") rows
                 </Text>
                 @if (_lastExecutedAt.HasValue)
                 {
-                    <span style="font-size: 0.75rem; color: var(--ant-color-text-secondary);">Last run @_lastExecutedAt.Value.ToLocalTime().ToString("HH:mm:ss")</span>
+                    <span style="font-size: 0.75rem; opacity: 0.6;">Last run @_lastExecutedAt.Value.ToLocalTime().ToString("HH:mm:ss")</span>
                 }
-            </Flex>
-            <DataFrameView Data="_resultDf" />
+            </div>
+            <div style="flex: 1 1 0%; overflow: auto;">
+                <DataFrameView Data="_resultDf" Fill="true" />
+            </div>
         }
         else if (_resultError is not null)
         {
-            <div style="border-left: 3px solid var(--ant-color-error); padding: 8px 12px; border-radius: 0 4px 4px 0;">
-                <Text Type="TextElementType.Danger" Strong Style="display: block; font-size: 0.875rem; margin-bottom: 4px;">@_resultError.Ename: @_resultError.Evalue</Text>
-                <pre style="font-family: monospace; font-size: 0.875rem; margin: 0; white-space: pre-wrap;"><Text Type="TextElementType.Danger">@string.Join("\n", _resultError.Traceback.Select(StripAnsi))</Text></pre>
+            <div style="flex: 1 1 0%; overflow: auto;">
+                <div class="qp-error-bar">
+                    <Text Type="TextElementType.Danger" Strong Style="display: block; font-size: 0.875rem; margin-bottom: 4px;">@_resultError.Ename: @_resultError.Evalue</Text>
+                    <pre style="font-family: monospace; font-size: 0.875rem; margin: 0; white-space: pre-wrap;"><Text Type="TextElementType.Danger">@string.Join("\n", _resultError.Traceback.Select(StripAnsi))</Text></pre>
+                </div>
             </div>
         }
         else if (_resultText is not null)
         {
-            <pre style="font-family: monospace; font-size: 0.875rem; margin: 0;">@_resultText</pre>
+            <div style="flex: 1 1 0%; overflow: auto;">
+                <pre style="font-family: monospace; font-size: 0.875rem; margin: 0;">@_resultText</pre>
+            </div>
         }
         else
         {
-            <div style="text-align: center; padding: 40px 0; color: var(--ant-color-text-quaternary);">
-                <Icon Type="@IconType.Outline.Table" Style="font-size: 40px;" />
+            <div style="flex: 1 1 0%; display: flex; align-items: center; justify-content: center; flex-direction: column;">
+                <Icon Type="@IconType.Outline.Table" Style="font-size: 40px; opacity: 0.25;" />
                 <p style="margin-top: 12px;"><Text Type="TextElementType.Secondary">Run a query to see results here.</Text></p>
             </div>
         }
     </div>
 </div>
+
+</div>@* end .qp-page *@
 
 @* Folder picker modal — shown when saving to workspace for the first time *@
 <FolderPickerModal Visible="_showFolderPicker"
@@ -274,7 +291,10 @@
     private ErrorInfo? _resultError;
     private string? _resultText;
 
-    private int _editorHeight = 200;
+    private int _topHeightPx = 300;
+    private int _editorHeight => Math.Max(40, _topHeightPx - 56);
+
+    private DotNetObjectReference<QueryPage>? _dotNetRef;
 
     private bool HasKernel => !string.IsNullOrEmpty(_kernelId);
 
@@ -354,9 +374,6 @@
     {
         _sql = value;
         _isDirty = true;
-        // Recompute editor height: at least 200px, up to 400px based on line count
-        int lines = Math.Max(1, value.Split('\n').Length);
-        _editorHeight = Math.Min(400, Math.Max(200, lines * 20 + 20));
     }
 
     // ── Workspace persistence ─────────────────────────────────────────
@@ -583,8 +600,25 @@
     private static string StripAnsi(string text) =>
         System.Text.RegularExpressions.Regex.Replace(text, @"\x1B\[[0-9;]*[a-zA-Z]", "");
 
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _dotNetRef = DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("initQueryPageSplitter", "qp-top-pane", "qp-drag-handle", _dotNetRef);
+        }
+    }
+
+    [JSInvokable]
+    public void OnSplitterDragEnd(double height)
+    {
+        _topHeightPx = Math.Max(80, (int)height);
+        StateHasChanged();
+    }
+
     public async ValueTask DisposeAsync()
     {
+        _dotNetRef?.Dispose();
         await StopKernelPollingAsync();
     }
 }
