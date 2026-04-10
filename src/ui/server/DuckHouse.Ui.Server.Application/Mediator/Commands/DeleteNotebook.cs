@@ -7,11 +7,6 @@ public record DeleteNotebookRequest(Guid Id) : IRequest<bool>;
 
 internal class DeleteNotebookHandler(IWorkspaceRepository repository) : IRequestHandler<DeleteNotebookRequest, bool>
 {
-    public async Task<bool> Handle(DeleteNotebookRequest request, CancellationToken cancellationToken)
-    {
-        var notebook = await repository.GetNotebookAsync(request.Id, cancellationToken);
-        if (notebook is null) return false;
-        await repository.DeleteNotebookAsync(request.Id, cancellationToken);
-        return true;
-    }
+    public Task<bool> Handle(DeleteNotebookRequest request, CancellationToken cancellationToken) =>
+        repository.DeleteItemAsync(request.Id, cancellationToken);
 }

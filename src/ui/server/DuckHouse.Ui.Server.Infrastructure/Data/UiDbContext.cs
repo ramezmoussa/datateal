@@ -6,7 +6,7 @@ namespace DuckHouse.Ui.Server.Infrastructure.Data;
 public class UiDbContext(DbContextOptions<UiDbContext> options) : DbContext(options)
 {
     public DbSet<Folder> Folders => Set<Folder>();
-    public DbSet<Notebook> Notebooks => Set<Notebook>();
+    public DbSet<WorkspaceItem> WorkspaceItems => Set<WorkspaceItem>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -21,13 +21,17 @@ public class UiDbContext(DbContextOptions<UiDbContext> options) : DbContext(opti
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        modelBuilder.Entity<Notebook>(entity =>
+        modelBuilder.Entity<WorkspaceItem>(entity =>
         {
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Title).HasMaxLength(512).IsRequired();
             entity.Property(e => e.Content).IsRequired();
+            entity.Property(e => e.ItemType)
+                .HasConversion<string>()
+                .HasMaxLength(32)
+                .IsRequired();
             entity.HasOne(e => e.Folder)
-                .WithMany(e => e.Notebooks)
+                .WithMany(e => e.Items)
                 .HasForeignKey(e => e.FolderId)
                 .IsRequired(false)
                 .OnDelete(DeleteBehavior.Cascade);

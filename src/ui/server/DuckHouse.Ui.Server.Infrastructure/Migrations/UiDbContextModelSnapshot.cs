@@ -46,7 +46,7 @@ namespace DuckHouse.Ui.Server.Infrastructure.Migrations
                     b.ToTable("Folders");
                 });
 
-            modelBuilder.Entity("DuckHouse.Ui.Server.Core.Workspace.Notebook", b =>
+            modelBuilder.Entity("DuckHouse.Ui.Server.Core.Workspace.WorkspaceItem", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -62,6 +62,11 @@ namespace DuckHouse.Ui.Server.Infrastructure.Migrations
                     b.Property<Guid?>("FolderId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("ItemType")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasMaxLength(512)
@@ -74,7 +79,7 @@ namespace DuckHouse.Ui.Server.Infrastructure.Migrations
 
                     b.HasIndex("FolderId");
 
-                    b.ToTable("Notebooks");
+                    b.ToTable("WorkspaceItems");
                 });
 
             modelBuilder.Entity("DuckHouse.Ui.Server.Core.Workspace.Folder", b =>
@@ -87,10 +92,10 @@ namespace DuckHouse.Ui.Server.Infrastructure.Migrations
                     b.Navigation("Parent");
                 });
 
-            modelBuilder.Entity("DuckHouse.Ui.Server.Core.Workspace.Notebook", b =>
+            modelBuilder.Entity("DuckHouse.Ui.Server.Core.Workspace.WorkspaceItem", b =>
                 {
                     b.HasOne("DuckHouse.Ui.Server.Core.Workspace.Folder", "Folder")
-                        .WithMany("Notebooks")
+                        .WithMany("Items")
                         .HasForeignKey("FolderId")
                         .OnDelete(DeleteBehavior.Cascade);
 
@@ -101,7 +106,7 @@ namespace DuckHouse.Ui.Server.Infrastructure.Migrations
                 {
                     b.Navigation("Children");
 
-                    b.Navigation("Notebooks");
+                    b.Navigation("Items");
                 });
 #pragma warning restore 612, 618
         }

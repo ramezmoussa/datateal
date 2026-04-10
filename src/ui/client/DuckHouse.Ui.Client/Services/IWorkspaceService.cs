@@ -16,4 +16,9 @@ public interface IWorkspaceService
     Task<NotebookSummary> CreateNotebookAsync(CreateNotebookRequest request, CancellationToken cancellationToken = default);
     Task<NotebookSummary?> UpdateNotebookAsync(Guid id, UpdateNotebookRequest request, CancellationToken cancellationToken = default);
     Task DeleteNotebookAsync(Guid id, CancellationToken cancellationToken = default);
+
+    Task<QueryDetail?> GetQueryAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<QuerySummary> CreateQueryAsync(CreateQueryRequest request, CancellationToken cancellationToken = default);
+    Task<QuerySummary?> UpdateQueryAsync(Guid id, UpdateQueryRequest request, CancellationToken cancellationToken = default);
+    Task DeleteQueryAsync(Guid id, CancellationToken cancellationToken = default);
 }

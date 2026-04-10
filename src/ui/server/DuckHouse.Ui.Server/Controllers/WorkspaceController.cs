@@ -71,4 +71,32 @@ public class WorkspaceController(IMediator mediator) : ControllerBase
         var found = await mediator.SendAsync(new Cmd.DeleteNotebookRequest(id), ct);
         return found ? NoContent() : NotFound();
     }
+
+    [HttpGet("queries/{id:guid}")]
+    public async Task<IActionResult> GetQuery(Guid id, CancellationToken ct)
+    {
+        var query = await mediator.SendAsync(new Qry.GetQueryRequest(id), ct);
+        return query is null ? NotFound() : Ok(query);
+    }
+
+    [HttpPost("queries")]
+    public async Task<IActionResult> CreateQuery(SharedWorkspace.CreateQueryRequest body, CancellationToken ct)
+    {
+        var query = await mediator.SendAsync(new Cmd.CreateQueryRequest(body.Title, body.Content, body.FolderId), ct);
+        return CreatedAtAction(nameof(GetQuery), new { id = query.Id }, query);
+    }
+
+    [HttpPut("queries/{id:guid}")]
+    public async Task<IActionResult> UpdateQuery(Guid id, SharedWorkspace.UpdateQueryRequest body, CancellationToken ct)
+    {
+        var query = await mediator.SendAsync(new Cmd.UpdateQueryRequest(id, body.Title, body.Content, body.FolderId), ct);
+        return query is null ? NotFound() : Ok(query);
+    }
+
+    [HttpDelete("queries/{id:guid}")]
+    public async Task<IActionResult> DeleteQuery(Guid id, CancellationToken ct)
+    {
+        var found = await mediator.SendAsync(new Cmd.DeleteQueryRequest(id), ct);
+        return found ? NoContent() : NotFound();
+    }
 }

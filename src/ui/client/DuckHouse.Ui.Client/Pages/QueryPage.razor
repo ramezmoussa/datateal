@@ -1,0 +1,558 @@
+@page "/query"
+@page "/query/{Id:guid}"
+
+@using DuckHouse.Core.Kernels
+@using DuckHouse.Core.Nodes
+@using DuckHouse.Ui.Shared.Kernels
+@using DuckHouse.Ui.Shared.Workspace
+@inject IKernelService KernelService
+@inject INodeService NodeService
+@inject IWorkspaceService WorkspaceService
+@inject NavigationManager Navigation
+@implements IAsyncDisposable
+
+<PageTitle>Query — DuckHouse</PageTitle>
+
+@* ── Title row ── *@
+<Flex Justify="FlexJustify.SpaceBetween" Align="FlexAlign.Center" Style="margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+    <Space Align="SpaceAlign.End" Size="SpaceSize.Middle">
+        <SpaceItem>
+            <Icon Height="24px" Width="24px" Type="@IconType.Outline.Code" />
+        </SpaceItem>
+        <SpaceItem>
+            <h2 style="margin: 0;">
+                @if (_editingTitle)
+                {
+                    <Input Style="width: 24ch; font-size: inherit;"
+                           @bind-Value="_editingTitleValue"
+                           OnPressEnter="@(_ => CommitTitleEdit())"
+                           OnBlur="@(_ => CommitTitleEdit())" />
+                }
+                else
+                {
+                    <span style="cursor: pointer;" @onclick="StartEditTitle">
+                        @_title@(_isDirty ? " *" : "")
+                    </span>
+                }
+            </h2>
+        </SpaceItem>
+    </Space>
+
+    @* File toolbar *@
+    <Space Size="SpaceSize.Small" Style="flex-wrap: wrap;">
+        <SpaceItem>
+            <Button OnClick="@(() => Navigation.NavigateTo("/workspace"))" Icon="@IconType.Outline.FolderOpen">
+                Browse workspace
+            </Button>
+        </SpaceItem>
+        @if (_workspaceQueryId.HasValue)
+        {
+            <SpaceItem>
+                <Button Disabled="@(!_isDirty)" Icon="@IconType.Outline.Save" OnClick="SaveToWorkspaceAsync">
+                    Save
+                </Button>
+            </SpaceItem>
+        }
+        else
+        {
+            <SpaceItem>
+                <Button Disabled="@(!_isDirty)" Icon="@IconType.Outline.CloudUpload" OnClick="OpenFolderPickerAsync">
+                    Save to workspace
+                </Button>
+            </SpaceItem>
+        }
+    </Space>
+</Flex>
+
+@* Workspace breadcrumb *@
+@if (_workspaceQueryId.HasValue && _breadcrumbs.Count > 0)
+{
+    <Breadcrumb Style="margin-bottom: 8px;">
+        @foreach (var crumb in _breadcrumbs)
+        {
+            <BreadcrumbItem>
+                <a @onclick="() => NavigateToWorkspace(crumb.Id)" @onclick:preventDefault style="cursor: pointer;">
+                    @crumb.Name
+                </a>
+            </BreadcrumbItem>
+        }
+        <BreadcrumbItem>@_title</BreadcrumbItem>
+    </Breadcrumb>
+}
+
+@* Kernel connection bar *@
+<Space Align="SpaceAlign.Center" Style="margin-bottom: 12px; flex-wrap: wrap;" Size="SpaceSize.Small">
+    <SpaceItem>
+        <Icon Type="@IconType.Outline.CloudServer" />
+    </SpaceItem>
+    <SpaceItem>
+        <Text Type="TextElementType.Secondary" Style="font-size: 0.875rem;">Node:</Text>
+    </SpaceItem>
+    @if (_loadingNodes)
+    {
+        <SpaceItem><Spin Size="SpinSize.Small" /></SpaceItem>
+    }
+    else
+    {
+        <SpaceItem>
+            <SimpleSelect Value="@(_nodeName ?? string.Empty)"
+                          OnSelectedItemChanged="@((string v) => _nodeName = string.IsNullOrEmpty(v) ? null : v)"
+                          Placeholder="— select node —"
+                          Disabled="@HasKernel"
+                          AllowClear
+                          Style="min-width: 150px;">
+                <SelectOptions>
+                    @foreach (var node in _nodes.Where(n => n.State == NodeState.Running))
+                    {
+                        <SimpleSelectOption Value="@node.Name" Label="@node.Name" />
+                    }
+                </SelectOptions>
+            </SimpleSelect>
+        </SpaceItem>
+    }
+
+    @if (!HasKernel)
+    {
+        <SpaceItem>
+            <Button Type="ButtonType.Primary" Size="ButtonSize.Small"
+                    Disabled="@(string.IsNullOrEmpty(_nodeName) || _connecting)"
+                    Loading="_connecting"
+                    Icon="@IconType.Outline.Api"
+                    OnClick="ConnectAsync">
+                Connect
+            </Button>
+        </SpaceItem>
+    }
+    else
+    {
+        <SpaceItem><Tag Color="@StatusTagColor(_kernel!.Status)">@_kernel!.Status</Tag></SpaceItem>
+        <SpaceItem>
+            <Button Size="ButtonSize.Small"
+                    Disabled="_disconnecting"
+                    Loading="_disconnecting"
+                    Icon="@IconType.Outline.Disconnect"
+                    OnClick="DisconnectAsync">
+                Disconnect
+            </Button>
+        </SpaceItem>
+    }
+</Space>
+
+@if (_error is not null)
+{
+    <Alert Type="AlertType.Error" Message="@_error" Closable ShowIcon="true"
+           OnClose="@(() => _error = null)" Style="margin-bottom: 12px;" />
+}
+
+@* ── Split layout ── *@
+<div style="display: flex; flex-direction: column; height: calc(100vh - 240px); min-height: 400px;">
+
+    @* Top half: editor + run toolbar *@
+    <div style="flex: 1 1 0%; display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--ant-color-border); border-radius: 8px 8px 0 0; padding: 8px;">
+        <Flex Justify="FlexJustify.SpaceBetween" Align="FlexAlign.Center" Style="margin-bottom: 8px;">
+            <Text Strong Style="font-size: 0.875rem; color: var(--ant-color-text-secondary);">SQL</Text>
+            <Space Size="SpaceSize.Small">
+                @if (_isExecuting)
+                {
+                    <SpaceItem>
+                        <ExecutionTimer IsRunning="true" DurationMs="null" />
+                    </SpaceItem>
+                    <SpaceItem>
+                        <Button Size="ButtonSize.Small"
+                                Icon="@IconType.Outline.Loading"
+                                OnClick="InterruptAsync">
+                            Interrupt
+                        </Button>
+                    </SpaceItem>
+                }
+                else
+                {
+                    @if (_lastDurationMs.HasValue)
+                    {
+                        <SpaceItem>
+                            <Text Type="TextElementType.Secondary" Style="font-size: 0.875rem;">
+                                <ExecutionTimer IsRunning="false" DurationMs="_lastDurationMs" />
+                            </Text>
+                        </SpaceItem>
+                    }
+                    <SpaceItem>
+                        <Button Type="ButtonType.Primary" Size="ButtonSize.Small"
+                                Disabled="@(!HasKernel || string.IsNullOrWhiteSpace(_sql))"
+                                Icon="@IconType.Outline.PlayCircle"
+                                OnClick="RunAsync">
+                            Run
+                        </Button>
+                    </SpaceItem>
+                }
+            </Space>
+        </Flex>
+        <div style="flex: 1 1 0%; overflow: hidden;">
+            <CodeCell Value="@_sql"
+                      ValueChanged="OnSqlChanged"
+                      Language="sql"
+                      Height="@_editorHeight"
+                      ReadOnly="@_isExecuting"
+                      OnExecute="RunAsync" />
+        </div>
+    </div>
+
+    @* Bottom half: results *@
+    <div style="flex: 1 1 0%; overflow: auto; border: 1px solid var(--ant-color-border); border-top: none; border-radius: 0 0 8px 8px; padding: 8px;">
+        @if (_isExecuting)
+        {
+            <Flex Justify="@("center")" Style="padding: 40px 0;"><Spin /></Flex>
+        }
+        else if (_resultDf is not null)
+        {
+            <Flex Justify="FlexJustify.SpaceBetween" Align="FlexAlign.Center" Style="margin-bottom: 8px;">
+                <Text Type="TextElementType.Secondary" Style="font-size: 0.875rem;">
+                    @_resultDf.TotalRows.ToString("N0")@(_resultDf.TotalRows == DataFrameOutput.RowCap ? "+" : "") rows
+                </Text>
+            </Flex>
+            <DataFrameView Data="_resultDf" />
+        }
+        else if (_resultError is not null)
+        {
+            <div style="border-left: 3px solid var(--ant-color-error); padding: 8px 12px; border-radius: 0 4px 4px 0;">
+                <Text Type="TextElementType.Danger" Strong Style="display: block; font-size: 0.875rem; margin-bottom: 4px;">@_resultError.Ename: @_resultError.Evalue</Text>
+                <pre style="font-family: monospace; font-size: 0.875rem; margin: 0; white-space: pre-wrap;"><Text Type="TextElementType.Danger">@string.Join("\n", _resultError.Traceback.Select(StripAnsi))</Text></pre>
+            </div>
+        }
+        else if (_resultText is not null)
+        {
+            <pre style="font-family: monospace; font-size: 0.875rem; margin: 0;">@_resultText</pre>
+        }
+        else
+        {
+            <div style="text-align: center; padding: 40px 0; color: var(--ant-color-text-quaternary);">
+                <Icon Type="@IconType.Outline.Table" Style="font-size: 40px;" />
+                <p style="margin-top: 12px;"><Text Type="TextElementType.Secondary">Run a query to see results here.</Text></p>
+            </div>
+        }
+    </div>
+</div>
+
+@* Folder picker modal — shown when saving to workspace for the first time *@
+<FolderPickerModal Visible="_showFolderPicker"
+                   Title="@("Choose folder to save in")"
+                   OkText="@("Save here")"
+                   OnConfirm="ConfirmSaveToFolderAsync"
+                   OnCancel="@(() => _showFolderPicker = false)" />
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private string _title = "Untitled Query";
+    private string _sql = "";
+    private bool _isDirty;
+    private bool _editingTitle;
+    private string _editingTitleValue = "";
+
+    private Guid? _workspaceQueryId;
+    private Guid? _workspaceQueryFolderId;
+    private List<(Guid? Id, string Name)> _breadcrumbs = [];
+    private bool _showFolderPicker;
+
+    private string? _nodeName;
+    private string? _kernelId;
+    private KernelInfo? _kernel;
+    private IReadOnlyList<NodeInfo> _nodes = [];
+    private bool _loadingNodes;
+    private bool _connecting;
+    private bool _disconnecting;
+    private string? _error;
+    private CancellationTokenSource? _kernelPollingCts;
+
+    private bool _isExecuting;
+    private double? _lastDurationMs;
+    private DataFrameOutput? _resultDf;
+    private ErrorInfo? _resultError;
+    private string? _resultText;
+
+    private int _editorHeight = 200;
+
+    private bool HasKernel => !string.IsNullOrEmpty(_kernelId);
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Id != Guid.Empty)
+        {
+            try
+            {
+                var detail = await WorkspaceService.GetQueryAsync(Id);
+                if (detail is not null)
+                {
+                    _title = detail.Title;
+                    _sql = detail.Content;
+                    _isDirty = false;
+                    _workspaceQueryId = detail.Id;
+                    _workspaceQueryFolderId = detail.FolderId;
+
+                    if (detail.FolderId is not null)
+                    {
+                        var ancestors = await WorkspaceService.GetFolderAncestorsAsync(detail.FolderId.Value);
+                        _breadcrumbs = [(null, "Workspace"), ..ancestors.Select(f => ((Guid?)f.Id, f.Name))];
+                    }
+                    else
+                    {
+                        _breadcrumbs = [(null, "Workspace")];
+                    }
+                }
+                else
+                {
+                    _error = "Query not found in workspace.";
+                }
+            }
+            catch (Exception ex)
+            {
+                _error = $"Failed to load query: {ex.Message}";
+            }
+        }
+        else
+        {
+            _title = $"Untitled Query {DateTime.Now:yyyy-MM-dd HH:mm:ss}";
+            _isDirty = true;
+        }
+
+        _loadingNodes = true;
+        try { _nodes = await NodeService.GetNodesAsync(); }
+        catch (Exception ex) { _error = $"Failed to load nodes: {ex.Message}"; }
+        finally { _loadingNodes = false; }
+    }
+
+    // ── Title editing ─────────────────────────────────────────────────
+
+    private void StartEditTitle()
+    {
+        _editingTitleValue = _title;
+        _editingTitle = true;
+    }
+
+    private void CommitTitleEdit()
+    {
+        _title = string.IsNullOrWhiteSpace(_editingTitleValue) ? "Untitled Query" : _editingTitleValue;
+        _isDirty = true;
+        _editingTitle = false;
+    }
+
+    private void OnSqlChanged(string value)
+    {
+        _sql = value;
+        _isDirty = true;
+        // Recompute editor height: at least 200px, up to 400px based on line count
+        int lines = Math.Max(1, value.Split('\n').Length);
+        _editorHeight = Math.Min(400, Math.Max(200, lines * 20 + 20));
+    }
+
+    // ── Workspace persistence ─────────────────────────────────────────
+
+    private void OpenFolderPickerAsync() => _showFolderPicker = true;
+
+    private async Task ConfirmSaveToFolderAsync(Guid? folderId)
+    {
+        _showFolderPicker = false;
+        try
+        {
+            var summary = await WorkspaceService.CreateQueryAsync(new CreateQueryRequest(_title, _sql, folderId));
+            _workspaceQueryId = summary.Id;
+            _workspaceQueryFolderId = folderId;
+            _isDirty = false;
+
+            if (folderId is not null)
+            {
+                var ancestors = await WorkspaceService.GetFolderAncestorsAsync(folderId.Value);
+                _breadcrumbs = [(null, "Workspace"), ..ancestors.Select(f => ((Guid?)f.Id, f.Name))];
+            }
+            else
+            {
+                _breadcrumbs = [(null, "Workspace")];
+            }
+
+            Navigation.NavigateTo($"/query/{summary.Id}", replace: true);
+        }
+        catch (Exception ex) { _error = $"Failed to save query: {ex.Message}"; }
+    }
+
+    private async Task SaveToWorkspaceAsync()
+    {
+        if (!_workspaceQueryId.HasValue) return;
+        try
+        {
+            await WorkspaceService.UpdateQueryAsync(_workspaceQueryId.Value,
+                new UpdateQueryRequest(_title, _sql, _workspaceQueryFolderId));
+            _isDirty = false;
+        }
+        catch (Exception ex) { _error = $"Failed to save query: {ex.Message}"; }
+    }
+
+    private void NavigateToWorkspace(Guid? folderId) =>
+        Navigation.NavigateTo(folderId is null ? "/workspace" : $"/workspace?folder={folderId}");
+
+    // ── Kernel connection ─────────────────────────────────────────────
+
+    private async Task ConnectAsync()
+    {
+        if (string.IsNullOrEmpty(_nodeName)) return;
+        _connecting = true;
+        _error = null;
+        try
+        {
+            var kernel = await KernelService.CreateKernelAsync(_nodeName);
+            _kernelId = kernel.Id;
+            _kernel = kernel;
+            _kernelPollingCts = new CancellationTokenSource();
+            _ = PollKernelStatusAsync(_kernelPollingCts.Token);
+        }
+        catch (Exception ex) { _error = $"Failed to create kernel: {ex.Message}"; }
+        finally { _connecting = false; }
+        StateHasChanged();
+    }
+
+    private async Task DisconnectAsync()
+    {
+        if (!HasKernel || string.IsNullOrEmpty(_nodeName)) return;
+        _disconnecting = true;
+        _error = null;
+        try
+        {
+            await StopKernelPollingAsync();
+            await KernelService.DeleteKernelAsync(_nodeName, _kernelId!);
+            _kernelId = null;
+            _kernel = null;
+        }
+        catch (Exception ex) { _error = $"Failed to disconnect: {ex.Message}"; }
+        finally { _disconnecting = false; }
+    }
+
+    private async Task PollKernelStatusAsync(CancellationToken cancellationToken)
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(30));
+        try
+        {
+            while (await timer.WaitForNextTickAsync(cancellationToken))
+            {
+                if (_isExecuting || string.IsNullOrEmpty(_kernelId) || string.IsNullOrEmpty(_nodeName))
+                    continue;
+                try
+                {
+                    _kernel = await KernelService.GetKernelAsync(_nodeName, _kernelId, cancellationToken);
+                    await InvokeAsync(StateHasChanged);
+                }
+                catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+                {
+                    _kernelId = null;
+                    _kernel = null;
+                    _error = "The kernel was evicted, likely due to inactivity. Please reconnect.";
+                    await InvokeAsync(StateHasChanged);
+                    break;
+                }
+                catch (OperationCanceledException) { break; }
+                catch { /* ignore transient errors */ }
+            }
+        }
+        catch (OperationCanceledException) { }
+    }
+
+    private async Task StopKernelPollingAsync()
+    {
+        if (_kernelPollingCts is not null)
+        {
+            await _kernelPollingCts.CancelAsync();
+            _kernelPollingCts.Dispose();
+            _kernelPollingCts = null;
+        }
+    }
+
+    // ── Execution ─────────────────────────────────────────────────────
+
+    private async Task RunAsync()
+    {
+        if (!HasKernel || string.IsNullOrEmpty(_nodeName) || _isExecuting || string.IsNullOrWhiteSpace(_sql)) return;
+
+        _isExecuting = true;
+        _resultDf = null;
+        _resultError = null;
+        _resultText = null;
+        _lastDurationMs = null;
+        _error = null;
+
+        if (_kernel is not null)
+            _kernel = _kernel with { Status = KernelStatus.Busy };
+
+        var codeToRun = $"import duckdb; duckdb.sql(\"\"\"{_sql}\"\"\")";
+
+        try
+        {
+            var handle = await KernelService.StartExecuteAsync(_nodeName, _kernelId!, new ExecuteKernelRequest(codeToRun));
+
+            PollExecutionResponse poll;
+            do
+            {
+                await Task.Delay(1000);
+                poll = await KernelService.PollExecutionAsync(_nodeName, _kernelId!, handle.ExecutionId);
+                StateHasChanged();
+            } while (!poll.IsComplete);
+
+            var result = poll.Result!;
+            _lastDurationMs = result.DurationMs;
+            _resultError = result.Error;
+
+            // Find the most relevant output
+            foreach (var output in result.Outputs)
+            {
+                if (output.Type is "execute_result" or "display_data" && output.Data is not null)
+                {
+                    if (output.Data.TryGetValue(DataFrameOutput.MimeType, out var dfRaw)
+                        && DataFrameOutput.TryParse(dfRaw) is { } df)
+                    {
+                        _resultDf = df;
+                        break;
+                    }
+                    if (output.Data.TryGetValue("text/plain", out var plain))
+                    {
+                        _resultText = plain?.ToString();
+                        break;
+                    }
+                }
+                else if (output.Type == "stream" && output.Text is not null)
+                {
+                    _resultText = (_resultText ?? "") + output.Text;
+                }
+            }
+
+            _kernel = await KernelService.GetKernelAsync(_nodeName, _kernelId!);
+        }
+        catch (Exception ex) { _error = $"Execution failed: {ex.Message}"; }
+        finally
+        {
+            _isExecuting = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task InterruptAsync()
+    {
+        if (!HasKernel || string.IsNullOrEmpty(_nodeName)) return;
+        try { await KernelService.InterruptKernelAsync(_nodeName, _kernelId!); }
+        catch (Exception ex) { _error = $"Interrupt failed: {ex.Message}"; }
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────
+
+    private static string StatusTagColor(KernelStatus status) => status switch
+    {
+        KernelStatus.Idle => "green",
+        KernelStatus.Busy => "blue",
+        KernelStatus.Starting => "orange",
+        KernelStatus.Dead => "red",
+        _ => "default",
+    };
+
+    private static string StripAnsi(string text) =>
+        System.Text.RegularExpressions.Regex.Replace(text, @"\x1B\[[0-9;]*[a-zA-Z]", "");
+
+    public async ValueTask DisposeAsync()
+    {
+        await StopKernelPollingAsync();
+    }
+}

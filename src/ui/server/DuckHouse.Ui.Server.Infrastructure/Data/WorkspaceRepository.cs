@@ -15,11 +15,14 @@ internal class WorkspaceRepository(UiDbContext db) : IWorkspaceRepository
         return await query.OrderBy(f => f.Name).ToListAsync(cancellationToken);
     }
 
-    public async Task<IReadOnlyList<Notebook>> GetNotebooksInAsync(Guid? folderId, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<WorkspaceItem>> GetItemsInAsync(Guid? folderId, WorkspaceItemType? type = null, CancellationToken cancellationToken = default)
     {
         var query = folderId.HasValue
-            ? db.Notebooks.Where(n => n.FolderId == folderId)
-            : db.Notebooks.Where(n => n.FolderId == null);
+            ? db.WorkspaceItems.Where(n => n.FolderId == folderId)
+            : db.WorkspaceItems.Where(n => n.FolderId == null);
+
+        if (type.HasValue)
+            query = query.Where(n => n.ItemType == type.Value);
 
         return await query.OrderBy(n => n.Title).ToListAsync(cancellationToken);
     }
@@ -41,8 +44,8 @@ internal class WorkspaceRepository(UiDbContext db) : IWorkspaceRepository
         return chain;
     }
 
-    public Task<Notebook?> GetNotebookAsync(Guid id, CancellationToken cancellationToken = default) =>
-        db.Notebooks.FirstOrDefaultAsync(n => n.Id == id, cancellationToken);
+    public Task<WorkspaceItem?> GetItemAsync(Guid id, CancellationToken cancellationToken = default) =>
+        db.WorkspaceItems.FirstOrDefaultAsync(n => n.Id == id, cancellationToken);
 
     public async Task<Folder> CreateFolderAsync(string name, Guid? parentId, CancellationToken cancellationToken = default)
     {
@@ -79,43 +82,44 @@ internal class WorkspaceRepository(UiDbContext db) : IWorkspaceRepository
         }
     }
 
-    public async Task<Notebook> CreateNotebookAsync(string title, string content, Guid? folderId, CancellationToken cancellationToken = default)
+    public async Task<WorkspaceItem> CreateItemAsync(string title, string content, WorkspaceItemType type, Guid? folderId, CancellationToken cancellationToken = default)
     {
         var now = DateTime.UtcNow;
-        var notebook = new Notebook
+        var item = new WorkspaceItem
         {
             Id = Guid.CreateVersion7(),
+            ItemType = type,
             Title = title,
             Content = content,
             FolderId = folderId,
             CreatedAt = now,
             UpdatedAt = now,
         };
-        db.Notebooks.Add(notebook);
+        db.WorkspaceItems.Add(item);
         await db.SaveChangesAsync(cancellationToken);
-        return notebook;
+        return item;
     }
 
-    public async Task<Notebook?> UpdateNotebookAsync(Guid id, string title, string content, Guid? folderId, CancellationToken cancellationToken = default)
+    public async Task<WorkspaceItem?> UpdateItemAsync(Guid id, string title, string content, Guid? folderId, CancellationToken cancellationToken = default)
     {
-        var notebook = await db.Notebooks.FirstOrDefaultAsync(n => n.Id == id, cancellationToken);
-        if (notebook is null) return null;
+        var item = await db.WorkspaceItems.FirstOrDefaultAsync(n => n.Id == id, cancellationToken);
+        if (item is null) return null;
 
-        notebook.Title = title;
-        notebook.Content = content;
-        notebook.FolderId = folderId;
-        notebook.UpdatedAt = DateTime.UtcNow;
+        item.Title = title;
+        item.Content = content;
+        item.FolderId = folderId;
+        item.UpdatedAt = DateTime.UtcNow;
         await db.SaveChangesAsync(cancellationToken);
-        return notebook;
+        return item;
     }
 
-    public async Task DeleteNotebookAsync(Guid id, CancellationToken cancellationToken = default)
+    public async Task<bool> DeleteItemAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        var notebook = await db.Notebooks.FirstOrDefaultAsync(n => n.Id == id, cancellationToken);
-        if (notebook is not null)
-        {
-            db.Notebooks.Remove(notebook);
-            await db.SaveChangesAsync(cancellationToken);
-        }
+        var item = await db.WorkspaceItems.FirstOrDefaultAsync(n => n.Id == id, cancellationToken);
+        if (item is null) return false;
+
+        db.WorkspaceItems.Remove(item);
+        await db.SaveChangesAsync(cancellationToken);
+        return true;
     }
 }

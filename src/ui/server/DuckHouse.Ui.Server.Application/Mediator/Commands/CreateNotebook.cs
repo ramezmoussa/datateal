@@ -1,6 +1,8 @@
 using DuckHouse.Core.Mediator;
 using DuckHouse.Ui.Server.Core.Repositories;
+using DuckHouse.Ui.Server.Core.Workspace;
 using DuckHouse.Ui.Shared.Workspace;
+using CoreItemType = DuckHouse.Ui.Server.Core.Workspace.WorkspaceItemType;
 
 namespace DuckHouse.Ui.Server.Application.Mediator.Commands;
 
@@ -10,7 +12,7 @@ internal class CreateNotebookHandler(IWorkspaceRepository repository) : IRequest
 {
     public async Task<NotebookSummary> Handle(CreateNotebookRequest request, CancellationToken cancellationToken)
     {
-        var notebook = await repository.CreateNotebookAsync(request.Title, request.Content, request.FolderId, cancellationToken);
-        return new NotebookSummary(notebook.Id, notebook.Title, notebook.FolderId, notebook.CreatedAt, notebook.UpdatedAt);
+        var item = await repository.CreateItemAsync(request.Title, request.Content, CoreItemType.Notebook, request.FolderId, cancellationToken);
+        return new NotebookSummary(item.Id, item.Title, item.FolderId, item.CreatedAt, item.UpdatedAt);
     }
 }

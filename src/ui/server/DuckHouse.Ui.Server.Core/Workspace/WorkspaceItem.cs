@@ -1,8 +1,9 @@
 namespace DuckHouse.Ui.Server.Core.Workspace;
 
-public class Notebook
+public class WorkspaceItem
 {
     public Guid Id { get; set; }
+    public WorkspaceItemType ItemType { get; set; }
     public required string Title { get; set; }
     public Guid? FolderId { get; set; }
 

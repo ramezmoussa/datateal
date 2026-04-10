@@ -32,10 +32,11 @@ namespace DuckHouse.Ui.Server.Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "Notebooks",
+                name: "WorkspaceItems",
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    ItemType = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
                     Title = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: false),
                     FolderId = table.Column<Guid>(type: "uuid", nullable: true),
                     Content = table.Column<string>(type: "text", nullable: false),
@@ -44,9 +45,9 @@ namespace DuckHouse.Ui.Server.Infrastructure.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_Notebooks", x => x.Id);
+                    table.PrimaryKey("PK_WorkspaceItems", x => x.Id);
                     table.ForeignKey(
-                        name: "FK_Notebooks_Folders_FolderId",
+                        name: "FK_WorkspaceItems_Folders_FolderId",
                         column: x => x.FolderId,
                         principalTable: "Folders",
                         principalColumn: "Id",
@@ -59,8 +60,8 @@ namespace DuckHouse.Ui.Server.Infrastructure.Migrations
                 column: "ParentId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_Notebooks_FolderId",
-                table: "Notebooks",
+                name: "IX_WorkspaceItems_FolderId",
+                table: "WorkspaceItems",
                 column: "FolderId");
         }
 
@@ -68,7 +69,7 @@ namespace DuckHouse.Ui.Server.Infrastructure.Migrations
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropTable(
-                name: "Notebooks");
+                name: "WorkspaceItems");
 
             migrationBuilder.DropTable(
                 name: "Folders");

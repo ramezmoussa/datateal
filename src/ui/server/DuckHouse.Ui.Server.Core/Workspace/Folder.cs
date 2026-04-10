@@ -8,7 +8,7 @@ public class Folder
 
     public Folder? Parent { get; set; }
     public List<Folder> Children { get; set; } = [];
-    public List<Notebook> Notebooks { get; set; } = [];
+    public List<WorkspaceItem> Items { get; set; } = [];
 
     public DateTime CreatedAt { get; set; }
 }

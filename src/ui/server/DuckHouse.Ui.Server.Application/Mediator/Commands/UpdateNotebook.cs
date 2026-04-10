@@ -10,7 +10,7 @@ internal class UpdateNotebookHandler(IWorkspaceRepository repository) : IRequest
 {
     public async Task<NotebookSummary?> Handle(UpdateNotebookRequest request, CancellationToken cancellationToken)
     {
-        var notebook = await repository.UpdateNotebookAsync(request.Id, request.Title, request.Content, request.FolderId, cancellationToken);
-        return notebook is null ? null : new NotebookSummary(notebook.Id, notebook.Title, notebook.FolderId, notebook.CreatedAt, notebook.UpdatedAt);
+        var item = await repository.UpdateItemAsync(request.Id, request.Title, request.Content, request.FolderId, cancellationToken);
+        return item is null ? null : new NotebookSummary(item.Id, item.Title, item.FolderId, item.CreatedAt, item.UpdatedAt);
     }
 }
