@@ -376,7 +376,7 @@
                     {
                         _nodeName = match.Name;
                         if (match.State == NodeState.Running)
-                            await ConnectAsync();
+                            _ = ConnectAsync();
                     }
                 }
             }
