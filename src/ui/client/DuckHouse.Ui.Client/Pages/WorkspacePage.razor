@@ -333,9 +333,11 @@ else
         finally
         {
             _items = [
-                .._listing.Folders.Select(f => new WorkspaceItem(f, null, null)),
-                .._listing.Notebooks.Select(n => new WorkspaceItem(null, n, null)),
-                .._listing.Queries.Select(q => new WorkspaceItem(null, null, q)),
+                .._listing.Folders.Select(f => new WorkspaceItem(f, null, null))
+                                  .OrderBy(x => x.Name, StringComparer.OrdinalIgnoreCase),
+                .._listing.Notebooks.Select(n => new WorkspaceItem(null, n, null))
+                    .Concat(_listing.Queries.Select(q => new WorkspaceItem(null, null, q)))
+                    .OrderBy(x => x.Name, StringComparer.OrdinalIgnoreCase),
             ];
             _loading = false;
         }
