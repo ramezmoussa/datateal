@@ -25,4 +25,8 @@ public interface IJobService
     Task<ScheduleDto> CreateScheduleAsync(Guid jobId, CreateScheduleRequest request, CancellationToken ct = default);
     Task<ScheduleDto?> UpdateScheduleAsync(Guid jobId, Guid scheduleId, UpdateScheduleRequest request, CancellationToken ct = default);
     Task DeleteScheduleAsync(Guid jobId, Guid scheduleId, CancellationToken ct = default);
+
+    // YAML import/export
+    Task<string> ExportJobAsync(Guid id, CancellationToken ct = default);
+    Task<JobSummary> ImportJobAsync(string yaml, CancellationToken ct = default);
 }

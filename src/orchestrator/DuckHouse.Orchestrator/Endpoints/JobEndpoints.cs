@@ -23,16 +23,30 @@ public static class JobEndpoints
 
         group.MapPost("/", async (CreateJobRequest request, IMediator mediator, CancellationToken ct) =>
         {
-            var job = await mediator.SendAsync(request, ct);
-            return Results.Created($"/api/jobs/{job.Id}", job);
+            try
+            {
+                var job = await mediator.SendAsync(request, ct);
+                return Results.Created($"/api/jobs/{job.Id}", job);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Results.BadRequest(new { error = ex.Message });
+            }
         })
         .WithName("CreateJob");
 
         group.MapPut("/{id:guid}", async (Guid id, UpdateJobRequest request, IMediator mediator, CancellationToken ct) =>
         {
-            var updated = request with { Id = id };
-            var job = await mediator.SendAsync(updated, ct);
-            return job is null ? Results.NotFound() : Results.Ok(job);
+            try
+            {
+                var updated = request with { Id = id };
+                var job = await mediator.SendAsync(updated, ct);
+                return job is null ? Results.NotFound() : Results.Ok(job);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Results.BadRequest(new { error = ex.Message });
+            }
         })
         .WithName("UpdateJob");
 
@@ -45,8 +59,15 @@ public static class JobEndpoints
 
         group.MapPost("/{id:guid}/trigger", async (Guid id, TriggerJobBody? body, IMediator mediator, CancellationToken ct) =>
         {
-            var run = await mediator.SendAsync(new TriggerJobRequest(id, body?.Parameters), ct);
-            return Results.Accepted($"/api/runs/{run.Id}", run);
+            try
+            {
+                var run = await mediator.SendAsync(new TriggerJobRequest(id, body?.Parameters), ct);
+                return Results.Accepted($"/api/runs/{run.Id}", run);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Results.BadRequest(new { error = ex.Message });
+            }
         })
         .WithName("TriggerJob");
 
@@ -81,8 +102,32 @@ public static class JobEndpoints
         })
         .WithName("DeleteSchedule");
 
+        // Import job from YAML
+        group.MapPost("/import", async (ImportJobBody body, IMediator mediator, CancellationToken ct) =>
+        {
+            try
+            {
+                var job = await mediator.SendAsync(new ImportJobRequest(body.Yaml), ct);
+                return Results.Created($"/api/jobs/{job.Id}", job);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Results.BadRequest(new { error = ex.Message });
+            }
+        })
+        .WithName("ImportJob");
+
+        // Export job as YAML
+        group.MapGet("/{id:guid}/export", async (Guid id, IMediator mediator, CancellationToken ct) =>
+        {
+            var yaml = await mediator.SendAsync(new ExportJobRequest(id), ct);
+            return yaml is null ? Results.NotFound() : Results.Content(yaml, "application/yaml");
+        })
+        .WithName("ExportJob");
+
         return endpoints;
     }
 }
 
 public record TriggerJobBody(Dictionary<string, string>? Parameters);
+public record ImportJobBody(string Yaml);

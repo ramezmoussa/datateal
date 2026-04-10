@@ -41,6 +41,9 @@
                     <Icon Type="@IconType.Outline.PlayCircle" /> Run
                 </Button>
             </Popconfirm>
+            <Button OnClick="ExportYamlAsync" Style="margin-left: 8px;">
+                <Icon Type="@IconType.Outline.Download" /> Export YAML
+            </Button>
         </Flex>
 
         <Tabs DefaultActiveKey="settings">
@@ -204,6 +207,13 @@
                 </div>
             </div>
         </Modal>
+
+        <Modal Title="Export YAML"
+               Visible="_showExportModal"
+               OnCancel="() => _showExportModal = false"
+               Footer="null">
+            <pre style="max-height: 500px; overflow: auto; font-size: 13px; white-space: pre-wrap;">@_exportYaml</pre>
+        </Modal>
     }
 </Spin>
 
@@ -226,6 +236,10 @@
     private bool _showScheduleModal;
     private string _newCron = "";
     private string? _newTimeZone;
+
+    // Export modal state
+    private bool _showExportModal;
+    private string _exportYaml = "";
 
     protected override async Task OnParametersSetAsync()
     {
@@ -286,6 +300,19 @@
         catch (Exception ex)
         {
             _error = $"Failed to trigger: {ex.Message}";
+        }
+    }
+
+    private async Task ExportYamlAsync()
+    {
+        try
+        {
+            _exportYaml = await JobService.ExportJobAsync(Id);
+            _showExportModal = true;
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to export YAML: {ex.Message}";
         }
     }
 

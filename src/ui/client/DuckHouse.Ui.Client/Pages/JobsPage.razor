@@ -18,6 +18,9 @@
     <Button Type="@ButtonType.Primary" OnClick="StartCreate">
         <Icon Type="@IconType.Outline.Plus" /> New Job
     </Button>
+    <Button OnClick="StartImport" Style="margin-left: 8px;">
+        <Icon Type="@IconType.Outline.Upload" /> Import
+    </Button>
 </Flex>
 
 @if (!string.IsNullOrEmpty(_error))
@@ -56,6 +59,11 @@
                     </Button>
                 </SpaceItem>
                 <SpaceItem>
+                    <Button Size="@ButtonSize.Small" OnClick="@(() => ExportAsync(context))">
+                        <Icon Type="@IconType.Outline.Download" />
+                    </Button>
+                </SpaceItem>
+                <SpaceItem>
                     <Popconfirm Title="@($"Trigger job '{context.Name}'?")" OnConfirm="() => TriggerAsync(context)">
                         <Button Size="@ButtonSize.Small" Type="@ButtonType.Primary">
                             <Icon Type="@IconType.Outline.PlayCircle" />
@@ -91,6 +99,26 @@
     </div>
 </Modal>
 
+<Modal Title="Import Job from YAML"
+       Visible="_showImportModal"
+       OnOk="ConfirmImport"
+       OnCancel="() => _showImportModal = false"
+       OkButtonProps="@(new ButtonProps { Disabled = string.IsNullOrWhiteSpace(_importYaml) })"
+       OkText="@("Import")">
+    <div>
+        <label style="display: block; margin-bottom: 4px; font-weight: 500;">YAML Definition</label>
+        <TextArea @bind-Value="_importYaml" Placeholder="Paste YAML here..." Rows="16"
+                  Style="font-family: monospace; font-size: 13px;" />
+    </div>
+</Modal>
+
+<Modal Title="Export YAML"
+       Visible="_showExportModal"
+       OnCancel="() => _showExportModal = false"
+       Footer="null">
+    <pre style="max-height: 500px; overflow: auto; font-size: 13px; white-space: pre-wrap;">@_exportYaml</pre>
+</Modal>
+
 @code {
     private IReadOnlyList<JobSummary> _jobs = [];
     private bool _loading = true;
@@ -99,6 +127,14 @@
     private bool _showCreateModal;
     private string _newJobName = "";
     private string? _newJobDescription;
+
+    // Import modal state
+    private bool _showImportModal;
+    private string _importYaml = "";
+
+    // Export modal state
+    private bool _showExportModal;
+    private string _exportYaml = "";
 
     protected override async Task OnInitializedAsync()
     {
@@ -127,6 +163,40 @@
         _newJobName = "";
         _newJobDescription = null;
         _showCreateModal = true;
+    }
+
+    private void StartImport()
+    {
+        _importYaml = "";
+        _showImportModal = true;
+    }
+
+    private async Task ConfirmImport()
+    {
+        if (string.IsNullOrWhiteSpace(_importYaml)) return;
+        try
+        {
+            var job = await JobService.ImportJobAsync(_importYaml);
+            _showImportModal = false;
+            Navigation.NavigateTo($"/jobs/{job.Id}");
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to import job: {ex.Message}";
+        }
+    }
+
+    private async Task ExportAsync(JobSummary job)
+    {
+        try
+        {
+            _exportYaml = await JobService.ExportJobAsync(job.Id);
+            _showExportModal = true;
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to export '{job.Name}': {ex.Message}";
+        }
     }
 
     private async Task ConfirmCreate()

@@ -108,4 +108,18 @@ internal class JobService(HttpClient httpClient) : IJobService
         var response = await httpClient.DeleteAsync($"api/orchestrator/jobs/{jobId}/schedules/{scheduleId}", ct);
         response.EnsureSuccessStatusCode();
     }
+
+    public async Task<string> ExportJobAsync(Guid id, CancellationToken ct)
+    {
+        var response = await httpClient.GetAsync($"api/orchestrator/jobs/{id}/export", ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadAsStringAsync(ct);
+    }
+
+    public async Task<JobSummary> ImportJobAsync(string yaml, CancellationToken ct)
+    {
+        var response = await httpClient.PostAsJsonAsync("api/orchestrator/jobs/import", new { yaml }, JsonOptions, ct);
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<JobSummary>(JsonOptions, ct))!;
+    }
 }
