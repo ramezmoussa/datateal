@@ -1,0 +1,183 @@
+@page "/jobs"
+
+@using DuckHouse.Ui.Shared.Orchestration
+@inject IJobService JobService
+@inject NavigationManager Navigation
+
+<PageTitle>Jobs — DuckHouse</PageTitle>
+
+<Flex Justify="FlexJustify.SpaceBetween" Align="FlexAlign.Center" Style="margin-bottom: 16px; flex-wrap: wrap; gap: 8px;">
+    <Space Align="SpaceAlign.Center" Size="SpaceSize.Small">
+        <SpaceItem>
+            <Icon Height="24px" Width="24px" Type="@IconType.Outline.Apartment" />
+        </SpaceItem>
+        <SpaceItem>
+            <h2 style="margin: 0;">Jobs</h2>
+        </SpaceItem>
+    </Space>
+    <Button Type="@ButtonType.Primary" OnClick="StartCreate">
+        <Icon Type="@IconType.Outline.Plus" /> New Job
+    </Button>
+</Flex>
+
+@if (!string.IsNullOrEmpty(_error))
+{
+    <Alert Type="@AlertType.Error" Message="@_error" Closable OnClose="() => _error = null"
+           Style="margin-bottom: 16px;" />
+}
+
+<Spin Spinning="_loading">
+    <Table TItem="JobSummary" DataSource="_jobs" Size="@TableSize.Small">
+        <PropertyColumn Property="c => c.Name" Title="Name" Sortable>
+            <a @onclick="@(() => Navigation.NavigateTo($"/jobs/{context.Id}"))"
+               @onclick:preventDefault style="cursor: pointer;">@context.Name</a>
+        </PropertyColumn>
+        <PropertyColumn Property="c => c.Description" Title="Description" />
+        <PropertyColumn Property="c => c.IsEnabled" Title="Enabled">
+            @if (context.IsEnabled)
+            {
+                <Tag Color="@("green")">Enabled</Tag>
+            }
+            else
+            {
+                <Tag>Disabled</Tag>
+            }
+        </PropertyColumn>
+        <PropertyColumn Property="c => c.TaskCount" Title="Tasks" />
+        <PropertyColumn Property="c => c.ScheduleCount" Title="Schedules" />
+        <PropertyColumn Property="c => c.UpdatedAt" Title="Updated" Sortable>
+            @FormatDate(context.UpdatedAt)
+        </PropertyColumn>
+        <ActionColumn Title="Actions">
+            <Space>
+                <SpaceItem>
+                    <Button Size="@ButtonSize.Small" OnClick="@(() => Navigation.NavigateTo($"/jobs/{context.Id}"))">
+                        <Icon Type="@IconType.Outline.Edit" />
+                    </Button>
+                </SpaceItem>
+                <SpaceItem>
+                    <Popconfirm Title="@($"Trigger job '{context.Name}'?")" OnConfirm="() => TriggerAsync(context)">
+                        <Button Size="@ButtonSize.Small" Type="@ButtonType.Primary">
+                            <Icon Type="@IconType.Outline.PlayCircle" />
+                        </Button>
+                    </Popconfirm>
+                </SpaceItem>
+                <SpaceItem>
+                    <Popconfirm Title="@($"Delete job '{context.Name}'?")" OnConfirm="() => DeleteAsync(context)">
+                        <Button Danger Size="@ButtonSize.Small">
+                            <Icon Type="@IconType.Outline.Delete" />
+                        </Button>
+                    </Popconfirm>
+                </SpaceItem>
+            </Space>
+        </ActionColumn>
+    </Table>
+</Spin>
+
+<Modal Title="New Job"
+       Visible="_showCreateModal"
+       OnOk="ConfirmCreate"
+       OnCancel="() => _showCreateModal = false"
+       OkButtonProps="@(new ButtonProps { Disabled = string.IsNullOrWhiteSpace(_newJobName) })">
+    <div style="display: flex; flex-direction: column; gap: 16px;">
+        <div>
+            <label style="display: block; margin-bottom: 4px; font-weight: 500;">Name</label>
+            <Input @bind-Value="_newJobName" Placeholder="My Job" />
+        </div>
+        <div>
+            <label style="display: block; margin-bottom: 4px; font-weight: 500;">Description</label>
+            <TextArea @bind-Value="_newJobDescription" Placeholder="Optional description" Rows="3" />
+        </div>
+    </div>
+</Modal>
+
+@code {
+    private IReadOnlyList<JobSummary> _jobs = [];
+    private bool _loading = true;
+    private string? _error;
+
+    private bool _showCreateModal;
+    private string _newJobName = "";
+    private string? _newJobDescription;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            _jobs = await JobService.GetJobsAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to load jobs: {ex.Message}";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void StartCreate()
+    {
+        _newJobName = "";
+        _newJobDescription = null;
+        _showCreateModal = true;
+    }
+
+    private async Task ConfirmCreate()
+    {
+        if (string.IsNullOrWhiteSpace(_newJobName)) return;
+        try
+        {
+            var job = await JobService.CreateJobAsync(
+                new CreateJobRequest(_newJobName.Trim(), _newJobDescription?.Trim(), null, 1));
+            _showCreateModal = false;
+            Navigation.NavigateTo($"/jobs/{job.Id}");
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to create job: {ex.Message}";
+        }
+    }
+
+    private async Task TriggerAsync(JobSummary job)
+    {
+        try
+        {
+            await JobService.TriggerJobAsync(job.Id);
+            _error = null;
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to trigger '{job.Name}': {ex.Message}";
+        }
+    }
+
+    private async Task DeleteAsync(JobSummary job)
+    {
+        try
+        {
+            await JobService.DeleteJobAsync(job.Id);
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to delete '{job.Name}': {ex.Message}";
+        }
+    }
+
+    private static string FormatDate(DateTime dt)
+    {
+        var diff = DateTime.UtcNow - dt;
+        if (diff.TotalMinutes < 1) return "just now";
+        if (diff.TotalHours < 1) return $"{(int)diff.TotalMinutes}m ago";
+        if (diff.TotalDays < 1) return $"{(int)diff.TotalHours}h ago";
+        if (diff.TotalDays < 30) return $"{(int)diff.TotalDays}d ago";
+        return dt.ToString("yyyy-MM-dd");
+    }
+}

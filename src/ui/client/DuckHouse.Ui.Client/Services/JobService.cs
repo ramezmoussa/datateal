@@ -1,0 +1,91 @@
+using System.Net;
+using System.Net.Http.Json;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using DuckHouse.Ui.Shared.Orchestration;
+
+namespace DuckHouse.Ui.Client.Services;
+
+internal class JobService(HttpClient httpClient) : IJobService
+{
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
+    {
+        Converters = { new JsonStringEnumConverter() },
+    };
+
+    public async Task<IReadOnlyList<JobSummary>> GetJobsAsync(CancellationToken ct)
+    {
+        return await httpClient.GetFromJsonAsync<IReadOnlyList<JobSummary>>("api/orchestrator/jobs", JsonOptions, ct)
+            ?? [];
+    }
+
+    public async Task<JobDetail?> GetJobAsync(Guid id, CancellationToken ct)
+    {
+        var response = await httpClient.GetAsync($"api/orchestrator/jobs/{id}", ct);
+        if (response.StatusCode == HttpStatusCode.NotFound) return null;
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<JobDetail>(JsonOptions, ct);
+    }
+
+    public async Task<JobSummary> CreateJobAsync(CreateJobRequest request, CancellationToken ct)
+    {
+        var response = await httpClient.PostAsJsonAsync("api/orchestrator/jobs", request, JsonOptions, ct);
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<JobSummary>(JsonOptions, ct))!;
+    }
+
+    public async Task<JobSummary?> UpdateJobAsync(Guid id, UpdateJobRequest request, CancellationToken ct)
+    {
+        var response = await httpClient.PutAsJsonAsync($"api/orchestrator/jobs/{id}", request, JsonOptions, ct);
+        if (response.StatusCode == HttpStatusCode.NotFound) return null;
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<JobSummary>(JsonOptions, ct);
+    }
+
+    public async Task DeleteJobAsync(Guid id, CancellationToken ct)
+    {
+        var response = await httpClient.DeleteAsync($"api/orchestrator/jobs/{id}", ct);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task<JobRunSummary> TriggerJobAsync(Guid id, TriggerJobRequest? request, CancellationToken ct)
+    {
+        var response = await httpClient.PostAsJsonAsync($"api/orchestrator/jobs/{id}/trigger",
+            request ?? new TriggerJobRequest(), JsonOptions, ct);
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<JobRunSummary>(JsonOptions, ct))!;
+    }
+
+    public async Task<IReadOnlyList<JobRunSummary>> GetRunsAsync(Guid jobId, CancellationToken ct)
+    {
+        return await httpClient.GetFromJsonAsync<IReadOnlyList<JobRunSummary>>(
+            $"api/orchestrator/jobs/{jobId}/runs", JsonOptions, ct) ?? [];
+    }
+
+    public async Task<IReadOnlyList<ScheduleDto>> GetSchedulesAsync(Guid jobId, CancellationToken ct)
+    {
+        return await httpClient.GetFromJsonAsync<IReadOnlyList<ScheduleDto>>(
+            $"api/orchestrator/jobs/{jobId}/schedules", JsonOptions, ct) ?? [];
+    }
+
+    public async Task<ScheduleDto> CreateScheduleAsync(Guid jobId, CreateScheduleRequest request, CancellationToken ct)
+    {
+        var response = await httpClient.PostAsJsonAsync($"api/orchestrator/jobs/{jobId}/schedules", request, JsonOptions, ct);
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<ScheduleDto>(JsonOptions, ct))!;
+    }
+
+    public async Task<ScheduleDto?> UpdateScheduleAsync(Guid jobId, Guid scheduleId, UpdateScheduleRequest request, CancellationToken ct)
+    {
+        var response = await httpClient.PutAsJsonAsync($"api/orchestrator/jobs/{jobId}/schedules/{scheduleId}", request, JsonOptions, ct);
+        if (response.StatusCode == HttpStatusCode.NotFound) return null;
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<ScheduleDto>(JsonOptions, ct);
+    }
+
+    public async Task DeleteScheduleAsync(Guid jobId, Guid scheduleId, CancellationToken ct)
+    {
+        var response = await httpClient.DeleteAsync($"api/orchestrator/jobs/{jobId}/schedules/{scheduleId}", ct);
+        response.EnsureSuccessStatusCode();
+    }
+}

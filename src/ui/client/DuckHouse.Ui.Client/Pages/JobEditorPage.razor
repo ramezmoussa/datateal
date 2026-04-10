@@ -1,0 +1,342 @@
+@page "/jobs/{Id:guid}"
+
+@using DuckHouse.Ui.Shared.Orchestration
+@inject IJobService JobService
+@inject NavigationManager Navigation
+
+<PageTitle>@(_job?.Name ?? "Job Editor") — DuckHouse</PageTitle>
+
+@if (!string.IsNullOrEmpty(_error))
+{
+    <Alert Type="@AlertType.Error" Message="@_error" Closable OnClose="() => _error = null"
+           Style="margin-bottom: 16px;" />
+}
+
+<Spin Spinning="_loading">
+    @if (_job is not null)
+    {
+        <Flex Justify="FlexJustify.SpaceBetween" Align="FlexAlign.Center" Style="margin-bottom: 16px; flex-wrap: wrap; gap: 8px;">
+            <Space Align="SpaceAlign.Center" Size="SpaceSize.Small">
+                <SpaceItem>
+                    <Button OnClick="@(() => Navigation.NavigateTo("/jobs"))">
+                        <Icon Type="@IconType.Outline.ArrowLeft" /> Back
+                    </Button>
+                </SpaceItem>
+                <SpaceItem>
+                    <h2 style="margin: 0;">@_job.Name</h2>
+                </SpaceItem>
+                <SpaceItem>
+                    @if (_job.IsEnabled)
+                    {
+                        <Tag Color="@("green")">Enabled</Tag>
+                    }
+                    else
+                    {
+                        <Tag>Disabled</Tag>
+                    }
+                </SpaceItem>
+            </Space>
+            <Popconfirm Title="Trigger this job?" OnConfirm="TriggerAsync">
+                <Button Type="@ButtonType.Primary">
+                    <Icon Type="@IconType.Outline.PlayCircle" /> Run
+                </Button>
+            </Popconfirm>
+        </Flex>
+
+        <Tabs DefaultActiveKey="settings">
+            <TabPane Key="settings" Tab="Settings">
+                <div style="max-width: 600px; margin-top: 16px;">
+                    <div style="display: flex; flex-direction: column; gap: 16px;">
+                        <div>
+                            <label style="display: block; margin-bottom: 4px; font-weight: 500;">Name</label>
+                            <Input @bind-Value="_editName" />
+                        </div>
+                        <div>
+                            <label style="display: block; margin-bottom: 4px; font-weight: 500;">Description</label>
+                            <TextArea @bind-Value="_editDescription" Rows="3" />
+                        </div>
+                        <div>
+                            <label style="display: block; margin-bottom: 4px; font-weight: 500;">Max Concurrent Runs</label>
+                            <AntDesign.InputNumber @bind-Value="_editMaxConcurrent" Min="1" Max="100" />
+                        </div>
+                        <div>
+                            <label style="display: block; margin-bottom: 4px; font-weight: 500;">Enabled</label>
+                            <Switch @bind-Checked="_editEnabled" />
+                        </div>
+                        <div>
+                            <Button Type="@ButtonType.Primary" OnClick="SaveSettingsAsync">
+                                Save Settings
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            </TabPane>
+
+            <TabPane Key="tasks" Tab="@($"Tasks ({_job.Tasks.Count})")">
+                <div style="margin-top: 16px;">
+                    <Table TItem="TaskDto" DataSource="_job.Tasks" Size="@TableSize.Small">
+                        <PropertyColumn Property="c => c.Name" Title="Name" />
+                        <PropertyColumn Property="c => c.TaskType" Title="Type">
+                            <Tag Color="@GetTaskTypeColor(context.TaskType)">@context.TaskType</Tag>
+                        </PropertyColumn>
+                        <PropertyColumn Property="c => c.NodePoolRef" Title="Node Pool">
+                            @(context.NodePoolRef ?? "—")
+                        </PropertyColumn>
+                        <PropertyColumn Property="c => c.MaxRetries" Title="Retries" />
+                        <PropertyColumn Property="c => c.Dependencies" Title="Dependencies">
+                            @if (context.Dependencies.Count > 0)
+                            {
+                                @foreach (var dep in context.Dependencies)
+                                {
+                                    <Tag>@dep.DependsOnTaskName (@dep.Condition)</Tag>
+                                }
+                            }
+                            else
+                            {
+                                <span style="color: #999;">None</span>
+                            }
+                        </PropertyColumn>
+                    </Table>
+                    <div style="margin-top: 8px; color: #999; font-size: 12px;">
+                        Task editing will be available in a future update. Use the API or YAML import to define tasks.
+                    </div>
+                </div>
+            </TabPane>
+
+            <TabPane Key="parameters" Tab="@($"Parameters ({_job.Parameters.Count})")">
+                <div style="margin-top: 16px;">
+                    <Table TItem="JobParameterDto" DataSource="_job.Parameters" Size="@TableSize.Small">
+                        <PropertyColumn Property="c => c.Name" Title="Name" />
+                        <PropertyColumn Property="c => c.DefaultValue" Title="Default">
+                            @(context.DefaultValue ?? "—")
+                        </PropertyColumn>
+                        <PropertyColumn Property="c => c.IsRequired" Title="Required">
+                            @if (context.IsRequired)
+                            {
+                                <Tag Color="@("red")">Required</Tag>
+                            }
+                            else
+                            {
+                                <Tag>Optional</Tag>
+                            }
+                        </PropertyColumn>
+                        <PropertyColumn Property="c => c.Description" Title="Description">
+                            @(context.Description ?? "—")
+                        </PropertyColumn>
+                    </Table>
+                </div>
+            </TabPane>
+
+            <TabPane Key="schedules" Tab="@($"Schedules ({_job.Schedules.Count})")">
+                <div style="margin-top: 16px;">
+                    <div style="margin-bottom: 8px;">
+                        <Button Size="@ButtonSize.Small" OnClick="StartAddSchedule">
+                            <Icon Type="@IconType.Outline.Plus" /> Add Schedule
+                        </Button>
+                    </div>
+                    <Table TItem="ScheduleDto" DataSource="_job.Schedules" Size="@TableSize.Small">
+                        <PropertyColumn Property="c => c.CronExpression" Title="Cron Expression">
+                            <code>@context.CronExpression</code>
+                        </PropertyColumn>
+                        <PropertyColumn Property="c => c.IsEnabled" Title="Enabled">
+                            @if (context.IsEnabled)
+                            {
+                                <Tag Color="@("green")">Enabled</Tag>
+                            }
+                            else
+                            {
+                                <Tag>Disabled</Tag>
+                            }
+                        </PropertyColumn>
+                        <PropertyColumn Property="c => c.TimeZone" Title="Time Zone">
+                            @(context.TimeZone ?? "UTC")
+                        </PropertyColumn>
+                        <PropertyColumn Property="c => c.NextFireTime" Title="Next Run">
+                            @(context.NextFireTime?.ToString("yyyy-MM-dd HH:mm") ?? "—")
+                        </PropertyColumn>
+                        <ActionColumn Title="Actions">
+                            <Popconfirm Title="Delete this schedule?" OnConfirm="() => DeleteScheduleAsync(context)">
+                                <Button Danger Size="@ButtonSize.Small">
+                                    <Icon Type="@IconType.Outline.Delete" />
+                                </Button>
+                            </Popconfirm>
+                        </ActionColumn>
+                    </Table>
+                </div>
+            </TabPane>
+
+            <TabPane Key="runs" Tab="Runs">
+                <div style="margin-top: 16px;">
+                    <Table TItem="JobRunSummary" DataSource="_runs" Size="@TableSize.Small" Loading="_runsLoading">
+                        <PropertyColumn Property="c => c.Status" Title="Status">
+                            <Tag Color="@GetStatusColor(context.Status)">@context.Status</Tag>
+                        </PropertyColumn>
+                        <PropertyColumn Property="c => c.Trigger" Title="Trigger">
+                            @context.Trigger
+                        </PropertyColumn>
+                        <PropertyColumn Property="c => c.CreatedAt" Title="Started">
+                            @context.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")
+                        </PropertyColumn>
+                        <PropertyColumn Property="c => c.CompletedAt" Title="Completed">
+                            @(context.CompletedAt?.ToString("yyyy-MM-dd HH:mm:ss") ?? "—")
+                        </PropertyColumn>
+                    </Table>
+                </div>
+            </TabPane>
+        </Tabs>
+
+        <Modal Title="Add Schedule"
+               Visible="_showScheduleModal"
+               OnOk="ConfirmAddSchedule"
+               OnCancel="() => _showScheduleModal = false"
+               OkButtonProps="@(new ButtonProps { Disabled = string.IsNullOrWhiteSpace(_newCron) })">
+            <div style="display: flex; flex-direction: column; gap: 16px;">
+                <div>
+                    <label style="display: block; margin-bottom: 4px; font-weight: 500;">Cron Expression</label>
+                    <Input @bind-Value="_newCron" Placeholder="0 6 * * *" />
+                </div>
+                <div>
+                    <label style="display: block; margin-bottom: 4px; font-weight: 500;">Time Zone</label>
+                    <Input @bind-Value="_newTimeZone" Placeholder="UTC" />
+                </div>
+            </div>
+        </Modal>
+    }
+</Spin>
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private JobDetail? _job;
+    private IReadOnlyList<JobRunSummary> _runs = [];
+    private bool _loading = true;
+    private bool _runsLoading;
+    private string? _error;
+
+    // Settings edit state
+    private string _editName = "";
+    private string? _editDescription;
+    private int _editMaxConcurrent = 1;
+    private bool _editEnabled = true;
+
+    // Schedule modal state
+    private bool _showScheduleModal;
+    private string _newCron = "";
+    private string? _newTimeZone;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            _job = await JobService.GetJobAsync(Id);
+            if (_job is not null)
+            {
+                _editName = _job.Name;
+                _editDescription = _job.Description;
+                _editMaxConcurrent = _job.MaxConcurrentRuns;
+                _editEnabled = _job.IsEnabled;
+
+                _runsLoading = true;
+                StateHasChanged();
+                _runs = await JobService.GetRunsAsync(Id);
+                _runsLoading = false;
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to load job: {ex.Message}";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task SaveSettingsAsync()
+    {
+        try
+        {
+            await JobService.UpdateJobAsync(Id, new UpdateJobRequest(
+                _editName, _editDescription, _job!.FolderId, _editMaxConcurrent, _editEnabled));
+            await LoadAsync();
+            _error = null;
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to save: {ex.Message}";
+        }
+    }
+
+    private async Task TriggerAsync()
+    {
+        try
+        {
+            await JobService.TriggerJobAsync(Id);
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to trigger: {ex.Message}";
+        }
+    }
+
+    private void StartAddSchedule()
+    {
+        _newCron = "";
+        _newTimeZone = null;
+        _showScheduleModal = true;
+    }
+
+    private async Task ConfirmAddSchedule()
+    {
+        if (string.IsNullOrWhiteSpace(_newCron)) return;
+        try
+        {
+            await JobService.CreateScheduleAsync(Id,
+                new CreateScheduleRequest(_newCron.Trim(), true, _newTimeZone?.Trim(), null));
+            _showScheduleModal = false;
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to add schedule: {ex.Message}";
+        }
+    }
+
+    private async Task DeleteScheduleAsync(ScheduleDto schedule)
+    {
+        try
+        {
+            await JobService.DeleteScheduleAsync(Id, schedule.Id);
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to delete schedule: {ex.Message}";
+        }
+    }
+
+    private static string GetTaskTypeColor(string taskType) => taskType.ToLowerInvariant() switch
+    {
+        "notebook" => "blue",
+        "sqlquery" or "sql" => "purple",
+        "subjob" => "orange",
+        _ => "default",
+    };
+
+    private static string GetStatusColor(string status) => status.ToLowerInvariant() switch
+    {
+        "succeeded" => "green",
+        "failed" => "red",
+        "running" => "blue",
+        "pending" => "default",
+        "cancelled" => "orange",
+        _ => "default",
+    };
+}

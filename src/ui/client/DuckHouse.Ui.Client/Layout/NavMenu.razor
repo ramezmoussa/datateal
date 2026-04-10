@@ -17,6 +17,10 @@
         <Icon Type="@IconType.Outline.Snippets" />
         <span>Workspace</span>
     </MenuItem>
+    <MenuItem Key="jobs" OnClick="@(() => Navigation.NavigateTo("/jobs"))">
+        <Icon Type="@IconType.Outline.Apartment" />
+        <span>Jobs</span>
+    </MenuItem>
     <MenuItem Key="settings" OnClick="@(() => Navigation.NavigateTo("/settings"))">
         <Icon Type="@IconType.Outline.Setting" />
         <span>Settings</span>
@@ -55,6 +59,7 @@
             _ when path.StartsWith("/workspace") => ["notebook"],
             _ when path.StartsWith("/notebook") => ["notebook"],
             _ when path.StartsWith("/query") => ["notebook"],
+            _ when path.StartsWith("/jobs") => ["jobs"],
             _ when path.StartsWith("/settings") => ["settings"],
             _ => []
         };

@@ -26,6 +26,8 @@ builder.Services.AddInfrastructureServices(builder.Configuration);
 
 builder.AddNpgsqlDbContext<UiDbContext>("duckhouse-ui");
 
+builder.Services.AddOrchestratorProxy();
+
 builder.Services.AddAntDesign();
 
 var app = builder.Build();
@@ -56,6 +58,7 @@ app.UseAntiforgery();
 
 app.MapStaticAssets();
 app.MapControllers();
+app.MapOrchestratorProxy();
 app.MapRazorComponents<App>()
 	.AddInteractiveWebAssemblyRenderMode()
 	.AddAdditionalAssemblies(typeof(DuckHouse.Ui.Client._Imports).Assembly);
