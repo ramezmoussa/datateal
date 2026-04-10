@@ -180,6 +180,10 @@ else
                                     OnClick="() => StartRenameQuery(context.Query!)">Rename</Button>
                         </SpaceItem>
                         <SpaceItem>
+                            <Button Size="ButtonSize.Small" Icon="@IconType.Outline.Copy"
+                                    OnClick="() => CloneQueryAsync(context.Query!)">Clone</Button>
+                        </SpaceItem>
+                        <SpaceItem>
                             <Popconfirm Title="Delete this query?"
                                         OnConfirm="@(() => DeleteQueryAsync(context.Query!))"
                                         OkText="@("Delete")" OkType="ButtonType.Primary"
@@ -492,6 +496,19 @@ else
             await LoadAsync();
         }
         catch (Exception ex) { _error = $"Failed to clone notebook: {ex.Message}"; }
+    }
+
+    private async Task CloneQueryAsync(QuerySummary query)
+    {
+        try
+        {
+            var detail = await WorkspaceService.GetQueryAsync(query.Id);
+            if (detail is not null)
+                await WorkspaceService.CreateQueryAsync(
+                    new CreateQueryRequest($"{query.Title} - Copy", detail.Content, query.FolderId));
+            await LoadAsync();
+        }
+        catch (Exception ex) { _error = $"Failed to clone query: {ex.Message}"; }
     }
 
     // ── Rename Query ──────────────────────────────────────────────────
