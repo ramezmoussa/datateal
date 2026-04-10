@@ -48,28 +48,10 @@ internal class JobRepository(OrchestratorDbContext db) : IJobRepository
 
     public async Task<Job?> UpdateJobAsync(Job job, CancellationToken cancellationToken = default)
     {
-        // The job entity is expected to already be tracked (loaded via GetJobAsync).
-        // The handler may have cleared and rebuilt the Tasks and Parameters collections.
-        // We need to delete orphaned children from the database.
-
-        // Find tasks/params in DB that are no longer in the entity's collections
-        var retainedTaskIds = job.Tasks.Select(t => t.Id).ToHashSet();
-        var orphanedDeps = await db.TaskDependencies
-            .Where(d => d.Task!.JobId == job.Id && !retainedTaskIds.Contains(d.TaskId))
-            .ToListAsync(cancellationToken);
-        db.TaskDependencies.RemoveRange(orphanedDeps);
-
-        var orphanedTasks = await db.JobTasks
-            .Where(t => t.JobId == job.Id && !retainedTaskIds.Contains(t.Id))
-            .ToListAsync(cancellationToken);
-        db.JobTasks.RemoveRange(orphanedTasks);
-
-        var retainedParamIds = job.Parameters.Select(p => p.Id).ToHashSet();
-        var orphanedParams = await db.JobParameters
-            .Where(p => p.JobId == job.Id && !retainedParamIds.Contains(p.Id))
-            .ToListAsync(cancellationToken);
-        db.JobParameters.RemoveRange(orphanedParams);
-
+        // The job entity is already tracked (loaded via GetJobAsync).
+        // Collections were cleared and rebuilt in the handler — EF Core's change tracker
+        // automatically marks orphaned children as Deleted for required cascade relationships,
+        // so no explicit orphan cleanup is needed here.
         job.UpdatedAt = DateTime.UtcNow;
         await db.SaveChangesAsync(cancellationToken);
 

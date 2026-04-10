@@ -31,6 +31,7 @@ internal class TriggerJobHandler(
         {
             Id = Guid.NewGuid(),
             JobId = job.Id,
+            JobName = job.Name,
             Status = JobRunStatus.Pending,
             Trigger = request.Trigger,
             ParametersJson = request.Parameters is { Count: > 0 }
@@ -41,11 +42,21 @@ internal class TriggerJobHandler(
 
         foreach (var task in job.Tasks)
         {
+            string taskType = task switch
+            {
+                NotebookTask => "Notebook",
+                SqlQueryTask => "SqlQuery",
+                SubJobTask => "SubJob",
+                _ => task.GetType().Name,
+            };
+
             run.TaskRuns.Add(new TaskRun
             {
                 Id = Guid.NewGuid(),
                 JobRunId = run.Id,
                 TaskId = task.Id,
+                TaskName = task.Name,
+                TaskType = taskType,
                 Status = TaskRunStatus.Pending,
                 AttemptNumber = 1,
             });

@@ -90,7 +90,9 @@ public class OrchestratorDbContext(DbContextOptions<OrchestratorDbContext> optio
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Status).HasConversion<string>().HasMaxLength(32);
             entity.Property(e => e.Trigger).HasConversion<string>().HasMaxLength(32);
+            entity.Property(e => e.JobName).HasMaxLength(256).IsRequired();
             entity.Property(e => e.ParametersJson).HasColumnType("jsonb");
+            entity.Ignore(e => e.Parameters);
             entity.HasOne(e => e.Job).WithMany().HasForeignKey(e => e.JobId).OnDelete(DeleteBehavior.Cascade);
             entity.HasOne(e => e.ParentRun).WithMany().HasForeignKey(e => e.ParentRunId).OnDelete(DeleteBehavior.SetNull);
             entity.HasMany(e => e.TaskRuns).WithOne(tr => tr.JobRun).HasForeignKey(tr => tr.JobRunId).OnDelete(DeleteBehavior.Cascade);
@@ -102,6 +104,8 @@ public class OrchestratorDbContext(DbContextOptions<OrchestratorDbContext> optio
         {
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Status).HasConversion<string>().HasMaxLength(32);
+            entity.Property(e => e.TaskName).HasMaxLength(256).IsRequired();
+            entity.Property(e => e.TaskType).HasMaxLength(32).IsRequired();
             entity.HasOne(e => e.Task).WithMany().HasForeignKey(e => e.TaskId).OnDelete(DeleteBehavior.Restrict);
             entity.HasMany(e => e.CellOutputs).WithOne(c => c.TaskRun).HasForeignKey(c => c.TaskRunId).OnDelete(DeleteBehavior.Cascade);
         });

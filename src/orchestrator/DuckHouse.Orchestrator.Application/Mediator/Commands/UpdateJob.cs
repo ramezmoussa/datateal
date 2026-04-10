@@ -48,6 +48,10 @@ internal class UpdateJobHandler(IJobRepository jobRepository) : IRequestHandler<
         existing.IsEnabled = request.IsEnabled;
 
         // Replace parameters if provided
+        // NOTE: New entities must NOT have pre-set IDs (leave as Guid.Empty) so that
+        // EF Core marks them as Added when attached via the tracked navigation collection.
+        // Entities with non-default keys would be attached as Unchanged/Modified and EF
+        // would try to UPDATE non-existent rows → DbUpdateConcurrencyException.
         if (request.Parameters is not null)
         {
             existing.Parameters.Clear();
@@ -55,7 +59,6 @@ internal class UpdateJobHandler(IJobRepository jobRepository) : IRequestHandler<
             {
                 existing.Parameters.Add(new JobParameter
                 {
-                    Id = Guid.NewGuid(),
                     JobId = existing.Id,
                     Name = p.Name,
                     DefaultValue = p.DefaultValue,
@@ -77,7 +80,6 @@ internal class UpdateJobHandler(IJobRepository jobRepository) : IRequestHandler<
                 {
                     "notebook" => new NotebookTask
                     {
-                        Id = Guid.NewGuid(),
                         JobId = existing.Id,
                         Name = t.Name,
                         MaxRetries = t.MaxRetries,
@@ -89,7 +91,6 @@ internal class UpdateJobHandler(IJobRepository jobRepository) : IRequestHandler<
                     },
                     "sqlquery" or "sql" => new SqlQueryTask
                     {
-                        Id = Guid.NewGuid(),
                         JobId = existing.Id,
                         Name = t.Name,
                         MaxRetries = t.MaxRetries,
@@ -101,7 +102,6 @@ internal class UpdateJobHandler(IJobRepository jobRepository) : IRequestHandler<
                     },
                     "subjob" => new SubJobTask
                     {
-                        Id = Guid.NewGuid(),
                         JobId = existing.Id,
                         Name = t.Name,
                         MaxRetries = t.MaxRetries,
@@ -117,7 +117,8 @@ internal class UpdateJobHandler(IJobRepository jobRepository) : IRequestHandler<
                 existing.Tasks.Add(task);
             }
 
-            // Resolve dependencies by task name
+            // Resolve dependencies by task name — use navigation property (not FK)
+            // because the new tasks have default (Guid.Empty) IDs at this point.
             for (var i = 0; i < request.Tasks.Count; i++)
             {
                 var taskReq = request.Tasks[i];
@@ -130,9 +131,7 @@ internal class UpdateJobHandler(IJobRepository jobRepository) : IRequestHandler<
 
                     task.Dependencies.Add(new TaskDependency
                     {
-                        Id = Guid.NewGuid(),
-                        TaskId = task.Id,
-                        DependsOnTaskId = dependsOnTask.Id,
+                        DependsOnTask = dependsOnTask,
                         Condition = dep.Condition,
                     });
                 }

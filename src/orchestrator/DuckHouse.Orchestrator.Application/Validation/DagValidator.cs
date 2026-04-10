@@ -8,52 +8,52 @@ public static class DagValidator
     /// Validates that the task dependency graph is a valid DAG (no cycles) and that
     /// all dependency references point to tasks within the same job.
     /// Uses Kahn's algorithm for topological sort.
+    /// Resolves dependencies via the <see cref="TaskDependency.DependsOnTask"/> navigation
+    /// property first, falling back to <see cref="TaskDependency.DependsOnTaskId"/> FK lookup.
     /// </summary>
     public static void Validate(IReadOnlyList<JobTask> tasks)
     {
-        var taskIds = new HashSet<Guid>(tasks.Select(t => t.Id));
+        // Build name-based graph (names are unique within a job)
+        var inDegree = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        var adjacency = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
 
-        // Validate all dependency references point to valid tasks
+        // ID→Name lookup for FK-based resolution (when navigation is not set)
+        var idToName = new Dictionary<Guid, string>();
+        foreach (var task in tasks)
+        {
+            inDegree[task.Name] = 0;
+            adjacency[task.Name] = [];
+            if (task.Id != Guid.Empty)
+                idToName[task.Id] = task.Name;
+        }
+
         foreach (var task in tasks)
         {
             foreach (var dep in task.Dependencies)
             {
-                if (!taskIds.Contains(dep.DependsOnTaskId))
+                // Prefer navigation property; fall back to FK lookup
+                var depName = dep.DependsOnTask?.Name;
+                if (depName is null && dep.DependsOnTaskId != Guid.Empty)
+                    idToName.TryGetValue(dep.DependsOnTaskId, out depName);
+
+                if (depName is null || !inDegree.ContainsKey(depName))
                     throw new InvalidOperationException(
-                        $"Task '{task.Name}' has a dependency on task ID '{dep.DependsOnTaskId}' which does not exist in the job.");
+                        $"Task '{task.Name}' has a dependency on a task that does not exist in the job.");
+
+                adjacency[depName].Add(task.Name);
+                inDegree[task.Name]++;
             }
         }
 
-        // Build adjacency list and in-degree map (Kahn's algorithm)
-        var inDegree = new Dictionary<Guid, int>();
-        var adjacency = new Dictionary<Guid, List<Guid>>();
-
-        foreach (var task in tasks)
-        {
-            inDegree[task.Id] = 0;
-            adjacency[task.Id] = [];
-        }
-
-        foreach (var task in tasks)
-        {
-            foreach (var dep in task.Dependencies)
-            {
-                // dep.DependsOnTaskId → task.Id (the depended-on task must complete first)
-                adjacency[dep.DependsOnTaskId].Add(task.Id);
-                inDegree[task.Id]++;
-            }
-        }
-
-        // Seed queue with tasks that have no dependencies
-        var queue = new Queue<Guid>();
-        foreach (var (id, degree) in inDegree)
+        // Kahn's algorithm — topological sort to detect cycles
+        var queue = new Queue<string>();
+        foreach (var (name, degree) in inDegree)
         {
             if (degree == 0)
-                queue.Enqueue(id);
+                queue.Enqueue(name);
         }
 
         var sortedCount = 0;
-
         while (queue.Count > 0)
         {
             var current = queue.Dequeue();
@@ -61,8 +61,7 @@ public static class DagValidator
 
             foreach (var neighbor in adjacency[current])
             {
-                inDegree[neighbor]--;
-                if (inDegree[neighbor] == 0)
+                if (--inDegree[neighbor] == 0)
                     queue.Enqueue(neighbor);
             }
         }

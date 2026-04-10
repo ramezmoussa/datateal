@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using DuckHouse.Orchestrator.Core.Enums;
 
 namespace DuckHouse.Orchestrator.Core.Entities;
@@ -6,6 +7,7 @@ public class TaskRunCellOutput
 {
     public Guid Id { get; set; }
     public Guid TaskRunId { get; set; }
+    [JsonIgnore]
     public TaskRun? TaskRun { get; set; }
 
     public int CellIndex { get; set; }
