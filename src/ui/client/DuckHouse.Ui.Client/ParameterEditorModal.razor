@@ -1,0 +1,85 @@
+@using DuckHouse.Ui.Client.Models
+
+<Modal Title="@(_isEdit ? "Edit Parameter" : "Add Parameter")"
+       Visible="Visible"
+       OnOk="HandleSave"
+       OnCancel="HandleCancel"
+       OkButtonProps="@(new ButtonProps { Disabled = string.IsNullOrWhiteSpace(_name) })">
+    <div style="display: flex; flex-direction: column; gap: 16px;">
+        <div>
+            <label style="display: block; margin-bottom: 4px; font-weight: 500;">Name</label>
+            <Input @bind-Value="_name" Placeholder="parameter_name" />
+        </div>
+        <div>
+            <label style="display: block; margin-bottom: 4px; font-weight: 500;">Default Value</label>
+            <Input @bind-Value="_defaultValue" Placeholder="Optional default value" />
+        </div>
+        <div>
+            <label style="display: block; margin-bottom: 4px; font-weight: 500;">Required</label>
+            <Switch @bind-Checked="_isRequired" />
+        </div>
+        <div>
+            <label style="display: block; margin-bottom: 4px; font-weight: 500;">Description</label>
+            <TextArea @bind-Value="_description" Rows="3" Placeholder="Optional description" />
+        </div>
+    </div>
+</Modal>
+
+@code {
+    [Parameter] public bool Visible { get; set; }
+    [Parameter] public EventCallback<bool> VisibleChanged { get; set; }
+    [Parameter] public EditableParameter? Parameter { get; set; }
+    [Parameter] public EventCallback<EditableParameter> OnSave { get; set; }
+
+    private string _name = "";
+    private string? _defaultValue;
+    private bool _isRequired;
+    private string? _description;
+    private bool _isEdit;
+
+    private bool _prevVisible;
+
+    protected override void OnParametersSet()
+    {
+        if (Visible && !_prevVisible)
+        {
+            if (Parameter is not null)
+            {
+                _isEdit = true;
+                _name = Parameter.Name;
+                _defaultValue = Parameter.DefaultValue;
+                _isRequired = Parameter.IsRequired;
+                _description = Parameter.Description;
+            }
+            else
+            {
+                _isEdit = false;
+                _name = "";
+                _defaultValue = null;
+                _isRequired = false;
+                _description = null;
+            }
+        }
+        _prevVisible = Visible;
+    }
+
+    private async Task HandleSave()
+    {
+        if (string.IsNullOrWhiteSpace(_name)) return;
+
+        var result = new EditableParameter
+        {
+            Name = _name.Trim(),
+            DefaultValue = _defaultValue,
+            IsRequired = _isRequired,
+            Description = _description
+        };
+        await OnSave.InvokeAsync(result);
+        await VisibleChanged.InvokeAsync(false);
+    }
+
+    private async Task HandleCancel()
+    {
+        await VisibleChanged.InvokeAsync(false);
+    }
+}

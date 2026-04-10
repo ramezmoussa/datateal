@@ -1,0 +1,73 @@
+@using DuckHouse.Ui.Shared.Workspace
+@inject IWorkspaceService WorkspaceService
+
+<Select TItem="WorkspaceItem"
+        TItemValue="Guid?"
+        DataSource="_items"
+        Value="SelectedId"
+        ValueChanged="OnValueChanged"
+        LabelName="@nameof(WorkspaceItem.Path)"
+        ValueName="@nameof(WorkspaceItem.Id)"
+        Placeholder="@(Placeholder ?? $"Select {ItemType}")"
+        EnableSearch
+        AllowClear
+        Loading="_loading"
+        Style="width: 100%;">
+</Select>
+
+@code {
+    [Parameter] public string ItemType { get; set; } = "Notebook";
+    [Parameter] public Guid? SelectedId { get; set; }
+    [Parameter] public EventCallback<Guid?> SelectedIdChanged { get; set; }
+    [Parameter] public string? Placeholder { get; set; }
+
+    private List<WorkspaceItem> _items = [];
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            await LoadItemsRecursive(null, "");
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task LoadItemsRecursive(Guid? folderId, string parentPath)
+    {
+        var listing = folderId.HasValue
+            ? await WorkspaceService.GetFolderAsync(folderId.Value)
+            : await WorkspaceService.GetRootAsync();
+
+        if (ItemType == "Notebook")
+        {
+            foreach (var nb in listing.Notebooks)
+            {
+                _items.Add(new WorkspaceItem(nb.Id, $"{parentPath}/{nb.Title}"));
+            }
+        }
+        else if (ItemType == "Query")
+        {
+            foreach (var q in listing.Queries)
+            {
+                _items.Add(new WorkspaceItem(q.Id, $"{parentPath}/{q.Title}"));
+            }
+        }
+
+        foreach (var folder in listing.Folders)
+        {
+            await LoadItemsRecursive(folder.Id, $"{parentPath}/{folder.Name}");
+        }
+    }
+
+    private async Task OnValueChanged(Guid? value)
+    {
+        SelectedId = value;
+        await SelectedIdChanged.InvokeAsync(value);
+    }
+
+    private record WorkspaceItem(Guid Id, string Path);
+}

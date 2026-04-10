@@ -1,0 +1,292 @@
+@using DuckHouse.Ui.Client.Models
+@using DuckHouse.Ui.Shared.Orchestration
+@inject INodePoolService NodePoolService
+@inject IJobService JobService
+
+<Drawer Title="@(_isEdit ? "Edit Task" : "Add Task")"
+        Visible="Visible"
+        OnClose="HandleCancel"
+        Width="520">
+    <div style="display: flex; flex-direction: column; gap: 24px; padding-bottom: 60px;">
+
+        @* Section 1: Basic Settings *@
+        <div>
+            <h4 style="margin: 0 0 12px;">Basic Settings</h4>
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+                <div>
+                    <label style="display: block; margin-bottom: 4px; font-weight: 500;">Name</label>
+                    <Input @bind-Value="_name" Placeholder="task-name" />
+                </div>
+                <div>
+                    <label style="display: block; margin-bottom: 4px; font-weight: 500;">Task Type</label>
+                    <Select TItem="string" TItemValue="string" @bind-Value="_taskType" Style="width: 100%;" OnSelectedItemChanged="@((string _) => OnTaskTypeChanged())">
+                        <SelectOption TItem="string" TItemValue="string" Value="@("Notebook")" Label="Notebook" />
+                        <SelectOption TItem="string" TItemValue="string" Value="@("SqlQuery")" Label="SQL Query" />
+                        <SelectOption TItem="string" TItemValue="string" Value="@("SubJob")" Label="Sub-Job" />
+                    </Select>
+                </div>
+            </div>
+        </div>
+
+        @* Section 2: Type-Specific Settings *@
+        <div>
+            <h4 style="margin: 0 0 12px;">Type Settings</h4>
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+                @if (_taskType == "Notebook")
+                {
+                    <div>
+                        <label style="display: block; margin-bottom: 4px; font-weight: 500;">Notebook</label>
+                        <WorkspaceItemPicker ItemType="Notebook"
+                                             @bind-SelectedId="_notebookId" />
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 4px; font-weight: 500;">Node Pool</label>
+                        <Select TItem="NodePoolOption"
+                                TItemValue="string?"
+                                DataSource="_nodePoolOptions"
+                                @bind-Value="_nodePoolRef"
+                                LabelName="@nameof(NodePoolOption.Label)"
+                                ValueName="@nameof(NodePoolOption.Value)"
+                                AllowClear
+                                Style="width: 100%;"
+                                Placeholder="Default" />
+                    </div>
+                }
+                else if (_taskType == "SqlQuery")
+                {
+                    <div>
+                        <label style="display: block; margin-bottom: 4px; font-weight: 500;">Query</label>
+                        <WorkspaceItemPicker ItemType="Query"
+                                             @bind-SelectedId="_queryId" />
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 4px; font-weight: 500;">Node Pool</label>
+                        <Select TItem="NodePoolOption"
+                                TItemValue="string?"
+                                DataSource="_nodePoolOptions"
+                                @bind-Value="_nodePoolRef"
+                                LabelName="@nameof(NodePoolOption.Label)"
+                                ValueName="@nameof(NodePoolOption.Value)"
+                                AllowClear
+                                Style="width: 100%;"
+                                Placeholder="Default" />
+                    </div>
+                }
+                else if (_taskType == "SubJob")
+                {
+                    <div>
+                        <label style="display: block; margin-bottom: 4px; font-weight: 500;">Job</label>
+                        <Select TItem="JobOption"
+                                TItemValue="Guid?"
+                                DataSource="_jobOptions"
+                                @bind-Value="_subJobId"
+                                LabelName="@nameof(JobOption.Label)"
+                                ValueName="@nameof(JobOption.Value)"
+                                EnableSearch
+                                AllowClear
+                                Style="width: 100%;"
+                                Placeholder="Select job" />
+                    </div>
+                }
+            </div>
+        </div>
+
+        @* Section 3: Execution Settings *@
+        <div>
+            <h4 style="margin: 0 0 12px;">Execution Settings</h4>
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+                <div>
+                    <label style="display: block; margin-bottom: 4px; font-weight: 500;">Max Retries</label>
+                    <AntDesign.InputNumber @bind-Value="_maxRetries" Min="0" Style="width: 100%;" />
+                </div>
+                <div>
+                    <label style="display: block; margin-bottom: 4px; font-weight: 500;">Retry Interval</label>
+                    <Input @bind-Value="_retryInterval" Placeholder="00:00:30" />
+                </div>
+                <div>
+                    <label style="display: block; margin-bottom: 4px; font-weight: 500;">Timeout</label>
+                    <Input @bind-Value="_timeout" Placeholder="01:00:00 (optional)" />
+                </div>
+            </div>
+        </div>
+
+        @* Section 4: Parameters *@
+        <div>
+            <h4 style="margin: 0 0 12px;">Parameters</h4>
+            @foreach (var (param, index) in _parameters.Select((p, i) => (p, i)))
+            {
+                var idx = index;
+                <div style="display: flex; gap: 8px; margin-bottom: 8px; align-items: center;">
+                    <Input @bind-Value="param.Key" Placeholder="Key" Style="flex: 1;" />
+                    <Input @bind-Value="param.Value" Placeholder="Value" Style="flex: 1;" />
+                    <Button Danger Size="@ButtonSize.Small" OnClick="() => _parameters.RemoveAt(idx)">
+                        <Icon Type="@IconType.Outline.Delete" />
+                    </Button>
+                </div>
+            }
+            <Button Size="@ButtonSize.Small" OnClick="() => _parameters.Add(new EditableTaskParameter())">
+                <Icon Type="@IconType.Outline.Plus" /> Add Parameter
+            </Button>
+        </div>
+
+        @* Section 5: Dependencies *@
+        <div>
+            <h4 style="margin: 0 0 12px;">Dependencies</h4>
+            @foreach (var (dep, index) in _dependencies.Select((d, i) => (d, i)))
+            {
+                var idx = index;
+                <div style="display: flex; gap: 8px; margin-bottom: 8px; align-items: center;">
+                    <Select TItem="string" TItemValue="string" @bind-Value="dep.TaskName" Style="flex: 1;" Placeholder="Depends on...">
+                        @foreach (var taskName in OtherTaskNames)
+                        {
+                            <SelectOption TItem="string" TItemValue="string" Value="@taskName" Label="@taskName" />
+                        }
+                    </Select>
+                    <Select TItem="string" TItemValue="string" @bind-Value="dep.Condition" Style="width: 140px;">
+                        <SelectOption TItem="string" TItemValue="string" Value="@("OnSuccess")" Label="On Success" />
+                        <SelectOption TItem="string" TItemValue="string" Value="@("OnFailure")" Label="On Failure" />
+                        <SelectOption TItem="string" TItemValue="string" Value="@("OnCompletion")" Label="On Completion" />
+                        <SelectOption TItem="string" TItemValue="string" Value="@("OnSkip")" Label="On Skip" />
+                    </Select>
+                    <Button Danger Size="@ButtonSize.Small" OnClick="() => _dependencies.RemoveAt(idx)">
+                        <Icon Type="@IconType.Outline.Delete" />
+                    </Button>
+                </div>
+            }
+            <Button Size="@ButtonSize.Small" OnClick="() => _dependencies.Add(new EditableDependency())">
+                <Icon Type="@IconType.Outline.Plus" /> Add Dependency
+            </Button>
+        </div>
+    </div>
+
+    @* Footer *@
+    <div style="position: absolute; bottom: 0; left: 0; right: 0; padding: 10px 16px; border-top: 1px solid #d9d9d9; background: #fff; display: flex; justify-content: flex-end; gap: 8px;">
+        <Button OnClick="HandleCancel">Cancel</Button>
+        <Button Type="@ButtonType.Primary" OnClick="HandleSave">Save</Button>
+    </div>
+</Drawer>
+
+@code {
+    [Parameter] public bool Visible { get; set; }
+    [Parameter] public EventCallback<bool> VisibleChanged { get; set; }
+    [Parameter] public EditableTask? Task { get; set; }
+    [Parameter] public EventCallback<EditableTask> OnSave { get; set; }
+    [Parameter] public List<string> OtherTaskNames { get; set; } = [];
+    [Parameter] public Guid CurrentJobId { get; set; }
+
+    private bool _isEdit;
+    private bool _prevVisible;
+
+    // Form fields
+    private string _name = "";
+    private string _taskType = "Notebook";
+    private int _maxRetries;
+    private string _retryInterval = "00:00:30";
+    private string? _timeout;
+    private Guid? _notebookId;
+    private Guid? _queryId;
+    private Guid? _subJobId;
+    private string? _nodePoolRef;
+    private List<EditableTaskParameter> _parameters = [];
+    private List<EditableDependency> _dependencies = [];
+
+    // Data sources
+    private List<NodePoolOption> _nodePoolOptions = [];
+    private List<JobOption> _jobOptions = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var pools = await NodePoolService.GetNodePoolsAsync();
+            _nodePoolOptions = pools.Select(p => new NodePoolOption(p.Name, $"{p.Name} ({p.VmSize})")).ToList();
+        }
+        catch { /* Node pools may not be available */ }
+
+        try
+        {
+            var jobs = await JobService.GetJobsAsync();
+            _jobOptions = jobs
+                .Where(j => j.Id != CurrentJobId)
+                .Select(j => new JobOption(j.Id, j.Name))
+                .ToList();
+        }
+        catch { /* Jobs may fail to load */ }
+    }
+
+    protected override void OnParametersSet()
+    {
+        if (Visible && !_prevVisible)
+        {
+            if (Task is not null)
+            {
+                _isEdit = true;
+                _name = Task.Name;
+                _taskType = Task.TaskType;
+                _maxRetries = Task.MaxRetries;
+                _retryInterval = Task.RetryInterval;
+                _timeout = Task.Timeout;
+                _notebookId = Task.NotebookId;
+                _queryId = Task.QueryId;
+                _subJobId = Task.SubJobId;
+                _nodePoolRef = Task.NodePoolRef;
+                _parameters = Task.Parameters.Select(p => new EditableTaskParameter { Key = p.Key, Value = p.Value }).ToList();
+                _dependencies = Task.Dependencies.Select(d => new EditableDependency { TaskName = d.TaskName, Condition = d.Condition }).ToList();
+            }
+            else
+            {
+                _isEdit = false;
+                _name = "";
+                _taskType = "Notebook";
+                _maxRetries = 0;
+                _retryInterval = "00:00:30";
+                _timeout = null;
+                _notebookId = null;
+                _queryId = null;
+                _subJobId = null;
+                _nodePoolRef = null;
+                _parameters = [];
+                _dependencies = [];
+            }
+        }
+        _prevVisible = Visible;
+    }
+
+    private void OnTaskTypeChanged()
+    {
+        _notebookId = null;
+        _queryId = null;
+        _subJobId = null;
+        _nodePoolRef = null;
+    }
+
+    private async Task HandleSave()
+    {
+        if (string.IsNullOrWhiteSpace(_name)) return;
+
+        var result = new EditableTask
+        {
+            Name = _name.Trim(),
+            TaskType = _taskType,
+            MaxRetries = _maxRetries,
+            RetryInterval = _retryInterval,
+            Timeout = _timeout,
+            NotebookId = _notebookId,
+            QueryId = _queryId,
+            SubJobId = _subJobId,
+            NodePoolRef = _nodePoolRef,
+            Parameters = _parameters.Where(p => !string.IsNullOrWhiteSpace(p.Key)).ToList(),
+            Dependencies = _dependencies.Where(d => !string.IsNullOrWhiteSpace(d.TaskName)).ToList(),
+        };
+        await OnSave.InvokeAsync(result);
+        await VisibleChanged.InvokeAsync(false);
+    }
+
+    private async Task HandleCancel()
+    {
+        await VisibleChanged.InvokeAsync(false);
+    }
+
+    private record NodePoolOption(string Value, string Label);
+    private record JobOption(Guid Value, string Label);
+}

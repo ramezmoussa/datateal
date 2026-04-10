@@ -48,18 +48,32 @@ internal class JobRepository(OrchestratorDbContext db) : IJobRepository
 
     public async Task<Job?> UpdateJobAsync(Job job, CancellationToken cancellationToken = default)
     {
-        var existing = await db.Jobs.FindAsync([job.Id], cancellationToken);
-        if (existing is null) return null;
+        // The job entity is expected to already be tracked (loaded via GetJobAsync).
+        // The handler may have cleared and rebuilt the Tasks and Parameters collections.
+        // We need to delete orphaned children from the database.
 
-        existing.Name = job.Name;
-        existing.Description = job.Description;
-        existing.FolderId = job.FolderId;
-        existing.MaxConcurrentRuns = job.MaxConcurrentRuns;
-        existing.IsEnabled = job.IsEnabled;
-        existing.UpdatedAt = DateTime.UtcNow;
+        // Find tasks/params in DB that are no longer in the entity's collections
+        var retainedTaskIds = job.Tasks.Select(t => t.Id).ToHashSet();
+        var orphanedDeps = await db.TaskDependencies
+            .Where(d => d.Task!.JobId == job.Id && !retainedTaskIds.Contains(d.TaskId))
+            .ToListAsync(cancellationToken);
+        db.TaskDependencies.RemoveRange(orphanedDeps);
 
+        var orphanedTasks = await db.JobTasks
+            .Where(t => t.JobId == job.Id && !retainedTaskIds.Contains(t.Id))
+            .ToListAsync(cancellationToken);
+        db.JobTasks.RemoveRange(orphanedTasks);
+
+        var retainedParamIds = job.Parameters.Select(p => p.Id).ToHashSet();
+        var orphanedParams = await db.JobParameters
+            .Where(p => p.JobId == job.Id && !retainedParamIds.Contains(p.Id))
+            .ToListAsync(cancellationToken);
+        db.JobParameters.RemoveRange(orphanedParams);
+
+        job.UpdatedAt = DateTime.UtcNow;
         await db.SaveChangesAsync(cancellationToken);
-        return existing;
+
+        return await GetJobAsync(job.Id, cancellationToken);
     }
 
     public async Task<bool> DeleteJobAsync(Guid id, CancellationToken cancellationToken = default)

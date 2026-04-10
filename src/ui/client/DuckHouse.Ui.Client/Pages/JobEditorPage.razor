@@ -36,14 +36,25 @@
                     }
                 </SpaceItem>
             </Space>
-            <Popconfirm Title="Trigger this job?" OnConfirm="TriggerAsync">
-                <Button Type="@ButtonType.Primary">
-                    <Icon Type="@IconType.Outline.PlayCircle" /> Run
-                </Button>
-            </Popconfirm>
-            <Button OnClick="ExportYamlAsync" Style="margin-left: 8px;">
-                <Icon Type="@IconType.Outline.Download" /> Export YAML
-            </Button>
+            <Space>
+                <SpaceItem>
+                    <Button Type="@ButtonType.Primary" OnClick="SaveAsync" Disabled="!_isDirty">
+                        <Icon Type="@IconType.Outline.Save" /> Save
+                    </Button>
+                </SpaceItem>
+                <SpaceItem>
+                    <Popconfirm Title="Trigger this job?" OnConfirm="TriggerAsync">
+                        <Button Type="@ButtonType.Primary">
+                            <Icon Type="@IconType.Outline.PlayCircle" /> Run
+                        </Button>
+                    </Popconfirm>
+                </SpaceItem>
+                <SpaceItem>
+                    <Button OnClick="ExportYamlAsync">
+                        <Icon Type="@IconType.Outline.Download" /> Export YAML
+                    </Button>
+                </SpaceItem>
+            </Space>
         </Flex>
 
         <Tabs DefaultActiveKey="settings">
@@ -52,32 +63,32 @@
                     <div style="display: flex; flex-direction: column; gap: 16px;">
                         <div>
                             <label style="display: block; margin-bottom: 4px; font-weight: 500;">Name</label>
-                            <Input @bind-Value="_editName" />
+                            <Input @bind-Value="_editName" OnChange="@((string _) => _isDirty = true)" />
                         </div>
                         <div>
                             <label style="display: block; margin-bottom: 4px; font-weight: 500;">Description</label>
-                            <TextArea @bind-Value="_editDescription" Rows="3" />
+                            <TextArea @bind-Value="_editDescription" Rows="3" OnChange="@((string _) => _isDirty = true)" />
                         </div>
                         <div>
                             <label style="display: block; margin-bottom: 4px; font-weight: 500;">Max Concurrent Runs</label>
-                            <AntDesign.InputNumber @bind-Value="_editMaxConcurrent" Min="1" Max="100" />
+                            <AntDesign.InputNumber @bind-Value="_editMaxConcurrent" Min="1" Max="100" OnChange="@((int _) => _isDirty = true)" />
                         </div>
                         <div>
                             <label style="display: block; margin-bottom: 4px; font-weight: 500;">Enabled</label>
-                            <Switch @bind-Checked="_editEnabled" />
-                        </div>
-                        <div>
-                            <Button Type="@ButtonType.Primary" OnClick="SaveSettingsAsync">
-                                Save Settings
-                            </Button>
+                            <Switch @bind-Checked="_editEnabled" OnChange="@((bool _) => _isDirty = true)" />
                         </div>
                     </div>
                 </div>
             </TabPane>
 
-            <TabPane Key="tasks" Tab="@($"Tasks ({_job.Tasks.Count})")">
+            <TabPane Key="tasks" Tab="@($"Tasks ({_editTasks.Count})")">
                 <div style="margin-top: 16px;">
-                    <Table TItem="TaskDto" DataSource="_job.Tasks" Size="@TableSize.Small">
+                    <div style="margin-bottom: 8px;">
+                        <Button Size="@ButtonSize.Small" OnClick="StartAddTask">
+                            <Icon Type="@IconType.Outline.Plus" /> Add Task
+                        </Button>
+                    </div>
+                    <Table TItem="EditableTask" DataSource="_editTasks" Size="@TableSize.Small">
                         <PropertyColumn Property="c => c.Name" Title="Name" />
                         <PropertyColumn Property="c => c.TaskType" Title="Type">
                             <Tag Color="@GetTaskTypeColor(context.TaskType)">@context.TaskType</Tag>
@@ -91,7 +102,7 @@
                             {
                                 @foreach (var dep in context.Dependencies)
                                 {
-                                    <Tag>@dep.DependsOnTaskName (@dep.Condition)</Tag>
+                                    <Tag>@dep.TaskName (@dep.Condition)</Tag>
                                 }
                             }
                             else
@@ -99,16 +110,34 @@
                                 <span style="color: #999;">None</span>
                             }
                         </PropertyColumn>
+                        <ActionColumn Title="Actions">
+                            <Space>
+                                <SpaceItem>
+                                    <Button Size="@ButtonSize.Small" OnClick="() => StartEditTask(context)">
+                                        <Icon Type="@IconType.Outline.Edit" />
+                                    </Button>
+                                </SpaceItem>
+                                <SpaceItem>
+                                    <Popconfirm Title="Delete this task?" OnConfirm="() => DeleteTask(context)">
+                                        <Button Danger Size="@ButtonSize.Small">
+                                            <Icon Type="@IconType.Outline.Delete" />
+                                        </Button>
+                                    </Popconfirm>
+                                </SpaceItem>
+                            </Space>
+                        </ActionColumn>
                     </Table>
-                    <div style="margin-top: 8px; color: #999; font-size: 12px;">
-                        Task editing will be available in a future update. Use the API or YAML import to define tasks.
-                    </div>
                 </div>
             </TabPane>
 
-            <TabPane Key="parameters" Tab="@($"Parameters ({_job.Parameters.Count})")">
+            <TabPane Key="parameters" Tab="@($"Parameters ({_editParams.Count})")">
                 <div style="margin-top: 16px;">
-                    <Table TItem="JobParameterDto" DataSource="_job.Parameters" Size="@TableSize.Small">
+                    <div style="margin-bottom: 8px;">
+                        <Button Size="@ButtonSize.Small" OnClick="StartAddParameter">
+                            <Icon Type="@IconType.Outline.Plus" /> Add Parameter
+                        </Button>
+                    </div>
+                    <Table TItem="EditableParameter" DataSource="_editParams" Size="@TableSize.Small">
                         <PropertyColumn Property="c => c.Name" Title="Name" />
                         <PropertyColumn Property="c => c.DefaultValue" Title="Default">
                             @(context.DefaultValue ?? "—")
@@ -126,6 +155,22 @@
                         <PropertyColumn Property="c => c.Description" Title="Description">
                             @(context.Description ?? "—")
                         </PropertyColumn>
+                        <ActionColumn Title="Actions">
+                            <Space>
+                                <SpaceItem>
+                                    <Button Size="@ButtonSize.Small" OnClick="() => StartEditParameter(context)">
+                                        <Icon Type="@IconType.Outline.Edit" />
+                                    </Button>
+                                </SpaceItem>
+                                <SpaceItem>
+                                    <Popconfirm Title="Delete this parameter?" OnConfirm="() => DeleteParameter(context)">
+                                        <Button Danger Size="@ButtonSize.Small">
+                                            <Icon Type="@IconType.Outline.Delete" />
+                                        </Button>
+                                    </Popconfirm>
+                                </SpaceItem>
+                            </Space>
+                        </ActionColumn>
                     </Table>
                 </div>
             </TabPane>
@@ -214,6 +259,16 @@
                Footer="null">
             <pre style="max-height: 500px; overflow: auto; font-size: 13px; white-space: pre-wrap;">@_exportYaml</pre>
         </Modal>
+
+        <TaskEditorModal @bind-Visible="_showTaskDrawer"
+                         Task="_taskBeingEdited"
+                         OnSave="OnTaskSaved"
+                         OtherTaskNames="_otherTaskNames"
+                         CurrentJobId="Id" />
+
+        <ParameterEditorModal @bind-Visible="_showParamModal"
+                              Parameter="_paramBeingEdited"
+                              OnSave="OnParameterSaved" />
     }
 </Spin>
 
@@ -225,12 +280,28 @@
     private bool _loading = true;
     private bool _runsLoading;
     private string? _error;
+    private bool _isDirty;
 
     // Settings edit state
     private string _editName = "";
     private string? _editDescription;
     private int _editMaxConcurrent = 1;
     private bool _editEnabled = true;
+
+    // Task & parameter mutable state
+    private List<EditableTask> _editTasks = [];
+    private List<EditableParameter> _editParams = [];
+
+    // Task editor state
+    private bool _showTaskDrawer;
+    private EditableTask? _taskBeingEdited;
+    private int _taskEditIndex = -1;
+    private List<string> _otherTaskNames = [];
+
+    // Parameter editor state
+    private bool _showParamModal;
+    private EditableParameter? _paramBeingEdited;
+    private int _paramEditIndex = -1;
 
     // Schedule modal state
     private bool _showScheduleModal;
@@ -259,6 +330,31 @@
                 _editMaxConcurrent = _job.MaxConcurrentRuns;
                 _editEnabled = _job.IsEnabled;
 
+                _editTasks = _job.Tasks.Select(t => new EditableTask
+                {
+                    Name = t.Name,
+                    TaskType = t.TaskType,
+                    MaxRetries = t.MaxRetries,
+                    RetryInterval = t.RetryInterval.ToString(),
+                    Timeout = t.Timeout?.ToString(),
+                    NotebookId = t.NotebookId,
+                    QueryId = t.QueryId,
+                    SubJobId = t.SubJobId,
+                    NodePoolRef = t.NodePoolRef,
+                    Parameters = t.Parameters?.Select(kv => new EditableTaskParameter { Key = kv.Key, Value = kv.Value }).ToList() ?? [],
+                    Dependencies = t.Dependencies.Select(d => new EditableDependency { TaskName = d.DependsOnTaskName, Condition = d.Condition }).ToList(),
+                }).ToList();
+
+                _editParams = _job.Parameters.Select(p => new EditableParameter
+                {
+                    Name = p.Name,
+                    DefaultValue = p.DefaultValue,
+                    IsRequired = p.IsRequired,
+                    Description = p.Description,
+                }).ToList();
+
+                _isDirty = false;
+
                 _runsLoading = true;
                 StateHasChanged();
                 _runs = await JobService.GetRunsAsync(Id);
@@ -275,20 +371,165 @@
         }
     }
 
-    private async Task SaveSettingsAsync()
+    private string? ValidateBeforeSave()
     {
+        // Task name validation
+        var taskNames = _editTasks.Select(t => t.Name.Trim()).ToList();
+        if (taskNames.Any(string.IsNullOrWhiteSpace))
+            return "All tasks must have a name.";
+        if (taskNames.Distinct(StringComparer.OrdinalIgnoreCase).Count() != taskNames.Count)
+            return "Task names must be unique (case-insensitive).";
+
+        // Parameter name validation
+        var paramNames = _editParams.Select(p => p.Name.Trim()).ToList();
+        if (paramNames.Any(string.IsNullOrWhiteSpace))
+            return "All parameters must have a name.";
+        if (paramNames.Distinct(StringComparer.OrdinalIgnoreCase).Count() != paramNames.Count)
+            return "Parameter names must be unique (case-insensitive).";
+
+        // Type-specific validation
+        foreach (var t in _editTasks)
+        {
+            if (t.TaskType == "Notebook" && t.NotebookId is null)
+                return $"Task '{t.Name}': a notebook must be selected.";
+            if (t.TaskType == "SqlQuery" && t.QueryId is null)
+                return $"Task '{t.Name}': a query must be selected.";
+            if (t.TaskType == "SubJob" && t.SubJobId is null)
+                return $"Task '{t.Name}': a sub-job must be selected.";
+        }
+
+        // Dependency validation
+        var nameSet = new HashSet<string>(taskNames, StringComparer.OrdinalIgnoreCase);
+        foreach (var t in _editTasks)
+        {
+            foreach (var dep in t.Dependencies)
+            {
+                if (string.Equals(dep.TaskName, t.Name, StringComparison.OrdinalIgnoreCase))
+                    return $"Task '{t.Name}' cannot depend on itself.";
+                if (!nameSet.Contains(dep.TaskName))
+                    return $"Task '{t.Name}' depends on unknown task '{dep.TaskName}'.";
+            }
+        }
+
+        return null;
+    }
+
+    private async Task SaveAsync()
+    {
+        var validationError = ValidateBeforeSave();
+        if (validationError is not null)
+        {
+            _error = validationError;
+            return;
+        }
+
         try
         {
+            var tasks = _editTasks.Select(t => new UpdateTaskRequest(
+                t.Name,
+                t.TaskType,
+                t.MaxRetries,
+                TimeSpan.TryParse(t.RetryInterval, out var ri) ? ri : TimeSpan.FromSeconds(30),
+                string.IsNullOrWhiteSpace(t.Timeout) ? null : TimeSpan.TryParse(t.Timeout, out var to) ? to : null,
+                t.NotebookId,
+                t.QueryId,
+                t.SubJobId,
+                t.NodePoolRef,
+                t.Parameters.Count > 0 ? t.Parameters.ToDictionary(p => p.Key, p => p.Value) : null,
+                t.Dependencies.Select(d => new UpdateDependencyRequest(d.TaskName, d.Condition)).ToList()
+            )).ToList();
+
+            var parameters = _editParams.Select(p => new UpdateParameterRequest(
+                p.Name, p.DefaultValue, p.IsRequired, p.Description
+            )).ToList();
+
             await JobService.UpdateJobAsync(Id, new UpdateJobRequest(
-                _editName, _editDescription, _job!.FolderId, _editMaxConcurrent, _editEnabled));
-            await LoadAsync();
+                _editName, _editDescription, _job!.FolderId, _editMaxConcurrent, _editEnabled,
+                tasks, parameters));
             _error = null;
+            await LoadAsync();
         }
         catch (Exception ex)
         {
             _error = $"Failed to save: {ex.Message}";
         }
     }
+
+    // --- Task editor ---
+
+    private void StartAddTask()
+    {
+        _taskBeingEdited = null;
+        _taskEditIndex = -1;
+        _otherTaskNames = _editTasks.Select(t => t.Name).ToList();
+        _showTaskDrawer = true;
+    }
+
+    private void StartEditTask(EditableTask task)
+    {
+        _taskEditIndex = _editTasks.IndexOf(task);
+        _taskBeingEdited = task;
+        _otherTaskNames = _editTasks.Where(t => t != task).Select(t => t.Name).ToList();
+        _showTaskDrawer = true;
+    }
+
+    private void OnTaskSaved(EditableTask task)
+    {
+        if (_taskEditIndex >= 0 && _taskEditIndex < _editTasks.Count)
+        {
+            _editTasks[_taskEditIndex] = task;
+        }
+        else
+        {
+            _editTasks.Add(task);
+        }
+        _isDirty = true;
+        _showTaskDrawer = false;
+    }
+
+    private void DeleteTask(EditableTask task)
+    {
+        _editTasks.Remove(task);
+        _isDirty = true;
+    }
+
+    // --- Parameter editor ---
+
+    private void StartAddParameter()
+    {
+        _paramBeingEdited = null;
+        _paramEditIndex = -1;
+        _showParamModal = true;
+    }
+
+    private void StartEditParameter(EditableParameter param)
+    {
+        _paramEditIndex = _editParams.IndexOf(param);
+        _paramBeingEdited = param;
+        _showParamModal = true;
+    }
+
+    private void OnParameterSaved(EditableParameter param)
+    {
+        if (_paramEditIndex >= 0 && _paramEditIndex < _editParams.Count)
+        {
+            _editParams[_paramEditIndex] = param;
+        }
+        else
+        {
+            _editParams.Add(param);
+        }
+        _isDirty = true;
+        _showParamModal = false;
+    }
+
+    private void DeleteParameter(EditableParameter param)
+    {
+        _editParams.Remove(param);
+        _isDirty = true;
+    }
+
+    // --- Other actions ---
 
     private async Task TriggerAsync()
     {

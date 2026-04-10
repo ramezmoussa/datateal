@@ -1,12 +1,19 @@
+using System.Text.Json.Serialization;
+
 namespace DuckHouse.Orchestrator.Core.Entities;
 
 /// <summary>
 /// Abstract base class for tasks in a job DAG. Uses TPH inheritance with discriminator "TaskType".
 /// </summary>
+[JsonPolymorphic(TypeDiscriminatorPropertyName = "taskType")]
+[JsonDerivedType(typeof(NotebookTask), "Notebook")]
+[JsonDerivedType(typeof(SqlQueryTask), "SqlQuery")]
+[JsonDerivedType(typeof(SubJobTask), "SubJob")]
 public abstract class JobTask
 {
     public Guid Id { get; set; }
     public Guid JobId { get; set; }
+    [JsonIgnore]
     public Job? Job { get; set; }
 
     public required string Name { get; set; }

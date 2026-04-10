@@ -1,9 +1,12 @@
+using System.Text.Json.Serialization;
+
 namespace DuckHouse.Orchestrator.Core.Entities;
 
 public class JobSchedule
 {
     public Guid Id { get; set; }
     public Guid JobId { get; set; }
+    [JsonIgnore]
     public Job? Job { get; set; }
 
     public required string CronExpression { get; set; }
