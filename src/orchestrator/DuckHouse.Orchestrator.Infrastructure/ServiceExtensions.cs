@@ -1,4 +1,6 @@
+using DuckHouse.Orchestrator.Core.Interfaces;
 using DuckHouse.Orchestrator.Core.Repositories;
+using DuckHouse.Orchestrator.Infrastructure.Clients;
 using DuckHouse.Orchestrator.Infrastructure.Repositories;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -19,6 +21,9 @@ public static class ServiceExtensions
         services.AddScoped<IJobRunRepository, JobRunRepository>();
         services.AddScoped<IScheduleRepository, ScheduleRepository>();
         services.AddScoped<INodePoolConfigRepository, NodePoolConfigRepository>();
+
+        services.AddScoped<IControlPlaneClient, ControlPlaneClient>();
+        services.AddScoped<IWorkspaceReader, WorkspaceReader>();
 
         return services;
     }

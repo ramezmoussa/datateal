@@ -1,5 +1,6 @@
 using System.Text.Json;
 using DuckHouse.Core.Mediator;
+using DuckHouse.Orchestrator.Application.Engine;
 using DuckHouse.Orchestrator.Core.Entities;
 using DuckHouse.Orchestrator.Core.Enums;
 using DuckHouse.Orchestrator.Core.Repositories;
@@ -13,7 +14,8 @@ public record TriggerJobRequest(
 
 internal class TriggerJobHandler(
     IJobRepository jobRepository,
-    IJobRunRepository jobRunRepository) : IRequestHandler<TriggerJobRequest, JobRun>
+    IJobRunRepository jobRunRepository,
+    RunDispatcher runDispatcher) : IRequestHandler<TriggerJobRequest, JobRun>
 {
     public async Task<JobRun> Handle(TriggerJobRequest request, CancellationToken cancellationToken)
     {
@@ -49,6 +51,11 @@ internal class TriggerJobHandler(
             });
         }
 
-        return await jobRunRepository.CreateJobRunAsync(run, cancellationToken);
+        var created = await jobRunRepository.CreateJobRunAsync(run, cancellationToken);
+
+        // Dispatch the run for background execution
+        runDispatcher.DispatchRun(created.Id);
+
+        return created;
     }
 }
