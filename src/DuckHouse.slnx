@@ -9,6 +9,12 @@
     <Project Path="control-plane/DuckHouse.ControlPlane.Infrastructure/DuckHouse.ControlPlane.Infrastructure.csproj" />
     <Project Path="control-plane/DuckHouse.ControlPlane/DuckHouse.ControlPlane.csproj" />
   </Folder>
+  <Folder Name="/orchestrator/">
+    <Project Path="orchestrator/DuckHouse.Orchestrator.Core/DuckHouse.Orchestrator.Core.csproj" />
+    <Project Path="orchestrator/DuckHouse.Orchestrator.Application/DuckHouse.Orchestrator.Application.csproj" />
+    <Project Path="orchestrator/DuckHouse.Orchestrator.Infrastructure/DuckHouse.Orchestrator.Infrastructure.csproj" />
+    <Project Path="orchestrator/DuckHouse.Orchestrator/DuckHouse.Orchestrator.csproj" />
+  </Folder>
   <Folder Name="/shared/">
     <Project Path="shared/DuckHouse.Core/DuckHouse.Core.csproj" />
   </Folder>

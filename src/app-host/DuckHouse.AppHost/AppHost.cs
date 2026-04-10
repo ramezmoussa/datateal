@@ -10,8 +10,15 @@ var controlPlane = builder.AddProject<Projects.DuckHouse_ControlPlane>("control-
     .WithReference(controlPlaneDb)
     .WaitFor(controlPlaneDb);
 
+var orchestrator = builder.AddProject<Projects.DuckHouse_Orchestrator>("orchestrator")
+    .WithReference(uiDb)
+    .WithReference(controlPlane)
+    .WaitFor(uiDb)
+    .WaitFor(controlPlane);
+
 builder.AddProject<Projects.DuckHouse_Ui_Server>("ui")
     .WithReference(controlPlane)
+    .WithReference(orchestrator)
     .WithReference(uiDb)
     .WaitFor(uiDb);
 

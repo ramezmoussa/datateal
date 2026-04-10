@@ -1,0 +1,25 @@
+using DuckHouse.Orchestrator.Core.Repositories;
+using DuckHouse.Orchestrator.Infrastructure.Repositories;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace DuckHouse.Orchestrator.Infrastructure;
+
+public static class ServiceExtensions
+{
+    public static IServiceCollection AddInfrastructureServices(this IServiceCollection services, IConfiguration configuration)
+    {
+        var controlPlaneBaseAddress = configuration["ControlPlane:BaseAddress"]
+            ?? throw new InvalidOperationException("ControlPlane:BaseAddress is not configured.");
+
+        services.AddHttpClient("ControlPlane", client =>
+            client.BaseAddress = new Uri(controlPlaneBaseAddress));
+
+        services.AddScoped<IJobRepository, JobRepository>();
+        services.AddScoped<IJobRunRepository, JobRunRepository>();
+        services.AddScoped<IScheduleRepository, ScheduleRepository>();
+        services.AddScoped<INodePoolConfigRepository, NodePoolConfigRepository>();
+
+        return services;
+    }
+}
