@@ -96,30 +96,22 @@
     {
         <SpaceItem><Spin Size="SpinSize.Small" /></SpaceItem>
     }
-    else if (HasKernel)
-    {
-        <SpaceItem>
-            <Text Strong Style="font-size: 0.875rem;">@_nodeName</Text>
-        </SpaceItem>
-    }
     else
     {
         <SpaceItem>
-            <SimpleSelect Value="@(_nodeName ?? string.Empty)"
-                          OnSelectedItemChanged="@((string v) => _nodeName = string.IsNullOrEmpty(v) ? null : v)"
-                          Placeholder="— select node —"
-                          AllowClear
-                          Style="min-width: 150px;">
-                <SelectOptions>
-                    @foreach (var node in _nodes.Where(n => n.State == NodeState.Running))
-                    {
-                        <SimpleSelectOption Value="@node.Name" Label="@node.Name" />
-                    }
-                </SelectOptions>
-            </SimpleSelect>
+            <Select TItemValue="string"
+                    TItem="NodeInfo"
+                    DataSource="@_nodes.Where(n => n.State == NodeState.Running).ToList()"
+                    @bind-Value="@_nodeName"
+                    ItemValue="n => n.Name"
+                    ItemLabel="n => n.Name"
+                    Placeholder="— select node —"
+                    AllowClear
+                    Disabled="@(_connecting || HasKernel)"
+                    Style="min-width: 150px;" />
         </SpaceItem>
     }
-
+    
     @if (!HasKernel)
     {
         <SpaceItem>
