@@ -94,6 +94,14 @@
             element.click();
         };
 
+        window.getMonacoEditorSelection = function (editorId) {
+            const holder = window.blazorMonaco?.editors?.find(h => h.id === editorId);
+            if (!holder) return '';
+            const sel = holder.editor.getSelection();
+            if (!sel || sel.isEmpty()) return '';
+            return holder.editor.getModel().getValueInRange(sel);
+        };
+
         window.initQueryPageSplitter = function (topPaneId, handleId, dotNetRef) {
             const topPane = document.getElementById(topPaneId);
             const handle = document.getElementById(handleId);

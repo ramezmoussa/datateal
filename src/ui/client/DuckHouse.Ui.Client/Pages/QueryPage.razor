@@ -180,12 +180,14 @@
                         </SpaceItem>
                     }
                     <SpaceItem>
-                        <Button Type="ButtonType.Primary" Size="ButtonSize.Small"
-                                Disabled="@(!HasKernel || string.IsNullOrWhiteSpace(_sql))"
-                                Icon="@IconType.Outline.PlayCircle"
-                                OnClick="RunAsync">
-                            Run
-                        </Button>
+                        <Tooltip Title="@("Ctrl+Enter")">
+                            <Button Type="ButtonType.Primary" Size="ButtonSize.Small"
+                                    Disabled="@(!HasKernel || string.IsNullOrWhiteSpace(_sql))"
+                                    Icon="@IconType.Outline.PlayCircle"
+                                    OnClick="RunAsync">
+                                @(string.IsNullOrWhiteSpace(_selectedSql) ? "Run all" : "Run selected")
+                            </Button>
+                        </Tooltip>
                     </SpaceItem>
                 }
             </Space>
@@ -193,6 +195,7 @@
         <div style="flex: 1 1 0%; overflow: hidden;">
             <CodeCell Value="@_sql"
                       ValueChanged="OnSqlChanged"
+                      OnSelectionChanged="OnSqlSelectionChanged"
                       Language="sql"
                       Height="@_editorHeight"
                       ReadOnly="@_isExecuting"
@@ -290,6 +293,7 @@
     private DataFrameOutput? _resultDf;
     private ErrorInfo? _resultError;
     private string? _resultText;
+    private string _selectedSql = "";
 
     private int _topHeightPx = 300;
     private int _editorHeight => Math.Max(40, _topHeightPx - 56);
@@ -374,6 +378,13 @@
     {
         _sql = value;
         _isDirty = true;
+    }
+
+    private void OnSqlSelectionChanged(string selected)
+    {
+        if (_selectedSql == selected) return;
+        _selectedSql = selected;
+        StateHasChanged();
     }
 
     // ── Workspace persistence ─────────────────────────────────────────
@@ -501,6 +512,8 @@
     {
         if (!HasKernel || string.IsNullOrEmpty(_nodeName) || _isExecuting || string.IsNullOrWhiteSpace(_sql)) return;
 
+        var sqlToRun = !string.IsNullOrWhiteSpace(_selectedSql) ? _selectedSql : _sql;
+
         _isExecuting = true;
         _resultDf = null;
         _resultError = null;
@@ -512,7 +525,7 @@
         if (_kernel is not null)
             _kernel = _kernel with { Status = KernelStatus.Busy };
 
-        var codeToRun = $"import duckdb; duckdb.sql(\"\"\"{_sql}\"\"\")";
+        var codeToRun = $"import duckdb; duckdb.sql(\"\"\"{sqlToRun}\"\"\")";
 
         try
         {

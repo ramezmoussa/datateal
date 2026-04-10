@@ -4,6 +4,7 @@
                       CssClass="@(Class ?? "")"
                       ConstructionOptions="GetConstructionOptions"
                       OnDidChangeModelContent="OnContentChangedAsync"
+                      OnDidChangeCursorSelection="OnCursorSelectionChangedAsync"
                       OnKeyDown="OnKeyDownAsync"
                       OnDidInit="OnEditorInitAsync" />
 
@@ -15,6 +16,7 @@
     [Parameter] public int Height { get; set; } = 0; // 0 = auto-size from line count
     [Parameter] public EventCallback OnExecute { get; set; }
     [Parameter] public EventCallback OnEditorReady { get; set; }
+    [Parameter] public EventCallback<string> OnSelectionChanged { get; set; }
     [Parameter] public string? Class { get; set; }
 
     [Inject] private IJSRuntime JS { get; set; } = default!;
@@ -66,6 +68,24 @@
     {
         if (!ReadOnly && e.CtrlKey && e.Code == "Enter")
             await OnExecute.InvokeAsync();
+    }
+
+    private async Task OnCursorSelectionChangedAsync(CursorSelectionChangedEvent e)
+    {
+        if (!OnSelectionChanged.HasDelegate) return;
+        var sel = e.Selection;
+        bool isEmpty = sel.StartLineNumber == sel.EndLineNumber && sel.StartColumn == sel.EndColumn;
+        if (isEmpty)
+        {
+            await OnSelectionChanged.InvokeAsync("");
+            return;
+        }
+        try
+        {
+            var text = await JS.InvokeAsync<string>("getMonacoEditorSelection", _id);
+            await OnSelectionChanged.InvokeAsync(text ?? "");
+        }
+        catch { await OnSelectionChanged.InvokeAsync(""); }
     }
 
     private async Task OnEditorInitAsync()
