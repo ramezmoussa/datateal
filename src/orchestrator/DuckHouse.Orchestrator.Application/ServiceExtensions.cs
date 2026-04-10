@@ -18,6 +18,7 @@ public static class ServiceExtensions
             services.AddScoped<TaskExecutor>();
             services.AddHostedService<SchedulerService>();
             services.AddHostedService<RecoveryService>();
+            services.AddHostedService<HistoryRetentionService>();
 
             return services;
         }

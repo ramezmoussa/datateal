@@ -44,6 +44,7 @@ app.MapDefaultEndpoints();
 app.MapJobEndpoints();
 app.MapRunEndpoints();
 app.MapNodePoolEndpoints();
+app.MapAdminEndpoints();
 
 app.Run();
 
