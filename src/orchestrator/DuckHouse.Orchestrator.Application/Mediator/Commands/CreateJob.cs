@@ -11,8 +11,8 @@ public record CreateJobRequest(
     string? Description,
     Guid? FolderId,
     int MaxConcurrentRuns,
-    List<CreateJobTaskRequest> Tasks,
-    List<CreateJobParameterRequest> Parameters) : IRequest<Job>;
+    List<CreateJobTaskRequest>? Tasks = null,
+    List<CreateJobParameterRequest>? Parameters = null) : IRequest<Job>;
 
 public record CreateJobTaskRequest(
     string Name,
@@ -46,7 +46,7 @@ internal class CreateJobHandler(IJobRepository jobRepository) : IRequestHandler<
             UpdatedAt = DateTime.UtcNow,
         };
 
-        foreach (var p in request.Parameters)
+        foreach (var p in request.Parameters ?? [])
         {
             job.Parameters.Add(new JobParameter
             {
@@ -62,7 +62,7 @@ internal class CreateJobHandler(IJobRepository jobRepository) : IRequestHandler<
         // Build a name→task map so we can resolve dependencies by name
         var tasksByName = new Dictionary<string, JobTask>(StringComparer.OrdinalIgnoreCase);
 
-        foreach (var t in request.Tasks)
+        foreach (var t in request.Tasks ?? [])
         {
             JobTask task = t.TaskType.ToLowerInvariant() switch
             {
@@ -109,9 +109,10 @@ internal class CreateJobHandler(IJobRepository jobRepository) : IRequestHandler<
         }
 
         // Resolve dependencies by task name
-        for (var i = 0; i < request.Tasks.Count; i++)
+        var tasksList = request.Tasks ?? [];
+        for (var i = 0; i < tasksList.Count; i++)
         {
-            var taskReq = request.Tasks[i];
+            var taskReq = tasksList[i];
             var task = job.Tasks[i];
 
             foreach (var dep in taskReq.Dependencies)
