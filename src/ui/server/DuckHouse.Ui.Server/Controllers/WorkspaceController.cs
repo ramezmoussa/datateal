@@ -99,4 +99,12 @@ public class WorkspaceController(IMediator mediator) : ControllerBase
         var found = await mediator.SendAsync(new Cmd.DeleteQueryRequest(id), ct);
         return found ? NoContent() : NotFound();
     }
+
+    [HttpPost("queries/{id:guid}/result")]
+    public async Task<IActionResult> SaveQueryResult(Guid id, SharedWorkspace.SaveQueryResultRequest body, CancellationToken ct)
+    {
+        var found = await mediator.SendAsync(
+            new Cmd.SaveQueryResultRequest(id, body.Status, body.DurationMs, body.DataFrame, body.Text, body.Error), ct);
+        return found ? NoContent() : NotFound();
+    }
 }

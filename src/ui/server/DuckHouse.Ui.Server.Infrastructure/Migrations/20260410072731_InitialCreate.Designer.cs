@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace DuckHouse.Ui.Server.Infrastructure.Migrations
 {
     [DbContext(typeof(UiDbContext))]
-    [Migration("20260410061445_InitialCreate")]
+    [Migration("20260410072731_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -83,6 +83,37 @@ namespace DuckHouse.Ui.Server.Infrastructure.Migrations
                     b.HasIndex("FolderId");
 
                     b.ToTable("WorkspaceItems");
+
+                    b.HasDiscriminator<string>("ItemType").HasValue("WorkspaceItem");
+
+                    b.UseTphMappingStrategy();
+                });
+
+            modelBuilder.Entity("DuckHouse.Ui.Server.Core.Workspace.Notebook", b =>
+                {
+                    b.HasBaseType("DuckHouse.Ui.Server.Core.Workspace.WorkspaceItem");
+
+                    b.HasDiscriminator().HasValue("Notebook");
+                });
+
+            modelBuilder.Entity("DuckHouse.Ui.Server.Core.Workspace.Query", b =>
+                {
+                    b.HasBaseType("DuckHouse.Ui.Server.Core.Workspace.WorkspaceItem");
+
+                    b.Property<double?>("LastDurationMs")
+                        .HasColumnType("double precision");
+
+                    b.Property<DateTime?>("LastExecutedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("LastResultJson")
+                        .HasColumnType("text");
+
+                    b.Property<string>("LastResultStatus")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.HasDiscriminator().HasValue("Query");
                 });
 
             modelBuilder.Entity("DuckHouse.Ui.Server.Core.Workspace.Folder", b =>

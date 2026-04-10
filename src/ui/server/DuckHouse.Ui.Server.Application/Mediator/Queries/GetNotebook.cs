@@ -10,9 +10,9 @@ internal class GetNotebookHandler(IWorkspaceRepository repository) : IRequestHan
 {
     public async Task<NotebookDetail?> Handle(GetNotebookRequest request, CancellationToken cancellationToken)
     {
-        var item = await repository.GetItemAsync(request.Id, cancellationToken);
-        return item is null
+        var notebook = await repository.GetNotebookAsync(request.Id, cancellationToken);
+        return notebook is null
             ? null
-            : new NotebookDetail(item.Id, item.Title, item.FolderId, item.CreatedAt, item.UpdatedAt, item.Content);
+            : new NotebookDetail(notebook.Id, notebook.Title, notebook.FolderId, notebook.CreatedAt, notebook.UpdatedAt, notebook.Content);
     }
 }

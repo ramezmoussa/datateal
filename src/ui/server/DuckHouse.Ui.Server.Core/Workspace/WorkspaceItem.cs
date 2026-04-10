@@ -1,9 +1,8 @@
 namespace DuckHouse.Ui.Server.Core.Workspace;
 
-public class WorkspaceItem
+public abstract class WorkspaceItem
 {
     public Guid Id { get; set; }
-    public WorkspaceItemType ItemType { get; set; }
     public required string Title { get; set; }
     public Guid? FolderId { get; set; }
 

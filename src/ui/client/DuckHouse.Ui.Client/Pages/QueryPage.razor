@@ -208,6 +208,10 @@
                 <Text Type="TextElementType.Secondary" Style="font-size: 0.875rem;">
                     @_resultDf.TotalRows.ToString("N0")@(_resultDf.TotalRows == DataFrameOutput.RowCap ? "+" : "") rows
                 </Text>
+                @if (_lastExecutedAt.HasValue)
+                {
+                    <span style="font-size: 0.75rem; color: var(--ant-color-text-secondary);">Last run @_lastExecutedAt.Value.ToLocalTime().ToString("HH:mm:ss")</span>
+                }
             </Flex>
             <DataFrameView Data="_resultDf" />
         }
@@ -265,6 +269,7 @@
 
     private bool _isExecuting;
     private double? _lastDurationMs;
+    private DateTime? _lastExecutedAt;
     private DataFrameOutput? _resultDf;
     private ErrorInfo? _resultError;
     private string? _resultText;
@@ -287,6 +292,16 @@
                     _isDirty = false;
                     _workspaceQueryId = detail.Id;
                     _workspaceQueryFolderId = detail.FolderId;
+
+                    // Restore last execution result if present
+                    if (detail.LastResult is { } lr)
+                    {
+                        _lastDurationMs = lr.DurationMs;
+                        _lastExecutedAt = lr.ExecutedAt;
+                        _resultDf = lr.DataFrame;
+                        _resultText = lr.Text;
+                        _resultError = lr.Error;
+                    }
 
                     if (detail.FolderId is not null)
                     {
@@ -474,6 +489,7 @@
         _resultError = null;
         _resultText = null;
         _lastDurationMs = null;
+        _lastExecutedAt = null;
         _error = null;
 
         if (_kernel is not null)
@@ -495,6 +511,7 @@
 
             var result = poll.Result!;
             _lastDurationMs = result.DurationMs;
+            _lastExecutedAt = DateTime.UtcNow;
             _resultError = result.Error;
 
             // Find the most relevant output
@@ -521,6 +538,21 @@
             }
 
             _kernel = await KernelService.GetKernelAsync(_nodeName, _kernelId!);
+
+            // Auto-save result to workspace if this query is persisted
+            if (_workspaceQueryId.HasValue)
+            {
+                var status = _resultError is not null ? "Error"
+                    : _resultDf is not null || _resultText is not null ? "Success"
+                    : "Empty";
+                try
+                {
+                    await WorkspaceService.SaveQueryResultAsync(
+                        _workspaceQueryId.Value,
+                        new SaveQueryResultRequest(status, _lastDurationMs ?? 0, _resultDf, _resultText, _resultError));
+                }
+                catch (Exception ex) { _error = $"Result saved locally but failed to persist: {ex.Message}"; }
+            }
         }
         catch (Exception ex) { _error = $"Execution failed: {ex.Message}"; }
         finally

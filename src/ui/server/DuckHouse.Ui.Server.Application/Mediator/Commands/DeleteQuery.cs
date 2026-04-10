@@ -8,5 +8,5 @@ public record DeleteQueryRequest(Guid Id) : IRequest<bool>;
 internal class DeleteQueryHandler(IWorkspaceRepository repository) : IRequestHandler<DeleteQueryRequest, bool>
 {
     public Task<bool> Handle(DeleteQueryRequest request, CancellationToken cancellationToken) =>
-        repository.DeleteItemAsync(request.Id, cancellationToken);
+        repository.DeleteQueryAsync(request.Id, cancellationToken);
 }

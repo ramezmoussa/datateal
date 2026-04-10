@@ -103,4 +103,10 @@ internal class WorkspaceService(HttpClient httpClient) : IWorkspaceService
         var response = await httpClient.DeleteAsync($"api/workspace/queries/{id}", cancellationToken);
         response.EnsureSuccessStatusCode();
     }
+
+    public async Task SaveQueryResultAsync(Guid id, SaveQueryResultRequest request, CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.PostAsJsonAsync($"api/workspace/queries/{id}/result", request, JsonOptions, cancellationToken);
+        response.EnsureSuccessStatusCode();
+    }
 }

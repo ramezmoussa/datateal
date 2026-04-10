@@ -1,3 +1,5 @@
+using System.Text.Json;
+using DuckHouse.Core.Kernels;
 using DuckHouse.Core.Mediator;
 using DuckHouse.Ui.Server.Core.Repositories;
 using DuckHouse.Ui.Shared.Workspace;
@@ -10,9 +12,31 @@ internal class GetQueryHandler(IWorkspaceRepository repository) : IRequestHandle
 {
     public async Task<QueryDetail?> Handle(GetQueryRequest request, CancellationToken cancellationToken)
     {
-        var item = await repository.GetItemAsync(request.Id, cancellationToken);
-        return item is null
-            ? null
-            : new QueryDetail(item.Id, item.Title, item.FolderId, item.CreatedAt, item.UpdatedAt, item.Content);
+        var query = await repository.GetQueryAsync(request.Id, cancellationToken);
+        if (query is null) return null;
+
+        QueryLastResult? lastResult = null;
+        if (query.LastResultStatus is not null && query.LastExecutedAt.HasValue)
+        {
+            ResultPayload? payload = null;
+            if (query.LastResultJson is not null)
+            {
+                try { payload = JsonSerializer.Deserialize<ResultPayload>(query.LastResultJson); }
+                catch { /* ignore corrupt data */ }
+            }
+
+            lastResult = new QueryLastResult(
+                query.LastResultStatus,
+                query.LastExecutedAt.Value,
+                query.LastDurationMs ?? 0,
+                payload?.DataFrame,
+                payload?.Text,
+                payload?.Error);
+        }
+
+        return new QueryDetail(query.Id, query.Title, query.FolderId, query.CreatedAt, query.UpdatedAt, query.Content, lastResult);
     }
+
+    internal record ResultPayload(DataFrameOutput? DataFrame, string? Text, ErrorInfo? Error);
 }
+

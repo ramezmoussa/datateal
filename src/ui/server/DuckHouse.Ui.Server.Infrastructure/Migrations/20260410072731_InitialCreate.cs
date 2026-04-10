@@ -36,12 +36,16 @@ namespace DuckHouse.Ui.Server.Infrastructure.Migrations
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
-                    ItemType = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
                     Title = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: false),
                     FolderId = table.Column<Guid>(type: "uuid", nullable: true),
                     Content = table.Column<string>(type: "text", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
+                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    ItemType = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
+                    LastExecutedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    LastDurationMs = table.Column<double>(type: "double precision", nullable: true),
+                    LastResultStatus = table.Column<string>(type: "character varying(16)", maxLength: 16, nullable: true),
+                    LastResultJson = table.Column<string>(type: "text", nullable: true)
                 },
                 constraints: table =>
                 {

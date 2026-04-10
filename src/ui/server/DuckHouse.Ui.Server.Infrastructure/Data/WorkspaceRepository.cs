@@ -6,6 +6,8 @@ namespace DuckHouse.Ui.Server.Infrastructure.Data;
 
 internal class WorkspaceRepository(UiDbContext db) : IWorkspaceRepository
 {
+    // ── Folders ──────────────────────────────────────────────────────────
+
     public async Task<IReadOnlyList<Folder>> GetFoldersInAsync(Guid? parentId, CancellationToken cancellationToken = default)
     {
         var query = parentId.HasValue
@@ -13,18 +15,6 @@ internal class WorkspaceRepository(UiDbContext db) : IWorkspaceRepository
             : db.Folders.Where(f => f.ParentId == null);
 
         return await query.OrderBy(f => f.Name).ToListAsync(cancellationToken);
-    }
-
-    public async Task<IReadOnlyList<WorkspaceItem>> GetItemsInAsync(Guid? folderId, WorkspaceItemType? type = null, CancellationToken cancellationToken = default)
-    {
-        var query = folderId.HasValue
-            ? db.WorkspaceItems.Where(n => n.FolderId == folderId)
-            : db.WorkspaceItems.Where(n => n.FolderId == null);
-
-        if (type.HasValue)
-            query = query.Where(n => n.ItemType == type.Value);
-
-        return await query.OrderBy(n => n.Title).ToListAsync(cancellationToken);
     }
 
     public Task<Folder?> GetFolderAsync(Guid id, CancellationToken cancellationToken = default) =>
@@ -43,9 +33,6 @@ internal class WorkspaceRepository(UiDbContext db) : IWorkspaceRepository
         }
         return chain;
     }
-
-    public Task<WorkspaceItem?> GetItemAsync(Guid id, CancellationToken cancellationToken = default) =>
-        db.WorkspaceItems.FirstOrDefaultAsync(n => n.Id == id, cancellationToken);
 
     public async Task<Folder> CreateFolderAsync(string name, Guid? parentId, CancellationToken cancellationToken = default)
     {
@@ -82,43 +69,116 @@ internal class WorkspaceRepository(UiDbContext db) : IWorkspaceRepository
         }
     }
 
-    public async Task<WorkspaceItem> CreateItemAsync(string title, string content, WorkspaceItemType type, Guid? folderId, CancellationToken cancellationToken = default)
+    // ── Workspace listing ─────────────────────────────────────────────────
+
+    public async Task<IReadOnlyList<WorkspaceItem>> GetItemsInAsync(Guid? folderId, CancellationToken cancellationToken = default)
+    {
+        var query = folderId.HasValue
+            ? db.WorkspaceItems.Where(i => i.FolderId == folderId)
+            : db.WorkspaceItems.Where(i => i.FolderId == null);
+
+        return await query.OrderBy(i => i.Title).ToListAsync(cancellationToken);
+    }
+
+    // ── Notebooks ─────────────────────────────────────────────────────────
+
+    public Task<Notebook?> GetNotebookAsync(Guid id, CancellationToken cancellationToken = default) =>
+        db.WorkspaceItems.OfType<Notebook>().FirstOrDefaultAsync(n => n.Id == id, cancellationToken);
+
+    public async Task<Notebook> CreateNotebookAsync(string title, string content, Guid? folderId, CancellationToken cancellationToken = default)
     {
         var now = DateTime.UtcNow;
-        var item = new WorkspaceItem
+        var notebook = new Notebook
         {
             Id = Guid.CreateVersion7(),
-            ItemType = type,
             Title = title,
             Content = content,
             FolderId = folderId,
             CreatedAt = now,
             UpdatedAt = now,
         };
-        db.WorkspaceItems.Add(item);
+        db.WorkspaceItems.Add(notebook);
         await db.SaveChangesAsync(cancellationToken);
-        return item;
+        return notebook;
     }
 
-    public async Task<WorkspaceItem?> UpdateItemAsync(Guid id, string title, string content, Guid? folderId, CancellationToken cancellationToken = default)
+    public async Task<Notebook?> UpdateNotebookAsync(Guid id, string title, string content, Guid? folderId, CancellationToken cancellationToken = default)
     {
-        var item = await db.WorkspaceItems.FirstOrDefaultAsync(n => n.Id == id, cancellationToken);
-        if (item is null) return null;
+        var notebook = await db.WorkspaceItems.OfType<Notebook>().FirstOrDefaultAsync(n => n.Id == id, cancellationToken);
+        if (notebook is null) return null;
 
-        item.Title = title;
-        item.Content = content;
-        item.FolderId = folderId;
-        item.UpdatedAt = DateTime.UtcNow;
+        notebook.Title = title;
+        notebook.Content = content;
+        notebook.FolderId = folderId;
+        notebook.UpdatedAt = DateTime.UtcNow;
         await db.SaveChangesAsync(cancellationToken);
-        return item;
+        return notebook;
     }
 
-    public async Task<bool> DeleteItemAsync(Guid id, CancellationToken cancellationToken = default)
+    public async Task<bool> DeleteNotebookAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        var item = await db.WorkspaceItems.FirstOrDefaultAsync(n => n.Id == id, cancellationToken);
-        if (item is null) return false;
+        var notebook = await db.WorkspaceItems.OfType<Notebook>().FirstOrDefaultAsync(n => n.Id == id, cancellationToken);
+        if (notebook is null) return false;
 
-        db.WorkspaceItems.Remove(item);
+        db.WorkspaceItems.Remove(notebook);
+        await db.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
+    // ── Queries ───────────────────────────────────────────────────────────
+
+    public Task<Query?> GetQueryAsync(Guid id, CancellationToken cancellationToken = default) =>
+        db.WorkspaceItems.OfType<Query>().FirstOrDefaultAsync(q => q.Id == id, cancellationToken);
+
+    public async Task<Query> CreateQueryAsync(string title, string content, Guid? folderId, CancellationToken cancellationToken = default)
+    {
+        var now = DateTime.UtcNow;
+        var query = new Query
+        {
+            Id = Guid.CreateVersion7(),
+            Title = title,
+            Content = content,
+            FolderId = folderId,
+            CreatedAt = now,
+            UpdatedAt = now,
+        };
+        db.WorkspaceItems.Add(query);
+        await db.SaveChangesAsync(cancellationToken);
+        return query;
+    }
+
+    public async Task<Query?> UpdateQueryAsync(Guid id, string title, string content, Guid? folderId, CancellationToken cancellationToken = default)
+    {
+        var query = await db.WorkspaceItems.OfType<Query>().FirstOrDefaultAsync(q => q.Id == id, cancellationToken);
+        if (query is null) return null;
+
+        query.Title = title;
+        query.Content = content;
+        query.FolderId = folderId;
+        query.UpdatedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync(cancellationToken);
+        return query;
+    }
+
+    public async Task<bool> DeleteQueryAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        var query = await db.WorkspaceItems.OfType<Query>().FirstOrDefaultAsync(q => q.Id == id, cancellationToken);
+        if (query is null) return false;
+
+        db.WorkspaceItems.Remove(query);
+        await db.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
+    public async Task<bool> SaveQueryResultAsync(Guid id, string status, double durationMs, DateTime executedAt, string? resultJson, CancellationToken cancellationToken = default)
+    {
+        var query = await db.WorkspaceItems.OfType<Query>().FirstOrDefaultAsync(q => q.Id == id, cancellationToken);
+        if (query is null) return false;
+
+        query.LastResultStatus = status;
+        query.LastDurationMs = durationMs;
+        query.LastExecutedAt = executedAt;
+        query.LastResultJson = resultJson;
         await db.SaveChangesAsync(cancellationToken);
         return true;
     }

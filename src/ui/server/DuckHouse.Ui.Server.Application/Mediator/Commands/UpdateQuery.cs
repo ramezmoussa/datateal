@@ -10,7 +10,7 @@ internal class UpdateQueryHandler(IWorkspaceRepository repository) : IRequestHan
 {
     public async Task<QuerySummary?> Handle(UpdateQueryRequest request, CancellationToken cancellationToken)
     {
-        var item = await repository.UpdateItemAsync(request.Id, request.Title, request.Content, request.FolderId, cancellationToken);
-        return item is null ? null : new QuerySummary(item.Id, item.Title, item.FolderId, item.CreatedAt, item.UpdatedAt);
+        var query = await repository.UpdateQueryAsync(request.Id, request.Title, request.Content, request.FolderId, cancellationToken);
+        return query is null ? null : new QuerySummary(query.Id, query.Title, query.FolderId, query.CreatedAt, query.UpdatedAt);
     }
 }

@@ -26,15 +26,20 @@ public class UiDbContext(DbContextOptions<UiDbContext> options) : DbContext(opti
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Title).HasMaxLength(512).IsRequired();
             entity.Property(e => e.Content).IsRequired();
-            entity.Property(e => e.ItemType)
-                .HasConversion<string>()
-                .HasMaxLength(32)
-                .IsRequired();
+            entity.HasDiscriminator<string>("ItemType")
+                .HasValue<Notebook>("Notebook")
+                .HasValue<Query>("Query");
+            entity.Property("ItemType").HasMaxLength(32).IsRequired();
             entity.HasOne(e => e.Folder)
                 .WithMany(e => e.Items)
                 .HasForeignKey(e => e.FolderId)
                 .IsRequired(false)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<Query>(entity =>
+        {
+            entity.Property(e => e.LastResultStatus).HasMaxLength(16);
         });
     }
 }
