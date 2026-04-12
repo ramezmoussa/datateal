@@ -43,7 +43,11 @@ public static class OrchestratorProxy
 
             context.Response.Headers.Remove("transfer-encoding");
 
-            await responseMessage.Content.CopyToAsync(context.Response.Body, context.RequestAborted);
+            if (responseMessage.Content.Headers.ContentLength != 0 &&
+                context.Response.StatusCode != StatusCodes.Status204NoContent)
+            {
+                await responseMessage.Content.CopyToAsync(context.Response.Body, context.RequestAborted);
+            }
         });
 
         return endpoints;
