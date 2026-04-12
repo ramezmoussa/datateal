@@ -7,6 +7,7 @@ public record CellOutputDto(
     string CellType,
     string? Language,
     string Status,
+    string? CellRole,
     string? OutputsJson,
     string? ErrorJson,
     int? ExecutionCount,

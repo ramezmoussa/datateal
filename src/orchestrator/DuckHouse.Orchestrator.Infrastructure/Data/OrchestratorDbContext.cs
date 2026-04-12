@@ -119,6 +119,7 @@ public class OrchestratorDbContext(DbContextOptions<OrchestratorDbContext> optio
         {
             entity.HasKey(e => e.Id);
             entity.Property(e => e.CellType).HasMaxLength(32).IsRequired();
+            entity.Property(e => e.CellRole).HasMaxLength(32);
             entity.Property(e => e.Language).HasMaxLength(32);
             entity.Property(e => e.Status).HasConversion<string>().HasMaxLength(32);
             entity.Property(e => e.OutputsJson).HasColumnType("jsonb");

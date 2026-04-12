@@ -15,6 +15,7 @@ public class TaskRunCellOutput
     public required string CellType { get; set; }
     public string? Language { get; set; }
     public CellExecutionStatus Status { get; set; }
+    public string? CellRole { get; set; }
     public string? OutputsJson { get; set; }
     public string? ErrorJson { get; set; }
     public int? ExecutionCount { get; set; }

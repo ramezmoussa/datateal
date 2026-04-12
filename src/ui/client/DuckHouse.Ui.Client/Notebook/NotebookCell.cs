@@ -12,6 +12,7 @@ public class NotebookCell
     public NotebookCellType CellType { get; set; }
     public NotebookCellLanguage Language { get; set; } = NotebookCellLanguage.Python;
     public string Source { get; set; } = "";
+    public bool IsParameterCell { get; set; }
     public List<Output> Outputs { get; set; } = [];
     public ErrorInfo? Error { get; set; }
     public int? ExecutionCount { get; set; }

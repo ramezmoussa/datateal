@@ -60,6 +60,14 @@ public static class NotebookSerializer
             {
                 cell.DurationMs = dur;
             }
+
+            if (meta.TryGetProperty("tags", out var tagsEl))
+            {
+                var tags = tagsEl.EnumerateArray().Select(t => t.GetString()).ToList();
+                // Skip injected-parameters cells — they are runtime artifacts, not part of the editable notebook
+                if (tags.Contains("injected-parameters")) return null;
+                cell.IsParameterCell = tags.Contains("parameters");
+            }
         }
 
         if (el.TryGetProperty("execution_count", out var ecEl) && ecEl.ValueKind != JsonValueKind.Null)
@@ -178,6 +186,12 @@ public static class NotebookSerializer
 
             writer.WriteStartObject("metadata");
             writer.WriteString("language", cell.Language == NotebookCellLanguage.Sql ? "sql" : "python");
+            if (cell.IsParameterCell)
+            {
+                writer.WriteStartArray("tags");
+                writer.WriteStringValue("parameters");
+                writer.WriteEndArray();
+            }
             writer.WriteStartObject("duckhouse");
             if (cell.DurationMs.HasValue)
                 writer.WriteNumber("duration_ms", cell.DurationMs.Value);

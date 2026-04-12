@@ -50,6 +50,16 @@ public class TaskExecutor(
                 $"Notebook {task.NotebookId} not found in workspace.");
 
         var cells = ParseNotebookCells(content.Content);
+
+        // Inject parameters cell if task has parameters and notebook has a parameter cell
+        int paramCellIndex = cells.FindIndex(c => c.Tags.Contains("parameters"));
+        if (paramCellIndex >= 0 && task.Parameters is { Count: > 0 })
+        {
+            var injectedSource = BuildInjectedParametersSource(task.Parameters);
+            var injected = new CellInfo(injectedSource, "Code", "Python", ["injected-parameters"]);
+            cells = [.. cells[..(paramCellIndex + 1)], injected, .. cells[(paramCellIndex + 1)..]];
+        }
+
         logger.LogInformation("Executing notebook '{Title}' with {Count} code cells",
             content.Title, cells.Count);
 
@@ -65,6 +75,9 @@ public class TaskExecutor(
                 CellSource = cell.Source,
                 CellType = cell.Type,
                 Language = cell.Type == "Markdown" ? null : cell.Language,
+                CellRole = cell.Tags.Contains("parameters") ? "parameters"
+                         : cell.Tags.Contains("injected-parameters") ? "injected-parameters"
+                         : null,
                 Status = CellExecutionStatus.Pending,
             }, ct);
         }
@@ -260,7 +273,7 @@ public class TaskExecutor(
 
     // ── Notebook parsing ────────────────────────────────────────────
 
-    internal record CellInfo(string Source, string Type, string Language);
+    internal record CellInfo(string Source, string Type, string Language, IReadOnlyList<string> Tags);
 
     internal static List<CellInfo> ParseNotebookCells(string notebookJson)
     {
@@ -280,14 +293,23 @@ public class TaskExecutor(
             var source = ReadMultilineString(cellEl, "source");
 
             var language = "Python";
-            if (cellEl.TryGetProperty("metadata", out var meta)
-                && meta.TryGetProperty("language", out var langEl)
-                && langEl.GetString() == "sql")
+            List<string> tags = [];
+            if (cellEl.TryGetProperty("metadata", out var meta))
             {
-                language = "Sql";
+                if (meta.TryGetProperty("language", out var langEl) && langEl.GetString() == "sql")
+                    language = "Sql";
+
+                if (meta.TryGetProperty("tags", out var tagsEl))
+                    tags = tagsEl.EnumerateArray()
+                        .Select(t => t.GetString() ?? "")
+                        .Where(t => t.Length > 0)
+                        .ToList();
             }
 
-            cells.Add(new CellInfo(source, cellType, language));
+            // Skip injected-parameters cells from prior runs stored in the notebook
+            if (tags.Contains("injected-parameters")) continue;
+
+            cells.Add(new CellInfo(source, cellType, language, tags));
         }
 
         return cells;
@@ -302,5 +324,29 @@ public class TaskExecutor(
             JsonValueKind.Array => string.Join("", prop.EnumerateArray().Select(l => l.GetString() ?? "")),
             _ => "",
         };
+    }
+
+    /// <summary>
+    /// Builds a Python source string that assigns the given parameters as variables,
+    /// using simple type inference: int, float, bool, or quoted string.
+    /// </summary>
+    internal static string BuildInjectedParametersSource(Dictionary<string, string> parameters)
+    {
+        var lines = parameters.Select(kvp =>
+        {
+            var value = kvp.Value;
+            if (long.TryParse(value, out _))
+                return $"{kvp.Key} = {value}";
+            if (double.TryParse(value, System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture, out _))
+                return $"{kvp.Key} = {value}";
+            if (value.Equals("true", StringComparison.OrdinalIgnoreCase))
+                return $"{kvp.Key} = True";
+            if (value.Equals("false", StringComparison.OrdinalIgnoreCase))
+                return $"{kvp.Key} = False";
+            var escaped = value.Replace("\\", "\\\\").Replace("\"", "\\\"");
+            return $"{kvp.Key} = \"{escaped}\"";
+        });
+        return string.Join("\n", lines);
     }
 }

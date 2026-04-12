@@ -209,7 +209,8 @@
                       OnDelete="@(() => DeleteCell(cell))"
                       OnMoveUp="@(() => MoveCell(index, -1))"
                       OnMoveDown="@(() => MoveCell(index, 1))"
-                      OnCellChanged="@(() => _notebook.IsDirty = true)" />
+                      OnCellChanged="@(() => _notebook.IsDirty = true)"
+                      OnToggleParameters="@(() => ToggleParameterCell(cell))" />
     <AddCellBar OnAddPython="() => AddCell(index + 1, NotebookCellType.Code, NotebookCellLanguage.Python)"
                 OnAddSql="() => AddCell(index + 1, NotebookCellType.Code, NotebookCellLanguage.Sql)"
                 OnAddMarkdown="() => AddCell(index + 1, NotebookCellType.Markdown)" />
@@ -567,6 +568,17 @@
     private void DeleteCell(NotebookCell cell)
     {
         _notebook.Cells.Remove(cell);
+        _notebook.IsDirty = true;
+    }
+
+    private void ToggleParameterCell(NotebookCell cell)
+    {
+        bool wasSet = cell.IsParameterCell;
+        // Clear the flag on all cells first
+        foreach (var c in _notebook.Cells)
+            c.IsParameterCell = false;
+        // Toggle on the target cell (unless it was already set — then it's now cleared)
+        cell.IsParameterCell = !wasSet;
         _notebook.IsDirty = true;
     }
 
