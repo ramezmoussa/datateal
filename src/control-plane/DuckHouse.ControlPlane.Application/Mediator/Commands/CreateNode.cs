@@ -12,7 +12,8 @@ public record CreateNodeRequest(
     string Name,
     string? VmSize = null,
     TimeSpan? KernelIdleTimeout = null,
-    TimeSpan? NodeIdleTimeout = null) : IRequest<NodeInfo>;
+    TimeSpan? NodeIdleTimeout = null,
+    string? KernelRequirements = null) : IRequest<NodeInfo>;
 
 internal class CreateNodeHandler(
     INodeService nodeService,
@@ -32,7 +33,8 @@ internal class CreateNodeHandler(
         await nodeConfigRepository.UpsertAsync(config, cancellationToken);
 
         var node = await nodeService.CreateNodeAsync(
-            new DuckHouse.Core.Nodes.CreateNodeRequest(request.Name, request.VmSize),
+            new DuckHouse.Core.Nodes.CreateNodeRequest(request.Name, request.VmSize,
+                KernelRequirements: request.KernelRequirements),
             cancellationToken);
 
         return node;

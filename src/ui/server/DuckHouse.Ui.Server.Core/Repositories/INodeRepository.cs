@@ -11,6 +11,7 @@ public interface INodeRepository
         string vmSize,
         TimeSpan? kernelIdleTimeout = null,
         TimeSpan? nodeIdleTimeout = null,
+        string? kernelRequirements = null,
         CancellationToken cancellationToken = default);
     Task RemoveNodeAsync(string name, CancellationToken cancellationToken = default);
     Task StopNodeAsync(string name, CancellationToken cancellationToken = default);

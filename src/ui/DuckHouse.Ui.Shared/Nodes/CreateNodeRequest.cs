@@ -4,4 +4,5 @@ public record CreateNodeRequest(
     string Name,
     string VmSize,
     TimeSpan? KernelIdleTimeout = null,
-    TimeSpan? NodeIdleTimeout = null);
+    TimeSpan? NodeIdleTimeout = null,
+    string? KernelRequirements = null);

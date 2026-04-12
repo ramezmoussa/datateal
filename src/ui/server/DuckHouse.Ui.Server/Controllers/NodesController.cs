@@ -26,7 +26,7 @@ public class NodesController(IMediator mediator) : ControllerBase
     public async Task<IActionResult> CreateNode(SharedNodes.CreateNodeRequest body, CancellationToken ct)
     {
         var node = await mediator.SendAsync(
-            new Cmd.CreateNodeRequest(body.Name, body.VmSize, body.KernelIdleTimeout, body.NodeIdleTimeout), ct);
+            new Cmd.CreateNodeRequest(body.Name, body.VmSize, body.KernelIdleTimeout, body.NodeIdleTimeout, body.KernelRequirements), ct);
         return CreatedAtAction(nameof(GetNode), new { name = node.Name }, node);
     }
 

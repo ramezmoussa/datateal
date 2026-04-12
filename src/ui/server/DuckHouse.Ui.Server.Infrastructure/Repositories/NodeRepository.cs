@@ -30,11 +30,12 @@ internal class NodeRepository(HttpClient httpClient) : INodeRepository
         string vmSize,
         TimeSpan? kernelIdleTimeout = null,
         TimeSpan? nodeIdleTimeout = null,
+        string? kernelRequirements = null,
         CancellationToken cancellationToken = default)
     {
         var response = await httpClient.PostAsJsonAsync(
             "/nodes",
-            new CreateNodeRequest(name, vmSize, kernelIdleTimeout, nodeIdleTimeout),
+            new CreateNodeRequest(name, vmSize, kernelIdleTimeout, nodeIdleTimeout, kernelRequirements),
             JsonOptions,
             cancellationToken);
         response.EnsureSuccessStatusCode();

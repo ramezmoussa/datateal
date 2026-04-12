@@ -46,7 +46,8 @@ public class NodeManager(
 
         await controlPlane.CreateNodeAsync(
             nodeName, config.VmSize,
-            config.KernelIdleTimeout, config.NodeIdleTimeout, ct);
+            config.KernelIdleTimeout, config.NodeIdleTimeout,
+            config.KernelRequirements, ct);
 
         // Poll until node is running
         var deadline = DateTime.UtcNow + NodeReadyTimeout;

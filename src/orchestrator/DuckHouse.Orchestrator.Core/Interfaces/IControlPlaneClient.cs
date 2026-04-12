@@ -8,7 +8,7 @@ public interface IControlPlaneClient
     // Nodes
     Task<NodeInfo> CreateNodeAsync(string name, string vmSize,
         TimeSpan? kernelIdleTimeout = null, TimeSpan? nodeIdleTimeout = null,
-        CancellationToken ct = default);
+        string? kernelRequirements = null, CancellationToken ct = default);
     Task<NodeInfo?> GetNodeAsync(string name, CancellationToken ct = default);
     Task DeleteNodeAsync(string name, CancellationToken ct = default);
     Task StartNodeAsync(string name, CancellationToken ct = default);

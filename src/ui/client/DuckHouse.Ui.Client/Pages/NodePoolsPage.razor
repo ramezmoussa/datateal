@@ -85,7 +85,7 @@
             </div>
             <div>
                 <label style="display: block; margin-bottom: 4px; font-weight: 500;">Kernel Requirements (pip)</label>
-                <TextArea @bind-Value="_formKernelReqs" Rows="3" Placeholder="scipy>=1.14&#10;scikit-learn>=1.6" />
+                <TextArea @bind-Value="_formKernelReqs" Rows="3" Placeholder="@("scipy>=1.14\nscikit-learn>=1.6")" />
             </div>
             <div>
                 <label style="display: block; margin-bottom: 4px; font-weight: 500;">Description</label>

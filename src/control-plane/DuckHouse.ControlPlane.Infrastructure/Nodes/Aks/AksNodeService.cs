@@ -150,6 +150,9 @@ public sealed class AksNodeService : INodeService
                         Name = "node",
                         Image = _options.RuntimeImage,
                         Ports = [new V1ContainerPort { ContainerPort = 8000 }],
+                        Env = string.IsNullOrWhiteSpace(request.KernelRequirements)
+                            ? null
+                            : [new V1EnvVar { Name = "KERNEL_PACKAGES", Value = request.KernelRequirements }],
                     },
                 ],
                 RestartPolicy = "Always",

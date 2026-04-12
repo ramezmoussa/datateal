@@ -81,6 +81,9 @@ public sealed class LocalNodeService : INodeService
                         // Never pull from a registry; use the locally built image.
                         ImagePullPolicy = "Never",
                         Ports = [new V1ContainerPort { ContainerPort = 8000 }],
+                        Env = string.IsNullOrWhiteSpace(request.KernelRequirements)
+                            ? null
+                            : [new V1EnvVar { Name = "KERNEL_PACKAGES", Value = request.KernelRequirements }],
                     },
                 ],
                 RestartPolicy = "Always",
