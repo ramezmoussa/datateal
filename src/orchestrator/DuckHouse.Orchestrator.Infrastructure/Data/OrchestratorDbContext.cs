@@ -1,3 +1,4 @@
+using System.Text.Json;
 using DuckHouse.Orchestrator.Core.Entities;
 using DuckHouse.Orchestrator.Core.Enums;
 using Microsoft.EntityFrameworkCore;
@@ -6,6 +7,10 @@ namespace DuckHouse.Orchestrator.Infrastructure.Data;
 
 public class OrchestratorDbContext(DbContextOptions<OrchestratorDbContext> options) : DbContext(options)
 {
+    private static readonly Microsoft.EntityFrameworkCore.Storage.ValueConversion.ValueConverter<Dictionary<string, string>?, string?> DictJsonConverter = new(
+        v => v == null ? null : JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
+        v => v == null ? null : JsonSerializer.Deserialize<Dictionary<string, string>>(v, (JsonSerializerOptions?)null));
+
     public DbSet<Job> Jobs => Set<Job>();
     public DbSet<JobParameter> JobParameters => Set<JobParameter>();
     public DbSet<JobTask> JobTasks => Set<JobTask>();
@@ -49,17 +54,17 @@ public class OrchestratorDbContext(DbContextOptions<OrchestratorDbContext> optio
 
         modelBuilder.Entity<NotebookTask>(entity =>
         {
-            entity.Property(e => e.Parameters).HasColumnType("jsonb");
+            entity.Property(e => e.Parameters).HasColumnType("jsonb").HasConversion(DictJsonConverter);
         });
 
         modelBuilder.Entity<SqlQueryTask>(entity =>
         {
-            entity.Property(e => e.Parameters).HasColumnType("jsonb");
+            entity.Property(e => e.Parameters).HasColumnType("jsonb").HasConversion(DictJsonConverter);
         });
 
         modelBuilder.Entity<SubJobTask>(entity =>
         {
-            entity.Property(e => e.Parameters).HasColumnType("jsonb");
+            entity.Property(e => e.Parameters).HasColumnType("jsonb").HasConversion(DictJsonConverter);
         });
 
         modelBuilder.Entity<TaskDependency>(entity =>
@@ -74,7 +79,7 @@ public class OrchestratorDbContext(DbContextOptions<OrchestratorDbContext> optio
             entity.HasKey(e => e.Id);
             entity.Property(e => e.CronExpression).HasMaxLength(128).IsRequired();
             entity.Property(e => e.TimeZone).HasMaxLength(64);
-            entity.Property(e => e.Parameters).HasColumnType("jsonb");
+            entity.Property(e => e.Parameters).HasColumnType("jsonb").HasConversion(DictJsonConverter);
         });
 
         modelBuilder.Entity<NodePoolConfig>(entity =>
