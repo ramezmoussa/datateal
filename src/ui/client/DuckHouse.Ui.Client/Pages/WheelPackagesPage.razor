@@ -2,6 +2,7 @@
 
 @using DuckHouse.Ui.Shared.Packages
 @inject IWheelPackageService WheelPackageService
+@inject NavigationManager Navigation
 
 <PageTitle>Packages — DuckHouse</PageTitle>
 
@@ -23,13 +24,18 @@
             </Button>
         </SpaceItem>
         <SpaceItem>
-            <InputFile id="wheelFileInput" OnChange="OnFileSelected" accept=".whl" style="display: none;" />
-            <Button Type="ButtonType.Primary"
-                    Icon="@IconType.Outline.Upload"
-                    Loading="_uploading"
-                    OnClick="@(() => ClickFileInput())">
-                Upload .whl
-            </Button>
+            <Upload Action="@_uploadUrl"
+                    Name="file"
+                    Accept=".whl"
+                    ShowUploadList="false"
+                    BeforeUpload="ValidateFile"
+                    OnSingleCompleted="OnUploadCompleted">
+                <Button Type="ButtonType.Primary"
+                        Icon="@IconType.Outline.Upload"
+                        Loading="_uploading">
+                    Upload .whl
+                </Button>
+            </Upload>
         </SpaceItem>
     </Space>
 </Flex>
@@ -82,12 +88,13 @@ else
 }
 
 @code {
-    @inject IJSRuntime JS
 
     private List<WheelPackageDto> _packages = [];
     private bool _loading = true;
     private bool _uploading;
     private string? _error;
+
+    private string _uploadUrl => Navigation.BaseUri + "api/packages";
 
     protected override async Task OnInitializedAsync() => await LoadAsync();
 
@@ -109,23 +116,38 @@ else
         }
     }
 
-    private async Task OnFileSelected(InputFileChangeEventArgs e)
+    private bool ValidateFile(UploadFileItem file)
     {
         _error = null;
-        _uploading = true;
-        try
+        if (!file.FileName.EndsWith(".whl", StringComparison.OrdinalIgnoreCase))
         {
-            var file = e.File;
-            await WheelPackageService.UploadPackageAsync(file);
+            _error = "Only .whl files are accepted.";
+            StateHasChanged();
+            return false;
+        }
+        if (file.Size > 5 * 1024 * 1024)
+        {
+            _error = "File exceeds the 5 MB limit.";
+            StateHasChanged();
+            return false;
+        }
+        _uploading = true;
+        StateHasChanged();
+        return true;
+    }
+
+    private async Task OnUploadCompleted(UploadInfo info)
+    {
+        _uploading = false;
+        if (info.File.State == UploadState.Success)
+        {
             await LoadAsync();
         }
-        catch (Exception ex)
+        else
         {
-            _error = $"Upload failed: {ex.Message}";
-        }
-        finally
-        {
-            _uploading = false;
+            _error = string.IsNullOrWhiteSpace(info.File.Response)
+                ? "Upload failed."
+                : info.File.Response;
         }
     }
 
@@ -142,9 +164,6 @@ else
             _error = $"Delete failed: {ex.Message}";
         }
     }
-
-    private Task ClickFileInput() =>
-        JS.InvokeVoidAsync("clickElement", "wheelFileInput").AsTask();
 
     private static string FormatSize(long bytes) =>
         bytes switch
