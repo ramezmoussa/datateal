@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using DuckHouse.Core.Kernels;
 using DuckHouse.Core.Mediator;
 using DuckHouse.Orchestrator.Application.Mediator.Commands;
@@ -22,18 +23,19 @@ public class TaskExecutor(
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
-    public async Task ExecuteAsync(TaskRun taskRun, JobTask task, NodeManager nodeManager, CancellationToken ct)
+    public async Task ExecuteAsync(TaskRun taskRun, JobTask task, NodeManager nodeManager,
+        Dictionary<string, string>? jobRunParameters, CancellationToken ct)
     {
         switch (task)
         {
             case NotebookTask notebook:
-                await ExecuteNotebookAsync(taskRun, notebook, nodeManager, ct);
+                await ExecuteNotebookAsync(taskRun, notebook, nodeManager, jobRunParameters, ct);
                 break;
             case SqlQueryTask sqlQuery:
-                await ExecuteSqlQueryAsync(taskRun, sqlQuery, nodeManager, ct);
+                await ExecuteSqlQueryAsync(taskRun, sqlQuery, nodeManager, jobRunParameters, ct);
                 break;
             case SubJobTask subJob:
-                await ExecuteSubJobAsync(taskRun, subJob, ct);
+                await ExecuteSubJobAsync(taskRun, subJob, jobRunParameters, ct);
                 break;
             default:
                 throw new InvalidOperationException($"Unknown task type: {task.GetType().Name}");
@@ -43,7 +45,8 @@ public class TaskExecutor(
     // ── Notebook execution ──────────────────────────────────────────
 
     private async Task ExecuteNotebookAsync(
-        TaskRun taskRun, NotebookTask task, NodeManager nodeManager, CancellationToken ct)
+        TaskRun taskRun, NotebookTask task, NodeManager nodeManager,
+        Dictionary<string, string>? jobRunParameters, CancellationToken ct)
     {
         var content = await workspaceReader.GetNotebookContentAsync(task.NotebookId, ct)
             ?? throw new InvalidOperationException(
@@ -51,11 +54,13 @@ public class TaskExecutor(
 
         var cells = ParseNotebookCells(content.Content);
 
+        var resolvedParameters = ResolveParameters(task.Parameters, jobRunParameters);
+
         // Inject parameters cell if task has parameters and notebook has a parameter cell
         int paramCellIndex = cells.FindIndex(c => c.Tags.Contains("parameters"));
-        if (paramCellIndex >= 0 && task.Parameters is { Count: > 0 })
+        if (paramCellIndex >= 0 && resolvedParameters is { Count: > 0 })
         {
-            var injectedSource = BuildInjectedParametersSource(task.Parameters);
+            var injectedSource = BuildInjectedParametersSource(resolvedParameters);
             var injected = new CellInfo(injectedSource, "Code", "Python", ["injected-parameters"]);
             cells = [.. cells[..(paramCellIndex + 1)], injected, .. cells[(paramCellIndex + 1)..]];
         }
@@ -185,7 +190,8 @@ public class TaskExecutor(
     // ── SQL execution ───────────────────────────────────────────────
 
     private async Task ExecuteSqlQueryAsync(
-        TaskRun taskRun, SqlQueryTask task, NodeManager nodeManager, CancellationToken ct)
+        TaskRun taskRun, SqlQueryTask task, NodeManager nodeManager,
+        Dictionary<string, string>? jobRunParameters, CancellationToken ct)
     {
         var content = await workspaceReader.GetQueryContentAsync(task.QueryId, ct)
             ?? throw new InvalidOperationException(
@@ -221,13 +227,16 @@ public class TaskExecutor(
 
     // ── SubJob execution ────────────────────────────────────────────
 
-    private async Task ExecuteSubJobAsync(TaskRun taskRun, SubJobTask task, CancellationToken ct)
+    private async Task ExecuteSubJobAsync(TaskRun taskRun, SubJobTask task,
+        Dictionary<string, string>? jobRunParameters, CancellationToken ct)
     {
         logger.LogInformation("Triggering sub-job {SubJobId} for task '{TaskName}'",
             task.SubJobId, task.Name);
 
+        var resolvedParameters = ResolveParameters(task.Parameters, jobRunParameters);
+
         var subRun = await mediator.SendAsync(
-            new TriggerJobRequest(task.SubJobId, task.Parameters, JobRunTrigger.SubJob), ct);
+            new TriggerJobRequest(task.SubJobId, resolvedParameters, JobRunTrigger.SubJob), ct);
 
         // Set parent references
         subRun.ParentRunId = taskRun.JobRunId;
@@ -325,6 +334,32 @@ public class TaskExecutor(
             _ => "",
         };
     }
+
+    /// <summary>
+    /// Resolves ${{ param_name }} tokens in task parameter values using job run parameter values.
+    /// Unknown placeholders are left unchanged.
+    /// </summary>
+    internal static Dictionary<string, string>? ResolveParameters(
+        Dictionary<string, string>? taskParameters,
+        Dictionary<string, string>? jobRunParameters)
+    {
+        if (taskParameters is null or { Count: 0 }) return taskParameters;
+        if (jobRunParameters is null or { Count: 0 }) return taskParameters;
+
+        return taskParameters.ToDictionary(
+            kv => kv.Key,
+            kv => ResolveValue(kv.Value, jobRunParameters));
+    }
+
+    private static readonly Regex PlaceholderRegex =
+        new(@"\$\{\{\s*(\w+)\s*\}\}", RegexOptions.Compiled);
+
+    private static string ResolveValue(string value, Dictionary<string, string> jobRunParameters) =>
+        PlaceholderRegex.Replace(value, m =>
+        {
+            var name = m.Groups[1].Value;
+            return jobRunParameters.TryGetValue(name, out var resolved) ? resolved : m.Value;
+        });
 
     /// <summary>
     /// Builds a Python source string that assigns the given parameters as variables,

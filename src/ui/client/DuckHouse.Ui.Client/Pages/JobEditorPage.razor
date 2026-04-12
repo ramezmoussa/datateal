@@ -43,11 +43,9 @@
                     </Button>
                 </SpaceItem>
                 <SpaceItem>
-                    <Popconfirm Title="Trigger this job?" OnConfirm="TriggerAsync">
-                        <Button Type="@ButtonType.Primary">
-                            <Icon Type="@IconType.Outline.PlayCircle" /> Run
-                        </Button>
-                    </Popconfirm>
+                    <Button Type="@ButtonType.Primary" OnClick="() => _showTriggerModal = true">
+                        <Icon Type="@IconType.Outline.PlayCircle" /> Run
+                    </Button>
                 </SpaceItem>
                 <SpaceItem>
                     <Button OnClick="ExportYamlAsync">
@@ -250,6 +248,23 @@
                     <label style="display: block; margin-bottom: 4px; font-weight: 500;">Time Zone</label>
                     <Input @bind-Value="_newTimeZone" Placeholder="UTC" />
                 </div>
+                <div>
+                    <label style="display: block; margin-bottom: 8px; font-weight: 500;">Parameter Overrides</label>
+                    @foreach (var (param, index) in _newScheduleParameters.Select((p, i) => (p, i)))
+                    {
+                        var idx = index;
+                        <div style="display: flex; gap: 8px; margin-bottom: 8px; align-items: center;">
+                            <Input @bind-Value="param.Key" Placeholder="Key" Style="flex: 1;" />
+                            <Input @bind-Value="param.Value" Placeholder="Value" Style="flex: 1;" />
+                            <Button Danger Size="@ButtonSize.Small" OnClick="() => _newScheduleParameters.RemoveAt(idx)">
+                                <Icon Type="@IconType.Outline.Delete" />
+                            </Button>
+                        </div>
+                    }
+                    <Button Size="@ButtonSize.Small" OnClick="() => _newScheduleParameters.Add(new())">
+                        <Icon Type="@IconType.Outline.Plus" /> Add Override
+                    </Button>
+                </div>
             </div>
         </Modal>
 
@@ -269,6 +284,10 @@
         <ParameterEditorModal @bind-Visible="_showParamModal"
                               Parameter="_paramBeingEdited"
                               OnSave="OnParameterSaved" />
+
+        <TriggerJobModal @bind-Visible="_showTriggerModal"
+                         JobId="Id"
+                         OnConfirm="TriggerConfirmedAsync" />
     }
 </Spin>
 
@@ -307,6 +326,10 @@
     private bool _showScheduleModal;
     private string _newCron = "";
     private string? _newTimeZone;
+    private List<EditableTaskParameter> _newScheduleParameters = [];
+
+    // Trigger modal state
+    private bool _showTriggerModal;
 
     // Export modal state
     private bool _showExportModal;
@@ -531,6 +554,20 @@
 
     // --- Other actions ---
 
+    private async Task TriggerConfirmedAsync(Dictionary<string, string>? parameters)
+    {
+        try
+        {
+            var request = parameters?.Count > 0 ? new TriggerJobRequest(parameters) : null;
+            await JobService.TriggerJobAsync(Id, request);
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to trigger: {ex.Message}";
+        }
+    }
+
     private async Task TriggerAsync()
     {
         try
@@ -561,6 +598,7 @@
     {
         _newCron = "";
         _newTimeZone = null;
+        _newScheduleParameters = [];
         _showScheduleModal = true;
     }
 
@@ -569,8 +607,13 @@
         if (string.IsNullOrWhiteSpace(_newCron)) return;
         try
         {
+            var parameters = _newScheduleParameters.Count > 0
+                ? _newScheduleParameters
+                    .Where(p => !string.IsNullOrWhiteSpace(p.Key))
+                    .ToDictionary(p => p.Key, p => p.Value)
+                : null;
             await JobService.CreateScheduleAsync(Id,
-                new CreateScheduleRequest(_newCron.Trim(), true, _newTimeZone?.Trim(), null));
+                new CreateScheduleRequest(_newCron.Trim(), true, _newTimeZone?.Trim(), parameters?.Count > 0 ? parameters : null));
             _showScheduleModal = false;
             await LoadAsync();
         }

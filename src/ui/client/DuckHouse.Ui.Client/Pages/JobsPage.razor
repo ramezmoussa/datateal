@@ -64,11 +64,10 @@
                     </Button>
                 </SpaceItem>
                 <SpaceItem>
-                    <Popconfirm Title="@($"Trigger job '{context.Name}'?")" OnConfirm="() => TriggerAsync(context)">
-                        <Button Size="@ButtonSize.Small" Type="@ButtonType.Primary">
-                            <Icon Type="@IconType.Outline.PlayCircle" />
-                        </Button>
-                    </Popconfirm>
+                    <Button Size="@ButtonSize.Small" Type="@ButtonType.Primary"
+                            OnClick="@(() => OpenTriggerModal(context.Id))">
+                        <Icon Type="@IconType.Outline.PlayCircle" />
+                    </Button>
                 </SpaceItem>
                 <SpaceItem>
                     <Popconfirm Title="@($"Delete job '{context.Name}'?")" OnConfirm="() => DeleteAsync(context)">
@@ -119,6 +118,10 @@
     <pre style="max-height: 500px; overflow: auto; font-size: 13px; white-space: pre-wrap;">@_exportYaml</pre>
 </Modal>
 
+<TriggerJobModal @bind-Visible="_showTriggerModal"
+                 JobId="_triggerJobId"
+                 OnConfirm="TriggerConfirmedAsync" />
+
 @code {
     private IReadOnlyList<JobSummary> _jobs = [];
     private bool _loading = true;
@@ -135,6 +138,10 @@
     // Export modal state
     private bool _showExportModal;
     private string _exportYaml = "";
+
+    // Trigger modal state
+    private bool _showTriggerModal;
+    private Guid? _triggerJobId;
 
     protected override async Task OnInitializedAsync()
     {
@@ -212,6 +219,27 @@
         catch (Exception ex)
         {
             _error = $"Failed to create job: {ex.Message}";
+        }
+    }
+
+    private void OpenTriggerModal(Guid jobId)
+    {
+        _triggerJobId = jobId;
+        _showTriggerModal = true;
+    }
+
+    private async Task TriggerConfirmedAsync(Dictionary<string, string>? parameters)
+    {
+        if (_triggerJobId is null) return;
+        try
+        {
+            var request = parameters?.Count > 0 ? new TriggerJobRequest(parameters) : null;
+            await JobService.TriggerJobAsync(_triggerJobId.Value, request);
+            _error = null;
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to trigger job: {ex.Message}";
         }
     }
 

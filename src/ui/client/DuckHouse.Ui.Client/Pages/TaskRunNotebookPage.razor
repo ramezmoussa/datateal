@@ -85,8 +85,7 @@
                     <div style="display: flex; align-items: center; gap: 6px; padding: 2px 8px;
                                 background: #f9f0ff; border-top: 1px dashed #d3adf7; border-bottom: 1px dashed #d3adf7;
                                 font-size: 11px; color: #531dab;">
-                        <Icon Type="@IconType.Outline.Experiment" Style="font-size: 11px;" />
-                        <span>Injected Parameters</span>
+                        <span>@@ Injected parameters</span>
                     </div>
                 }
                 else if (cell.CellRole == "parameters")
@@ -94,8 +93,7 @@
                     <div style="display: flex; align-items: center; gap: 6px; padding: 2px 8px;
                                 background: #e6f4ff; border-top: 1px dashed #91caff; border-bottom: 1px dashed #91caff;
                                 font-size: 11px; color: #0958d9;">
-                        <Icon Type="@IconType.Outline.Experiment" Style="font-size: 11px;" />
-                        <span>Parameters</span>
+                        <span>@@ Parameters</span>
                     </div>
                 }
                 @if (cell.CellType == "Markdown")

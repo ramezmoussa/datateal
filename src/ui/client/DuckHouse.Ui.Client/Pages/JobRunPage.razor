@@ -64,6 +64,15 @@
                 {
                     <DescriptionsItem Title="Duration">@FormatDuration((_run.CompletedAt.Value - _run.StartedAt.Value).TotalMilliseconds)</DescriptionsItem>
                 }
+                @if (_run.Parameters is { Count: > 0 })
+                {
+                    <DescriptionsItem Title="Parameters" Span="3">
+                        @foreach (var kv in _run.Parameters)
+                        {
+                            <Tag Style="margin-bottom: 4px; font-family: monospace;">@kv.Key = @kv.Value</Tag>
+                        }
+                    </DescriptionsItem>
+                }
             </Descriptions>
 
             <h3>Tasks</h3>
