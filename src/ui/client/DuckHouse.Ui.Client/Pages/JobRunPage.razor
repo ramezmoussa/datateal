@@ -49,31 +49,26 @@
                 </Space>
             </Flex>
 
-            <div style="margin-bottom: 16px;">
-                <Space Size="@("large")">
-                    <SpaceItem>
-                        <span style="color: #888;">Trigger:</span> @_run.Trigger
-                    </SpaceItem>
-                    <SpaceItem>
-                        <span style="color: #888;">Created:</span> @_run.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")
-                    </SpaceItem>
-                    @if (_run.StartedAt.HasValue)
-                    {
-                        <SpaceItem>
-                            <span style="color: #888;">Started:</span> @_run.StartedAt.Value.ToString("HH:mm:ss")
-                        </SpaceItem>
-                    }
-                    @if (_run.CompletedAt.HasValue)
-                    {
-                        <SpaceItem>
-                            <span style="color: #888;">Completed:</span> @_run.CompletedAt.Value.ToString("HH:mm:ss")
-                        </SpaceItem>
-                    }
-                </Space>
-            </div>
+            <Descriptions Bordered="false" Size="@DescriptionsSize.Small" Style="margin-bottom: 16px;">
+                <DescriptionsItem Title="Trigger">@_run.Trigger</DescriptionsItem>
+                <DescriptionsItem Title="Created">@_run.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")</DescriptionsItem>
+                @if (_run.StartedAt.HasValue)
+                {
+                    <DescriptionsItem Title="Started">@_run.StartedAt.Value.ToString("yyyy-MM-dd HH:mm:ss")</DescriptionsItem>
+                }
+                @if (_run.CompletedAt.HasValue)
+                {
+                    <DescriptionsItem Title="Completed">@_run.CompletedAt.Value.ToString("yyyy-MM-dd HH:mm:ss")</DescriptionsItem>
+                }
+                @if (_run.StartedAt.HasValue && _run.CompletedAt.HasValue)
+                {
+                    <DescriptionsItem Title="Duration">@FormatDuration((_run.CompletedAt.Value - _run.StartedAt.Value).TotalMilliseconds)</DescriptionsItem>
+                }
+            </Descriptions>
 
             <h3>Tasks</h3>
-            <Table TItem="TaskRunDto" DataSource="_run.TaskRuns" Size="@TableSize.Small">
+            <Table TItem="TaskRunDto" DataSource="_run.TaskRuns" Size="@TableSize.Small"
+                   PageSize="int.MaxValue" HidePagination="true">
                 <PropertyColumn Property="c => c.TaskName" Title="Task">
                     @context.TaskName
                 </PropertyColumn>
@@ -85,7 +80,7 @@
                 </PropertyColumn>
                 <PropertyColumn Property="c => c.AttemptNumber" Title="Attempt" />
                 <PropertyColumn Property="c => c.DurationMs" Title="Duration">
-                    @(context.DurationMs.HasValue ? $"{context.DurationMs.Value:F0}ms" : "—")
+                    @(context.DurationMs.HasValue ? FormatDuration(context.DurationMs.Value) : "—")
                 </PropertyColumn>
                 <PropertyColumn Property="c => c.NodeName" Title="Node">
                     @(context.NodeName ?? "—")
@@ -181,4 +176,13 @@
         "subjob" => "orange",
         _ => "default",
     };
+
+    private static string FormatDuration(double ms)
+    {
+        double s = ms / 1000.0;
+        if (s < 10.0) return $"{s:F1}s";
+        int total = (int)s;
+        if (total < 60) return $"{total}s";
+        return $"{total / 60}m {total % 60}s";
+    }
 }
