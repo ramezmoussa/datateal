@@ -21,6 +21,14 @@ internal class JobRepository(OrchestratorDbContext db) : IJobRepository
             .Include(j => j.Schedules)
             .FirstOrDefaultAsync(j => j.Id == id, cancellationToken);
 
+    public async Task<Job?> GetJobDetailAsync(Guid id, CancellationToken cancellationToken = default) =>
+        await db.Jobs
+            .Include(j => j.Parameters)
+            .Include(j => j.Tasks).ThenInclude(t => t.Dependencies).ThenInclude(d => d.DependsOnTask)
+            .Include(j => j.Schedules)
+            .AsNoTracking()
+            .FirstOrDefaultAsync(j => j.Id == id, cancellationToken);
+
     public async Task<Job?> GetJobByNameAsync(string name, CancellationToken cancellationToken = default) =>
         await db.Jobs
             .Include(j => j.Parameters)

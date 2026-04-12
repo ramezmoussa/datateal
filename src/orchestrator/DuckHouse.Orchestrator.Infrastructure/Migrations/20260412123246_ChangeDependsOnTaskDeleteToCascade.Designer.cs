@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using DuckHouse.Orchestrator.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -12,9 +13,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace DuckHouse.Orchestrator.Infrastructure.Migrations
 {
     [DbContext(typeof(OrchestratorDbContext))]
-    partial class OrchestratorDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260412123246_ChangeDependsOnTaskDeleteToCascade")]
+    partial class ChangeDependsOnTaskDeleteToCascade
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -102,7 +105,7 @@ namespace DuckHouse.Orchestrator.Infrastructure.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<Guid?>("JobId")
+                    b.Property<Guid>("JobId")
                         .HasColumnType("uuid");
 
                     b.Property<string>("JobName")
@@ -328,7 +331,7 @@ namespace DuckHouse.Orchestrator.Infrastructure.Migrations
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)");
 
-                    b.Property<Guid?>("TaskId")
+                    b.Property<Guid>("TaskId")
                         .HasColumnType("uuid");
 
                     b.Property<string>("TaskName")
@@ -481,7 +484,8 @@ namespace DuckHouse.Orchestrator.Infrastructure.Migrations
                     b.HasOne("DuckHouse.Orchestrator.Core.Entities.Job", "Job")
                         .WithMany()
                         .HasForeignKey("JobId")
-                        .OnDelete(DeleteBehavior.SetNull);
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
                     b.HasOne("DuckHouse.Orchestrator.Core.Entities.JobRun", "ParentRun")
                         .WithMany()
@@ -545,7 +549,8 @@ namespace DuckHouse.Orchestrator.Infrastructure.Migrations
                     b.HasOne("DuckHouse.Orchestrator.Core.Entities.JobTask", "Task")
                         .WithMany()
                         .HasForeignKey("TaskId")
-                        .OnDelete(DeleteBehavior.SetNull);
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
 
                     b.Navigation("JobRun");
 

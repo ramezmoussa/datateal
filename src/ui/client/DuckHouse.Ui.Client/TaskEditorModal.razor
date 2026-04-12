@@ -42,7 +42,7 @@
                     <div>
                         <label style="display: block; margin-bottom: 4px; font-weight: 500;">Node Pool</label>
                         <Select TItem="NodePoolOption"
-                                TItemValue="string?"
+                                TItemValue="string"
                                 DataSource="_nodePoolOptions"
                                 @bind-Value="_nodePoolRef"
                                 LabelName="@nameof(NodePoolOption.Label)"
@@ -62,7 +62,7 @@
                     <div>
                         <label style="display: block; margin-bottom: 4px; font-weight: 500;">Node Pool</label>
                         <Select TItem="NodePoolOption"
-                                TItemValue="string?"
+                                TItemValue="string"
                                 DataSource="_nodePoolOptions"
                                 @bind-Value="_nodePoolRef"
                                 LabelName="@nameof(NodePoolOption.Label)"
@@ -136,12 +136,11 @@
             {
                 var idx = index;
                 <div style="display: flex; gap: 8px; margin-bottom: 8px; align-items: center;">
-                    <Select TItem="string" TItemValue="string" @bind-Value="dep.TaskName" Style="flex: 1;" Placeholder="Depends on...">
-                        @foreach (var taskName in OtherTaskNames)
-                        {
-                            <SelectOption TItem="string" TItemValue="string" Value="@taskName" Label="@taskName" />
-                        }
-                    </Select>
+                    <Select TItem="string" TItemValue="string"
+                            DataSource="@OtherTaskNames"
+                            @bind-Value="dep.TaskName"
+                            Style="flex: 1;"
+                            Placeholder="Depends on..." />
                     <Select TItem="string" TItemValue="string" @bind-Value="dep.Condition" Style="width: 140px;">
                         <SelectOption TItem="string" TItemValue="string" Value="@("OnSuccess")" Label="On Success" />
                         <SelectOption TItem="string" TItemValue="string" Value="@("OnFailure")" Label="On Failure" />

@@ -27,7 +27,8 @@ public class RunCoordinator(
         var run = await jobRunRepository.GetJobRunAsync(jobRunId, ct)
             ?? throw new InvalidOperationException($"Job run {jobRunId} not found.");
 
-        var job = await jobRepository.GetJobAsync(run.JobId, ct)
+        var job = await jobRepository.GetJobAsync(run.JobId
+                ?? throw new InvalidOperationException($"Job run {jobRunId} has no associated job (job was deleted)."), ct)
             ?? throw new InvalidOperationException($"Job {run.JobId} not found.");
 
         _logger.LogInformation("Starting job run {RunId} for job '{JobName}'", jobRunId, job.Name);
@@ -48,7 +49,9 @@ public class RunCoordinator(
 
         // Build lookup maps
         var taskMap = job.Tasks.ToDictionary(t => t.Id);
-        var taskRunMap = run.TaskRuns.ToDictionary(tr => tr.TaskId);
+        var taskRunMap = run.TaskRuns
+            .Where(tr => tr.TaskId.HasValue)
+            .ToDictionary(tr => tr.TaskId!.Value);
 
         try
         {

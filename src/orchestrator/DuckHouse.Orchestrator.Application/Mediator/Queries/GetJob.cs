@@ -11,6 +11,6 @@ internal class GetJobHandler(IJobRepository jobRepository)
 {
     public async Task<Job?> Handle(GetJobRequest request, CancellationToken cancellationToken)
     {
-        return await jobRepository.GetJobAsync(request.Id, cancellationToken);
+        return await jobRepository.GetJobDetailAsync(request.Id, cancellationToken);
     }
 }

@@ -10,7 +10,7 @@ public class TaskRun
     [JsonIgnore]
     public JobRun? JobRun { get; set; }
 
-    public Guid TaskId { get; set; }
+    public Guid? TaskId { get; set; }
     [JsonIgnore]
     public JobTask? Task { get; set; }
 

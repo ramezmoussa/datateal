@@ -13,6 +13,7 @@ public class TaskDependency
     public Guid DependsOnTaskId { get; set; }
     [JsonIgnore]
     public JobTask? DependsOnTask { get; set; }
+    public string? DependsOnTaskName => DependsOnTask?.Name;
 
     public DependencyCondition Condition { get; set; }
 }

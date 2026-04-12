@@ -7,7 +7,7 @@ namespace DuckHouse.Orchestrator.Core.Entities;
 public class JobRun
 {
     public Guid Id { get; set; }
-    public Guid JobId { get; set; }
+    public Guid? JobId { get; set; }
     [JsonIgnore]
     public Job? Job { get; set; }
 
