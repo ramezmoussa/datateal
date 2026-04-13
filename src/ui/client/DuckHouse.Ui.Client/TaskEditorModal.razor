@@ -45,16 +45,19 @@
                         }
                     </div>
                     <div>
-                        <label style="display: block; margin-bottom: 4px; font-weight: 500;">Node pool</label>
+                        <label style="display: block; margin-bottom: 4px; font-weight: 500;">Node pool <span style="color: #ff4d4f;">*</span></label>
                         <Select TItem="NodePoolOption"
                                 TItemValue="string"
                                 DataSource="_nodePoolOptions"
                                 @bind-Value="_nodePoolRef"
                                 LabelName="@nameof(NodePoolOption.Label)"
                                 ValueName="@nameof(NodePoolOption.Value)"
-                                AllowClear
                                 Style="width: 100%;"
-                                Placeholder="Default" />
+                                Placeholder="Select node pool" />
+                        @if (_nodePoolRef is null)
+                        {
+                            <div style="color: #ff4d4f; font-size: 12px; margin-top: 2px;">A node pool must be selected.</div>
+                        }
                     </div>
                 }
                 else if (_taskType == "SqlQuery")
@@ -69,16 +72,19 @@
                         }
                     </div>
                     <div>
-                        <label style="display: block; margin-bottom: 4px; font-weight: 500;">Node pool</label>
+                        <label style="display: block; margin-bottom: 4px; font-weight: 500;">Node pool <span style="color: #ff4d4f;">*</span></label>
                         <Select TItem="NodePoolOption"
                                 TItemValue="string"
                                 DataSource="_nodePoolOptions"
                                 @bind-Value="_nodePoolRef"
                                 LabelName="@nameof(NodePoolOption.Label)"
                                 ValueName="@nameof(NodePoolOption.Value)"
-                                AllowClear
                                 Style="width: 100%;"
-                                Placeholder="Default" />
+                                Placeholder="Select node pool" />
+                        @if (_nodePoolRef is null)
+                        {
+                            <div style="color: #ff4d4f; font-size: 12px; margin-top: 2px;">A node pool must be selected.</div>
+                        }
                     </div>
                 }
                 else if (_taskType == "SubJob")
@@ -301,6 +307,7 @@
         if (_taskType == "Notebook" && _notebookId is null) return true;
         if (_taskType == "SqlQuery" && _queryId is null) return true;
         if (_taskType == "SubJob" && _subJobId is null) return true;
+        if ((_taskType == "Notebook" || _taskType == "SqlQuery") && _nodePoolRef is null) return true;
         if (ValidationHelper.ValidateTimeSpan(_retryInterval, required: true) is not null) return true;
         if (ValidationHelper.ValidateTimeSpan(_timeout, required: false) is not null) return true;
         if (_taskType == "Notebook" && _parameters.Any(p => ValidationHelper.ValidatePythonIdentifier(p.Key) is not null)) return true;

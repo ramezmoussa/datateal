@@ -88,21 +88,14 @@ public class TaskExecutor(
         }
 
         // Provision node and kernel
-        string? nodeName = null;
-        string? kernelId = null;
-
-        if (task.NodePoolRef is not null)
-        {
-            (nodeName, kernelId) = await nodeManager.CreateKernelAsync(task.NodePoolRef, ct);
-            taskRun.NodeName = nodeName;
-            taskRun.KernelId = kernelId;
-            await jobRunRepository.UpdateTaskRunAsync(taskRun, ct);
-        }
-        else
-        {
+        if (task.NodePoolRef is null)
             throw new InvalidOperationException(
                 $"Notebook task '{task.Name}' requires a NodePoolRef to execute.");
-        }
+
+        var (nodeName, kernelId) = await nodeManager.CreateKernelAsync(task.NodePoolRef, ct);
+        taskRun.NodeName = nodeName;
+        taskRun.KernelId = kernelId;
+        await jobRunRepository.UpdateTaskRunAsync(taskRun, ct);
 
         try
         {
@@ -168,8 +161,7 @@ public class TaskExecutor(
         }
         finally
         {
-            if (nodeName is not null && kernelId is not null)
-                await nodeManager.CleanupKernelAsync(nodeName, kernelId, ct);
+            await nodeManager.CleanupKernelAsync(nodeName, kernelId, ct);
         }
     }
 

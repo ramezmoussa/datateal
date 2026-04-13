@@ -86,7 +86,7 @@ internal class UpdateJobHandler(IJobRepository jobRepository) : IRequestHandler<
                         RetryInterval = t.RetryInterval,
                         Timeout = t.Timeout,
                         NotebookId = t.NotebookId ?? throw new InvalidOperationException("NotebookId is required for notebook tasks."),
-                        NodePoolRef = t.NodePoolRef,
+                        NodePoolRef = t.NodePoolRef ?? throw new InvalidOperationException("NodePoolRef is required for notebook tasks."),
                         Parameters = t.Parameters,
                     },
                     "sqlquery" or "sql" => new SqlQueryTask
@@ -97,7 +97,7 @@ internal class UpdateJobHandler(IJobRepository jobRepository) : IRequestHandler<
                         RetryInterval = t.RetryInterval,
                         Timeout = t.Timeout,
                         QueryId = t.QueryId ?? throw new InvalidOperationException("QueryId is required for SQL query tasks."),
-                        NodePoolRef = t.NodePoolRef,
+                        NodePoolRef = t.NodePoolRef ?? throw new InvalidOperationException("NodePoolRef is required for SQL query tasks."),
                         Parameters = t.Parameters,
                     },
                     "subjob" => new SubJobTask

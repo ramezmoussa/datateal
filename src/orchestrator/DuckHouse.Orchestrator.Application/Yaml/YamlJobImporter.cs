@@ -97,7 +97,9 @@ public class YamlJobImporter(
                     RetryInterval = ParseTimeSpan(t.RetryInterval, TimeSpan.FromSeconds(30)),
                     Timeout = ParseNullableTimeSpan(t.Timeout),
                     NotebookId = await ResolveNotebookAsync(t.NotebookPath, ct),
-                    NodePoolRef = t.NodePoolRef,
+                    NodePoolRef = string.IsNullOrWhiteSpace(t.NodePoolRef)
+                        ? throw new InvalidOperationException($"NodePoolRef is required for notebook task '{t.Name}'.")
+                        : t.NodePoolRef,
                     Parameters = t.Parameters,
                 },
                 "sqlquery" or "sql" => new SqlQueryTask
@@ -109,7 +111,9 @@ public class YamlJobImporter(
                     RetryInterval = ParseTimeSpan(t.RetryInterval, TimeSpan.FromSeconds(30)),
                     Timeout = ParseNullableTimeSpan(t.Timeout),
                     QueryId = await ResolveQueryAsync(t.QueryPath, ct),
-                    NodePoolRef = t.NodePoolRef,
+                    NodePoolRef = string.IsNullOrWhiteSpace(t.NodePoolRef)
+                        ? throw new InvalidOperationException($"NodePoolRef is required for SQL query task '{t.Name}'.")
+                        : t.NodePoolRef,
                     Parameters = t.Parameters,
                 },
                 "subjob" => new SubJobTask
