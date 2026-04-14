@@ -1,11 +1,11 @@
 @using DuckHouse.Ui.Shared.Orchestration
 @inject IJobService JobService
 
-<Modal Title="@(_job?.Parameters.Count > 0 ? "Trigger Job — Parameters" : "Trigger Job")"
+<Modal Title="@(_job?.Parameters.Count > 0 ? "Trigger job — parameters" : "Trigger job")"
        Visible="Visible"
        OnOk="HandleConfirm"
        OnCancel="HandleCancel"
-       OkText="@("Run Now")"
+       OkText="@("Run now")"
        OkButtonProps="@(new ButtonProps { Disabled = !CanConfirm(), Loading = _loading })">
     <Spin Spinning="_loading">
         @if (_job is not null)
