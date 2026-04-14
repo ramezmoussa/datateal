@@ -6,4 +6,6 @@ public record CreateNodeRequest(
     TimeSpan? KernelIdleTimeout = null,
     TimeSpan? NodeIdleTimeout = null,
     string? KernelRequirements = null,
-    IReadOnlyList<Guid>? WheelPackageIds = null);
+    IReadOnlyList<Guid>? WheelPackageIds = null,
+    IReadOnlyList<Guid>? EnvironmentVariableIds = null,
+    IReadOnlyList<Guid>? SecretIds = null);

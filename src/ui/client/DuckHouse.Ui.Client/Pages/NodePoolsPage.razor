@@ -1,10 +1,12 @@
 @page "/node-pools"
 
 @using DuckHouse.Ui.Shared.Orchestration
+@using DuckHouse.Ui.Shared.Environment
 @using DuckHouse.Ui.Client.Validation
 @using DuckHouse.Ui.Shared.Packages
 @inject INodePoolService NodePoolService
 @inject IWheelPackageService WheelPackageService
+@inject IEnvironmentService EnvironmentService
 
 <PageTitle>Node Pools — DuckHouse</PageTitle>
 
@@ -102,6 +104,30 @@
                         Style="width: 100%;" />
             </div>
             <div>
+                <label style="display: block; margin-bottom: 4px; font-weight: 500;">Environment variables</label>
+                <Select Mode="SelectMode.Multiple"
+                        TItem="EnvironmentVariableDto"
+                        TItemValue="Guid"
+                        DataSource="_availableEnvVars"
+                        LabelName="@nameof(EnvironmentVariableDto.Key)"
+                        ValueName="@nameof(EnvironmentVariableDto.Id)"
+                        @bind-Values="_formEnvVarIds"
+                        Placeholder="Select environment variables"
+                        Style="width: 100%;" />
+            </div>
+            <div>
+                <label style="display: block; margin-bottom: 4px; font-weight: 500;">Secrets</label>
+                <Select Mode="SelectMode.Multiple"
+                        TItem="SecretDto"
+                        TItemValue="Guid"
+                        DataSource="_availableSecrets"
+                        LabelName="@nameof(SecretDto.Key)"
+                        ValueName="@nameof(SecretDto.Id)"
+                        @bind-Values="_formSecretIds"
+                        Placeholder="Select secrets"
+                        Style="width: 100%;" />
+            </div>
+            <div>
                 <label style="display: block; margin-bottom: 4px; font-weight: 500;">Description</label>
                 <TextArea @bind-Value="_formDescription" Rows="2" />
             </div>
@@ -124,17 +150,33 @@
     private string? _formKernelReqs;
     private string? _formDescription;
     private IEnumerable<Guid> _formWheelPackageIds = [];
+    private IEnumerable<Guid> _formEnvVarIds = [];
+    private IEnumerable<Guid> _formSecretIds = [];
 
     private List<WheelPackageDto> _availablePackages = [];
+    private List<EnvironmentVariableDto> _availableEnvVars = [];
+    private List<SecretDto> _availableSecrets = [];
 
     protected override async Task OnInitializedAsync()
     {
-        await Task.WhenAll(LoadAsync(), LoadPackagesAsync());
+        await Task.WhenAll(LoadAsync(), LoadPackagesAsync(), LoadEnvVarsAsync(), LoadSecretsAsync());
     }
 
     private async Task LoadPackagesAsync()
     {
         try { _availablePackages = [.. await WheelPackageService.GetPackagesAsync()]; }
+        catch { /* non-fatal */ }
+    }
+
+    private async Task LoadEnvVarsAsync()
+    {
+        try { _availableEnvVars = [.. await EnvironmentService.GetVariablesAsync()]; }
+        catch { /* non-fatal */ }
+    }
+
+    private async Task LoadSecretsAsync()
+    {
+        try { _availableSecrets = [.. await EnvironmentService.GetSecretsAsync()]; }
         catch { /* non-fatal */ }
     }
 
@@ -165,6 +207,8 @@
         _formKernelReqs = null;
         _formDescription = null;
         _formWheelPackageIds = [];
+        _formEnvVarIds = [];
+        _formSecretIds = [];
         _showModal = true;
     }
 
@@ -178,6 +222,8 @@
         _formKernelReqs = pool.KernelRequirements;
         _formDescription = pool.Description;
         _formWheelPackageIds = pool.WheelPackageIds ?? [];
+        _formEnvVarIds = pool.EnvironmentVariableIds ?? [];
+        _formSecretIds = pool.SecretIds ?? [];
         _showModal = true;
     }
 
@@ -195,14 +241,18 @@
                 await NodePoolService.CreateNodePoolAsync(new CreateNodePoolRequest(
                     _formName.Trim(), _formVmSize.Trim(), kernelTimeout, nodeTimeout,
                     _formKernelReqs?.Trim(), _formDescription?.Trim(),
-                    _formWheelPackageIds.Any() ? [.. _formWheelPackageIds] : null));
+                    _formWheelPackageIds.Any() ? [.. _formWheelPackageIds] : null,
+                    _formEnvVarIds.Any() ? [.. _formEnvVarIds] : null,
+                    _formSecretIds.Any() ? [.. _formSecretIds] : null));
             }
             else
             {
                 await NodePoolService.UpdateNodePoolAsync(_editTarget.Id, new UpdateNodePoolRequest(
                     _formName.Trim(), _formVmSize.Trim(), kernelTimeout, nodeTimeout,
                     _formKernelReqs?.Trim(), _formDescription?.Trim(),
-                    _formWheelPackageIds.Any() ? [.. _formWheelPackageIds] : null));
+                    _formWheelPackageIds.Any() ? [.. _formWheelPackageIds] : null,
+                    _formEnvVarIds.Any() ? [.. _formEnvVarIds] : null,
+                    _formSecretIds.Any() ? [.. _formSecretIds] : null));
             }
             _showModal = false;
             await LoadAsync();

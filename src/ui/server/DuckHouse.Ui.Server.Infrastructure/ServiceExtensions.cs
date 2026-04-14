@@ -20,5 +20,6 @@ public static class ServiceExtensions
 
         services.AddScoped<IWorkspaceRepository, WorkspaceRepository>();
         services.AddScoped<IWheelPackageRepository, WheelPackageRepository>();
+        services.AddScoped<IEnvironmentRepository, EnvironmentRepository>();
     }
 }

@@ -24,6 +24,10 @@ public static partial class ValidationHelper
     [GeneratedRegex(@"^[a-zA-Z_][a-zA-Z0-9_]*$")]
     private static partial Regex PythonIdentifierRegex();
 
+    // Environment variable key: letters, digits, and underscores; must start with a letter or underscore.
+    [GeneratedRegex(@"^[a-zA-Z_][a-zA-Z0-9_]*$")]
+    private static partial Regex EnvVarKeyRegex();
+
     // Basic cron field: *, number, */N, N-M, N,M,... or combinations.
     [GeneratedRegex(@"^(\*|(\d+(-\d+)?(,\d+(-\d+)?)*)|(\*/\d+))$")]
     private static partial Regex CronFieldRegex();
@@ -128,6 +132,28 @@ public static partial class ValidationHelper
         {
             if (!CronFieldRegex().IsMatch(field))
                 return $"Invalid cron field: '{field}'. Use *, a number, N-M, N,M,... or */N.";
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Validates an environment variable key.
+    /// Returns an error message, or null if valid.
+    /// </summary>
+    public static string? ValidateEnvVarKey(string? key)
+    {
+        if (string.IsNullOrEmpty(key))
+            return null;
+
+        if (key.Length > 256)
+            return "Key must be 256 characters or fewer.";
+
+        if (!EnvVarKeyRegex().IsMatch(key))
+        {
+            if (char.IsDigit(key[0]))
+                return "Key must not start with a digit.";
+            return "Key may only contain letters, digits, and underscores.";
         }
 
         return null;

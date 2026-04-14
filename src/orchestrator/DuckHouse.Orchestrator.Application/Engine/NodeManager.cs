@@ -14,6 +14,7 @@ public class NodeManager(
     IControlPlaneClient controlPlane,
     INodePoolConfigRepository nodePoolConfigRepo,
     IWheelPackageReader wheelPackageReader,
+    IEnvironmentResolver environmentResolver,
     Guid jobRunId,
     ILogger logger)
 {
@@ -51,11 +52,16 @@ public class NodeManager(
             wheelContents = await wheelPackageReader.GetWheelContentsAsync(config.WheelPackageIds, ct);
         }
 
+        var resolved = await environmentResolver.ResolveAsync(
+            config.EnvironmentVariableIds, config.SecretIds, ct);
+
         await controlPlane.CreateNodeAsync(
             nodeName, config.VmSize,
             config.KernelIdleTimeout, config.NodeIdleTimeout,
             config.KernelRequirements,
             wheelContents,
+            resolved.Variables.Count > 0 ? resolved.Variables : null,
+            resolved.Secrets.Count > 0 ? resolved.Secrets : null,
             ct);
 
         // Poll until node is running

@@ -1,6 +1,7 @@
 using DuckHouse.Core.Nodes;
 using DuckHouse.Core.Mediator;
 using DuckHouse.Ui.Server.Core.Repositories;
+using DuckHouse.Ui.Shared.Environment;
 using Microsoft.AspNetCore.Mvc;
 using Cmd = DuckHouse.Ui.Server.Application.Mediator.Commands;
 using Qry = DuckHouse.Ui.Server.Application.Mediator.Queries;
@@ -39,8 +40,20 @@ public class NodesController(IMediator mediator, IWheelPackageRepository wheelPa
                 .ToList();
         }
 
+        // Resolve environment variables and secrets
+        ResolvedEnvironment? resolved = null;
+        if (body.EnvironmentVariableIds is { Count: > 0 } || body.SecretIds is { Count: > 0 })
+        {
+            resolved = await mediator.SendAsync(
+                new Qry.ResolveEnvironmentRequest(body.EnvironmentVariableIds, body.SecretIds), ct);
+        }
+
         var node = await mediator.SendAsync(
-            new Cmd.CreateNodeRequest(body.Name, body.VmSize, body.KernelIdleTimeout, body.NodeIdleTimeout, body.KernelRequirements, wheelContents), ct);
+            new Cmd.CreateNodeRequest(
+                body.Name, body.VmSize, body.KernelIdleTimeout, body.NodeIdleTimeout, body.KernelRequirements,
+                wheelContents,
+                resolved?.Variables,
+                resolved?.Secrets), ct);
         return CreatedAtAction(nameof(GetNode), new { name = node.Name }, node);
     }
 

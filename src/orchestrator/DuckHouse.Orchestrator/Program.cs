@@ -2,6 +2,7 @@ using DuckHouse.Orchestrator.Application;
 using DuckHouse.Orchestrator.Endpoints;
 using DuckHouse.Orchestrator.Infrastructure;
 using DuckHouse.Orchestrator.Infrastructure.Data;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json.Serialization;
 
@@ -17,6 +18,11 @@ builder.Services.AddApplicationServices();
 builder.Services.AddInfrastructureServices(builder.Configuration);
 
 builder.AddNpgsqlDbContext<OrchestratorDbContext>("duckhouse-ui");
+builder.AddNpgsqlDbContext<DataProtectionKeyContext>("duckhouse-ui");
+
+builder.Services.AddDataProtection()
+    .PersistKeysToDbContext<DataProtectionKeyContext>()
+    .SetApplicationName("DuckHouse");
 
 builder.Services.ConfigureHttpJsonOptions(options =>
 {

@@ -12,7 +12,9 @@ public record UpdateNodePoolConfigRequest(
     TimeSpan? NodeIdleTimeout,
     string? KernelRequirements,
     string? Description,
-    List<Guid>? WheelPackageIds = null) : IRequest<NodePoolConfig?>;
+    List<Guid>? WheelPackageIds = null,
+    List<Guid>? EnvironmentVariableIds = null,
+    List<Guid>? SecretIds = null) : IRequest<NodePoolConfig?>;
 
 internal class UpdateNodePoolConfigHandler(INodePoolConfigRepository repository)
     : IRequestHandler<UpdateNodePoolConfigRequest, NodePoolConfig?>
@@ -37,6 +39,8 @@ internal class UpdateNodePoolConfigHandler(INodePoolConfigRepository repository)
             KernelRequirements = request.KernelRequirements,
             Description = request.Description,
             WheelPackageIds = request.WheelPackageIds,
+            EnvironmentVariableIds = request.EnvironmentVariableIds,
+            SecretIds = request.SecretIds,
             UpdatedAt = DateTime.UtcNow,
         };
 

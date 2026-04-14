@@ -94,6 +94,8 @@ public class OrchestratorDbContext(DbContextOptions<OrchestratorDbContext> optio
             entity.HasIndex(e => e.Name).IsUnique();
             entity.Property(e => e.VmSize).HasMaxLength(64).IsRequired();
             entity.Property(e => e.WheelPackageIds).HasColumnType("jsonb").HasConversion(GuidListJsonConverter);
+            entity.Property(e => e.EnvironmentVariableIds).HasColumnType("jsonb").HasConversion(GuidListJsonConverter);
+            entity.Property(e => e.SecretIds).HasColumnType("jsonb").HasConversion(GuidListJsonConverter);
         });
 
         modelBuilder.Entity<JobRun>(entity =>

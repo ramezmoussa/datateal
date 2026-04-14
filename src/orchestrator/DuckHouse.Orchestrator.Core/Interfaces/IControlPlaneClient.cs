@@ -10,6 +10,8 @@ public interface IControlPlaneClient
         TimeSpan? kernelIdleTimeout = null, TimeSpan? nodeIdleTimeout = null,
         string? kernelRequirements = null,
         IReadOnlyList<WheelContent>? wheelContents = null,
+        IReadOnlyDictionary<string, string>? environmentVariables = null,
+        IReadOnlyDictionary<string, string>? secrets = null,
         CancellationToken ct = default);
     Task<NodeInfo?> GetNodeAsync(string name, CancellationToken ct = default);
     Task DeleteNodeAsync(string name, CancellationToken ct = default);

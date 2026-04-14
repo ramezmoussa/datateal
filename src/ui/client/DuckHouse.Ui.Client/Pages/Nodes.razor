@@ -3,8 +3,10 @@
 @using DuckHouse.Core.Nodes
 @using DuckHouse.Ui.Client.Validation
 @using DuckHouse.Ui.Shared.Packages
+@using DuckHouse.Ui.Shared.Environment
 @inject INodeService NodeService
 @inject IWheelPackageService WheelPackageService
+@inject IEnvironmentService EnvironmentService
 
 <PageTitle>Nodes — DuckHouse</PageTitle>
 
@@ -172,6 +174,32 @@ else
                 Style="width: 100%;" />
         <Text Type="TextElementType.Secondary" Style="font-size: 0.8rem;">Custom .whl packages installed in the kernel venv at startup.</Text>
     </div>
+    <div style="margin-bottom: 16px;">
+        <label style="display: block; font-weight: 600; margin-bottom: 4px;">Environment variables</label>
+        <Select Mode="SelectMode.Multiple"
+                TItem="EnvironmentVariableDto"
+                TItemValue="Guid"
+                DataSource="_availableEnvVars"
+                LabelName="@nameof(EnvironmentVariableDto.Key)"
+                ValueName="@nameof(EnvironmentVariableDto.Id)"
+                @bind-Values="_createEnvVarIds"
+                Placeholder="Select environment variables"
+                Style="width: 100%;" />
+        <Text Type="TextElementType.Secondary" Style="font-size: 0.8rem;">Environment variables injected into the node container.</Text>
+    </div>
+    <div style="margin-bottom: 16px;">
+        <label style="display: block; font-weight: 600; margin-bottom: 4px;">Secrets</label>
+        <Select Mode="SelectMode.Multiple"
+                TItem="SecretDto"
+                TItemValue="Guid"
+                DataSource="_availableSecrets"
+                LabelName="@nameof(SecretDto.Key)"
+                ValueName="@nameof(SecretDto.Id)"
+                @bind-Values="_createSecretIds"
+                Placeholder="Select secrets"
+                Style="width: 100%;" />
+        <Text Type="TextElementType.Secondary" Style="font-size: 0.8rem;">Secrets injected as environment variables via Kubernetes Secrets.</Text>
+    </div>
     @if (_createError is not null)
     {
         <Alert Type="AlertType.Error" Message="@_createError" ShowIcon="true" Style="margin-bottom: 16px;" />
@@ -206,20 +234,37 @@ else
     private int? _createNodeIdleMinutes;
     private string? _createKernelReqs;
     private IEnumerable<Guid> _createWheelPackageIds = [];
+    private IEnumerable<Guid> _createEnvVarIds = [];
+    private IEnumerable<Guid> _createSecretIds = [];
     private bool _creating;
     private string? _createError;
 
     private List<WheelPackageDto> _availablePackages = [];
+    private List<EnvironmentVariableDto> _availableEnvVars = [];
+    private List<SecretDto> _availableSecrets = [];
 
     protected override async Task OnInitializedAsync()
     {
-        await Task.WhenAll(LoadNodesAsync(), LoadPackagesAsync());
+        await Task.WhenAll(LoadNodesAsync(), LoadPackagesAsync(), LoadEnvironmentAsync());
     }
 
     private async Task LoadPackagesAsync()
     {
         try { _availablePackages = [.. await WheelPackageService.GetPackagesAsync()]; }
         catch { /* non-fatal; packages selector will be empty */ }
+    }
+
+    private async Task LoadEnvironmentAsync()
+    {
+        try
+        {
+            var varsTask = EnvironmentService.GetVariablesAsync();
+            var secretsTask = EnvironmentService.GetSecretsAsync();
+            await Task.WhenAll(varsTask, secretsTask);
+            _availableEnvVars = [.. await varsTask];
+            _availableSecrets = [.. await secretsTask];
+        }
+        catch { /* non-fatal; selectors will be empty */ }
     }
 
     private async Task LoadNodesAsync()
@@ -248,6 +293,8 @@ else
         _createNodeIdleMinutes = null;
         _createKernelReqs = null;
         _createWheelPackageIds = [];
+        _createEnvVarIds = [];
+        _createSecretIds = [];
         _createError = null;
         _createOpen = true;
     }
@@ -266,7 +313,9 @@ else
                 _createKernelIdleMinutes is > 0 ? TimeSpan.FromMinutes(_createKernelIdleMinutes.Value) : null,
                 _createNodeIdleMinutes is > 0 ? TimeSpan.FromMinutes(_createNodeIdleMinutes.Value) : null,
                 string.IsNullOrWhiteSpace(_createKernelReqs) ? null : _createKernelReqs.Trim(),
-                _createWheelPackageIds.Any() ? [.. _createWheelPackageIds] : null);
+                _createWheelPackageIds.Any() ? [.. _createWheelPackageIds] : null,
+                _createEnvVarIds.Any() ? [.. _createEnvVarIds] : null,
+                _createSecretIds.Any() ? [.. _createSecretIds] : null);
             var node = await NodeService.CreateNodeAsync(request);
             _nodes.Add(node);
             _createOpen = false;

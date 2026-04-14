@@ -10,6 +10,8 @@ public class NodePoolConfig
     public string? KernelRequirements { get; set; }
     public string? Description { get; set; }
     public List<Guid>? WheelPackageIds { get; set; }
+    public List<Guid>? EnvironmentVariableIds { get; set; }
+    public List<Guid>? SecretIds { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 }

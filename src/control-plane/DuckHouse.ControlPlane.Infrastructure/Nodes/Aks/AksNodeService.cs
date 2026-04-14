@@ -133,6 +133,41 @@ public sealed class AksNodeService : INodeService
             await CreateWheelConfigMapsAsync(request.Name, wheels, volumes, volumeMounts, cancellationToken);
         }
 
+        // Build container environment variables
+        var envVars = new List<V1EnvVar>();
+
+        if (!string.IsNullOrWhiteSpace(request.KernelRequirements))
+            envVars.Add(new V1EnvVar { Name = "KERNEL_PACKAGES", Value = request.KernelRequirements });
+
+        if (request.EnvironmentVariables is { Count: > 0 })
+        {
+            foreach (var (key, value) in request.EnvironmentVariables)
+                envVars.Add(new V1EnvVar { Name = key, Value = value });
+        }
+
+        // Create Kubernetes Secret for sensitive values
+        if (request.Secrets is { Count: > 0 })
+        {
+            var secretName = $"env-{request.Name}";
+            await CreateKubernetesSecretAsync(secretName, request.Secrets, cancellationToken);
+
+            foreach (var key in request.Secrets.Keys)
+            {
+                envVars.Add(new V1EnvVar
+                {
+                    Name = key,
+                    ValueFrom = new V1EnvVarSource
+                    {
+                        SecretKeyRef = new V1SecretKeySelector
+                        {
+                            Name = secretName,
+                            Key = key,
+                        },
+                    },
+                });
+            }
+        }
+
         var pod = new V1Pod
         {
             Metadata = new V1ObjectMeta
@@ -158,9 +193,7 @@ public sealed class AksNodeService : INodeService
                         Name = "node",
                         Image = _options.RuntimeImage,
                         Ports = [new V1ContainerPort { ContainerPort = 8000 }],
-                        Env = string.IsNullOrWhiteSpace(request.KernelRequirements)
-                            ? null
-                            : [new V1EnvVar { Name = "KERNEL_PACKAGES", Value = request.KernelRequirements }],
+                        Env = envVars.Count > 0 ? envVars : null,
                         VolumeMounts = volumeMounts.Count > 0 ? volumeMounts : null,
                     },
                 ],
@@ -175,6 +208,11 @@ public sealed class AksNodeService : INodeService
         if (request.WheelContents is { Count: > 0 })
         {
             await SetConfigMapOwnerReferencesAsync(request.Name, created, cancellationToken);
+        }
+
+        if (request.Secrets is { Count: > 0 })
+        {
+            await SetSecretOwnerReferenceAsync($"env-{request.Name}", created, cancellationToken);
         }
 
         return new NodeInfo(
@@ -304,4 +342,40 @@ public sealed class AksNodeService : INodeService
 
     private static string WheelFileNameToKey(string fileName) =>
         System.Text.RegularExpressions.Regex.Replace(fileName, @"[^a-zA-Z0-9._-]", "_");
+
+    private async Task CreateKubernetesSecretAsync(
+        string secretName,
+        IReadOnlyDictionary<string, string> secrets,
+        CancellationToken cancellationToken)
+    {
+        var secret = new V1Secret
+        {
+            Metadata = new V1ObjectMeta
+            {
+                Name = secretName,
+                NamespaceProperty = Namespace,
+            },
+            StringData = new Dictionary<string, string>(secrets),
+        };
+
+        await _kubernetes.CoreV1.CreateNamespacedSecretAsync(secret, Namespace, cancellationToken: cancellationToken);
+        _logger.LogInformation("Created Secret {SecretName} with {Count} key(s)", secretName, secrets.Count);
+    }
+
+    private async Task SetSecretOwnerReferenceAsync(string secretName, V1Pod pod, CancellationToken cancellationToken)
+    {
+        var ownerRef = new V1OwnerReference
+        {
+            ApiVersion = "v1",
+            Kind = "Pod",
+            Name = pod.Metadata.Name,
+            Uid = pod.Metadata.Uid,
+            BlockOwnerDeletion = true,
+            Controller = false,
+        };
+
+        var secret = await _kubernetes.CoreV1.ReadNamespacedSecretAsync(secretName, Namespace, cancellationToken: cancellationToken);
+        secret.Metadata.OwnerReferences = [ownerRef];
+        await _kubernetes.CoreV1.ReplaceNamespacedSecretAsync(secret, secretName, Namespace, cancellationToken: cancellationToken);
+    }
 }

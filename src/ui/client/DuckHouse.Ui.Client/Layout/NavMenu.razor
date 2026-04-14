@@ -25,6 +25,10 @@
         <Icon Type="@IconType.Outline.Cluster" />
         <span>Node pools</span>
     </MenuItem>
+    <MenuItem Key="environment" OnClick="@(() => Navigation.NavigateTo("/environment"))">
+        <Icon Type="@IconType.Outline.Key" />
+        <span>Environment</span>
+    </MenuItem>
     <MenuItem Key="packages" OnClick="@(() => Navigation.NavigateTo("/packages"))">
         <Icon Type="@IconType.Outline.CodeSandbox" />
         <span>Packages</span>
@@ -70,6 +74,7 @@
             _ when path.StartsWith("/jobs") => ["jobs"],
             _ when path.StartsWith("/runs") => ["jobs"],
             _ when path.StartsWith("/node-pools") => ["node-pools"],
+            _ when path.StartsWith("/environment") => ["environment"],
             _ when path.StartsWith("/packages") => ["packages"],
             _ when path.StartsWith("/settings") => ["settings"],
             _ => []

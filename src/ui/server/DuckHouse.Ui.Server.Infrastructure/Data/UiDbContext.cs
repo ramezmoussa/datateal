@@ -1,14 +1,19 @@
 namespace DuckHouse.Ui.Server.Infrastructure.Data;
 
+using DuckHouse.Ui.Server.Core.Environment;
 using DuckHouse.Ui.Server.Core.RuntimePackages;
 using DuckHouse.Ui.Server.Core.Workspace;
+using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
-public class UiDbContext(DbContextOptions<UiDbContext> options) : DbContext(options)
+public class UiDbContext(DbContextOptions<UiDbContext> options) : DbContext(options), IDataProtectionKeyContext
 {
     public DbSet<Folder> Folders => Set<Folder>();
     public DbSet<WorkspaceItem> WorkspaceItems => Set<WorkspaceItem>();
     public DbSet<WheelPackage> WheelPackages => Set<WheelPackage>();
+    public DbSet<EnvironmentVariable> EnvironmentVariables => Set<EnvironmentVariable>();
+    public DbSet<Secret> Secrets => Set<Secret>();
+    public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -51,6 +56,24 @@ public class UiDbContext(DbContextOptions<UiDbContext> options) : DbContext(opti
             entity.Property(e => e.FileName).HasMaxLength(512).IsRequired();
             entity.Property(e => e.Data).IsRequired();
             entity.HasIndex(e => e.Name).IsUnique();
+        });
+
+        modelBuilder.Entity<EnvironmentVariable>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Key).HasMaxLength(256).IsRequired();
+            entity.Property(e => e.Value).IsRequired();
+            entity.Property(e => e.Description).HasMaxLength(1024);
+            entity.HasIndex(e => e.Key).IsUnique();
+        });
+
+        modelBuilder.Entity<Secret>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Key).HasMaxLength(256).IsRequired();
+            entity.Property(e => e.EncryptedValue).IsRequired();
+            entity.Property(e => e.Description).HasMaxLength(1024);
+            entity.HasIndex(e => e.Key).IsUnique();
         });
     }
 }

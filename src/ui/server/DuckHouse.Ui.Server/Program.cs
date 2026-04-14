@@ -4,6 +4,7 @@ using DuckHouse.Ui.Server.Application;
 using DuckHouse.Ui.Server.Components;
 using DuckHouse.Ui.Server.Infrastructure;
 using DuckHouse.Ui.Server.Infrastructure.Data;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -23,6 +24,10 @@ builder.Services.AddProblemDetails();
 
 builder.Services.AddApplicationServices();
 builder.Services.AddInfrastructureServices(builder.Configuration);
+
+builder.Services.AddDataProtection()
+    .PersistKeysToDbContext<UiDbContext>()
+    .SetApplicationName("DuckHouse");
 
 builder.AddNpgsqlDbContext<UiDbContext>("duckhouse-ui");
 

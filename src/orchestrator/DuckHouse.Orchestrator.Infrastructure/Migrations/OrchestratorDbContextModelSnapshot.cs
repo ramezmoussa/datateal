@@ -233,6 +233,9 @@ namespace DuckHouse.Orchestrator.Infrastructure.Migrations
                     b.Property<string>("Description")
                         .HasColumnType("text");
 
+                    b.Property<string>("EnvironmentVariableIds")
+                        .HasColumnType("jsonb");
+
                     b.Property<TimeSpan?>("KernelIdleTimeout")
                         .HasColumnType("interval");
 
@@ -246,6 +249,9 @@ namespace DuckHouse.Orchestrator.Infrastructure.Migrations
 
                     b.Property<TimeSpan?>("NodeIdleTimeout")
                         .HasColumnType("interval");
+
+                    b.Property<string>("SecretIds")
+                        .HasColumnType("jsonb");
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");

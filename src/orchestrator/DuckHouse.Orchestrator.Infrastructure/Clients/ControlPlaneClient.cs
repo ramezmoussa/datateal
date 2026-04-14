@@ -23,10 +23,13 @@ internal class ControlPlaneClient(IHttpClientFactory httpClientFactory) : IContr
         TimeSpan? kernelIdleTimeout, TimeSpan? nodeIdleTimeout,
         string? kernelRequirements,
         IReadOnlyList<WheelContent>? wheelContents,
+        IReadOnlyDictionary<string, string>? environmentVariables,
+        IReadOnlyDictionary<string, string>? secrets,
         CancellationToken ct)
     {
         using var client = CreateClient();
-        var request = new CreateNodeRequest(name, vmSize, kernelIdleTimeout, nodeIdleTimeout, kernelRequirements, wheelContents);
+        var request = new CreateNodeRequest(name, vmSize, kernelIdleTimeout, nodeIdleTimeout, kernelRequirements, wheelContents,
+            environmentVariables, secrets);
         var response = await client.PostAsJsonAsync("/nodes", request, JsonOptions, ct);
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<NodeInfo>(JsonOptions, ct))!;
