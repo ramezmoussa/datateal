@@ -30,6 +30,11 @@ public class YamlJobImporter(
         if (string.IsNullOrWhiteSpace(model.Name))
             throw new InvalidOperationException("Job name is required.");
 
+        // Validate unique job name across all jobs.
+        var nameConflict = await jobRepository.GetJobByNameAsync(model.Name, ct);
+        if (nameConflict is not null)
+            throw new JobNameConflictException(model.Name);
+
         // Create or update node pool configs
         foreach (var pool in model.NodePools)
         {

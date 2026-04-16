@@ -30,6 +30,7 @@ internal class JobService(HttpClient httpClient) : IJobService
     public async Task<JobSummary> CreateJobAsync(CreateJobRequest request, CancellationToken ct)
     {
         var response = await httpClient.PostAsJsonAsync("api/orchestrator/jobs", request, JsonOptions, ct);
+        await EnsureNoJobErrorAsync(response, ct);
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<JobSummary>(JsonOptions, ct))!;
     }
@@ -38,6 +39,7 @@ internal class JobService(HttpClient httpClient) : IJobService
     {
         var response = await httpClient.PutAsJsonAsync($"api/orchestrator/jobs/{id}", request, JsonOptions, ct);
         if (response.StatusCode == HttpStatusCode.NotFound) return null;
+        await EnsureNoJobErrorAsync(response, ct);
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadFromJsonAsync<JobSummary>(JsonOptions, ct);
     }
@@ -119,7 +121,29 @@ internal class JobService(HttpClient httpClient) : IJobService
     public async Task<JobSummary> ImportJobAsync(string yaml, CancellationToken ct)
     {
         var response = await httpClient.PostAsJsonAsync("api/orchestrator/jobs/import", new { yaml }, JsonOptions, ct);
+        await EnsureNoJobErrorAsync(response, ct);
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<JobSummary>(JsonOptions, ct))!;
     }
+
+    /// <summary>
+    /// Reads the <c>{ "error": "..." }</c> body from 400 Bad Request and 409 Conflict responses
+    /// and throws <see cref="InvalidOperationException"/> with that message so callers display it correctly.
+    /// </summary>
+    private static async Task EnsureNoJobErrorAsync(HttpResponseMessage response, CancellationToken ct)
+    {
+        if (response.StatusCode is not (HttpStatusCode.BadRequest or HttpStatusCode.Conflict)) return;
+
+        string? message = null;
+        try
+        {
+            var body = await response.Content.ReadFromJsonAsync<JobErrorBody>(JsonOptions, ct);
+            message = body?.Error;
+        }
+        catch { /* fall through to default message */ }
+
+        throw new InvalidOperationException(message ?? "The operation failed. Please check the job configuration.");
+    }
+
+    private sealed record JobErrorBody(string? Error);
 }

@@ -35,6 +35,19 @@ internal class CreateJobHandler(IJobRepository jobRepository) : IRequestHandler<
 {
     public async Task<Job> Handle(CreateJobRequest request, CancellationToken cancellationToken)
     {
+        // Validate unique task names in the submitted task list.
+        var taskNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var t in request.Tasks ?? [])
+        {
+            if (!taskNames.Add(t.Name))
+                throw new InvalidOperationException($"Duplicate task name: \"{t.Name}\". Task names must be unique within a job.");
+        }
+
+        // Validate unique job name across all jobs.
+        var existing = await jobRepository.GetJobByNameAsync(request.Name, cancellationToken);
+        if (existing is not null)
+            throw new JobNameConflictException(request.Name);
+
         var job = new Job
         {
             Id = Guid.NewGuid(),

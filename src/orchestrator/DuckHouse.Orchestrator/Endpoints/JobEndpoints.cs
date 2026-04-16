@@ -1,6 +1,7 @@
 using DuckHouse.Core.Mediator;
 using DuckHouse.Orchestrator.Application.Mediator.Commands;
 using DuckHouse.Orchestrator.Application.Mediator.Queries;
+using DuckHouse.Orchestrator.Core.Entities;
 
 namespace DuckHouse.Orchestrator.Endpoints;
 
@@ -28,6 +29,10 @@ public static class JobEndpoints
                 var job = await mediator.SendAsync(request, ct);
                 return Results.Created($"/api/jobs/{job.Id}", job);
             }
+            catch (JobNameConflictException ex)
+            {
+                return Results.Conflict(new { error = ex.Message });
+            }
             catch (InvalidOperationException ex)
             {
                 return Results.BadRequest(new { error = ex.Message });
@@ -42,6 +47,10 @@ public static class JobEndpoints
                 var updated = request with { Id = id };
                 var job = await mediator.SendAsync(updated, ct);
                 return job is null ? Results.NotFound() : Results.Ok(job);
+            }
+            catch (JobNameConflictException ex)
+            {
+                return Results.Conflict(new { error = ex.Message });
             }
             catch (InvalidOperationException ex)
             {
@@ -109,6 +118,10 @@ public static class JobEndpoints
             {
                 var job = await mediator.SendAsync(new ImportJobRequest(body.Yaml), ct);
                 return Results.Created($"/api/jobs/{job.Id}", job);
+            }
+            catch (JobNameConflictException ex)
+            {
+                return Results.Conflict(new { error = ex.Message });
             }
             catch (InvalidOperationException ex)
             {

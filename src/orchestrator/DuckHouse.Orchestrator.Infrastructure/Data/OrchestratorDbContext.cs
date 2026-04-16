@@ -49,6 +49,7 @@ public class OrchestratorDbContext(DbContextOptions<OrchestratorDbContext> optio
         {
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Name).HasMaxLength(256).IsRequired();
+            entity.HasIndex(e => new { e.JobId, e.Name }).IsUnique();
             entity.HasDiscriminator<string>("TaskType")
                 .HasValue<NotebookTask>("Notebook")
                 .HasValue<SqlQueryTask>("SqlQuery")

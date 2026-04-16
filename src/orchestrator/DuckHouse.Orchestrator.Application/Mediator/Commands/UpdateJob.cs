@@ -40,6 +40,22 @@ internal class UpdateJobHandler(IJobRepository jobRepository) : IRequestHandler<
         var existing = await jobRepository.GetJobAsync(request.Id, cancellationToken);
         if (existing is null) return null;
 
+        // Validate unique task names in the submitted task list.
+        var taskNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var t in request.Tasks ?? [])
+        {
+            if (!taskNames.Add(t.Name))
+                throw new InvalidOperationException($"Duplicate task name: \"{t.Name}\". Task names must be unique within a job.");
+        }
+
+        // Validate unique job name — exclude this job from the check.
+        if (!string.Equals(existing.Name, request.Name, StringComparison.OrdinalIgnoreCase))
+        {
+            var nameConflict = await jobRepository.GetJobByNameAsync(request.Name, cancellationToken);
+            if (nameConflict is not null)
+                throw new JobNameConflictException(request.Name);
+        }
+
         // Update top-level settings
         existing.Name = request.Name;
         existing.Description = request.Description;
