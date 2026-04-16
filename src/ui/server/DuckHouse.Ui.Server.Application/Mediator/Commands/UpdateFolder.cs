@@ -1,5 +1,6 @@
 using DuckHouse.Core.Mediator;
 using DuckHouse.Ui.Server.Core.Repositories;
+using DuckHouse.Ui.Server.Core.Workspace;
 using DuckHouse.Ui.Shared.Workspace;
 
 namespace DuckHouse.Ui.Server.Application.Mediator.Commands;
@@ -10,6 +11,8 @@ internal class UpdateFolderHandler(IWorkspaceRepository repository) : IRequestHa
 {
     public async Task<FolderSummary?> Handle(UpdateFolderRequest request, CancellationToken cancellationToken)
     {
+        WorkspaceNameValidationException.ValidateNoSlash(request.Name);
+
         // Prevent cycles: walk up the proposed parent chain and reject if we encounter the folder itself.
         if (request.ParentId == request.Id)
             throw new InvalidOperationException("A folder cannot be its own parent.");

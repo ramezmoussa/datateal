@@ -393,7 +393,13 @@
 
     private void CommitTitleEdit()
     {
-        _title = string.IsNullOrWhiteSpace(_editingTitleValue) ? "Untitled Query" : _editingTitleValue;
+        var value = string.IsNullOrWhiteSpace(_editingTitleValue) ? "Untitled Query" : _editingTitleValue;
+        if (value.Contains('/'))
+        {
+            _error = "Query title cannot contain '/'.";
+            return;
+        }
+        _title = value;
         _isDirty = true;
         _editingTitle = false;
     }

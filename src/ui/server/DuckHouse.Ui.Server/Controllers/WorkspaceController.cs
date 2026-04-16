@@ -34,15 +34,29 @@ public class WorkspaceController(IMediator mediator) : ControllerBase
     [HttpPost("folders")]
     public async Task<IActionResult> CreateFolder(SharedWorkspace.CreateFolderRequest body, CancellationToken ct)
     {
-        var folder = await mediator.SendAsync(new Cmd.CreateFolderRequest(body.Name, body.ParentId), ct);
-        return CreatedAtAction(nameof(GetFolder), new { id = folder.Id }, folder);
+        try
+        {
+            var folder = await mediator.SendAsync(new Cmd.CreateFolderRequest(body.Name, body.ParentId), ct);
+            return CreatedAtAction(nameof(GetFolder), new { id = folder.Id }, folder);
+        }
+        catch (WorkspaceNameValidationException ex)
+        {
+            return BadRequest(new ProblemDetails { Status = 400, Title = "Invalid name", Detail = ex.Message });
+        }
     }
 
     [HttpPut("folders/{id:guid}")]
     public async Task<IActionResult> UpdateFolder(Guid id, SharedWorkspace.UpdateFolderRequest body, CancellationToken ct)
     {
-        var folder = await mediator.SendAsync(new Cmd.UpdateFolderRequest(id, body.Name, body.ParentId), ct);
-        return folder is null ? NotFound() : Ok(folder);
+        try
+        {
+            var folder = await mediator.SendAsync(new Cmd.UpdateFolderRequest(id, body.Name, body.ParentId), ct);
+            return folder is null ? NotFound() : Ok(folder);
+        }
+        catch (WorkspaceNameValidationException ex)
+        {
+            return BadRequest(new ProblemDetails { Status = 400, Title = "Invalid name", Detail = ex.Message });
+        }
     }
 
     [HttpDelete("folders/{id:guid}")]
@@ -67,6 +81,10 @@ public class WorkspaceController(IMediator mediator) : ControllerBase
             var notebook = await mediator.SendAsync(new Cmd.CreateNotebookRequest(body.Title, body.Content, body.FolderId), ct);
             return CreatedAtAction(nameof(GetNotebook), new { id = notebook.Id }, notebook);
         }
+        catch (WorkspaceNameValidationException ex)
+        {
+            return BadRequest(new ProblemDetails { Status = 400, Title = "Invalid name", Detail = ex.Message });
+        }
         catch (WorkspaceTitleConflictException ex)
         {
             return Conflict(new ProblemDetails { Status = 409, Title = "Title conflict", Detail = ex.Message });
@@ -80,6 +98,10 @@ public class WorkspaceController(IMediator mediator) : ControllerBase
         {
             var notebook = await mediator.SendAsync(new Cmd.UpdateNotebookRequest(id, body.Title, body.Content, body.FolderId), ct);
             return notebook is null ? NotFound() : Ok(notebook);
+        }
+        catch (WorkspaceNameValidationException ex)
+        {
+            return BadRequest(new ProblemDetails { Status = 400, Title = "Invalid name", Detail = ex.Message });
         }
         catch (WorkspaceTitleConflictException ex)
         {
@@ -109,6 +131,10 @@ public class WorkspaceController(IMediator mediator) : ControllerBase
             var query = await mediator.SendAsync(new Cmd.CreateQueryRequest(body.Title, body.Content, body.FolderId), ct);
             return CreatedAtAction(nameof(GetQuery), new { id = query.Id }, query);
         }
+        catch (WorkspaceNameValidationException ex)
+        {
+            return BadRequest(new ProblemDetails { Status = 400, Title = "Invalid name", Detail = ex.Message });
+        }
         catch (WorkspaceTitleConflictException ex)
         {
             return Conflict(new ProblemDetails { Status = 409, Title = "Title conflict", Detail = ex.Message });
@@ -122,6 +148,10 @@ public class WorkspaceController(IMediator mediator) : ControllerBase
         {
             var query = await mediator.SendAsync(new Cmd.UpdateQueryRequest(id, body.Title, body.Content, body.FolderId), ct);
             return query is null ? NotFound() : Ok(query);
+        }
+        catch (WorkspaceNameValidationException ex)
+        {
+            return BadRequest(new ProblemDetails { Status = 400, Title = "Invalid name", Detail = ex.Message });
         }
         catch (WorkspaceTitleConflictException ex)
         {

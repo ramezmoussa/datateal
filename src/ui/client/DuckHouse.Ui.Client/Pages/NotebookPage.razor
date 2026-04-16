@@ -269,7 +269,13 @@
 
     private void CommitTitleEdit()
     {
-        _notebook.Title = string.IsNullOrWhiteSpace(_editingTitleValue) ? "Untitled" : _editingTitleValue;
+        var value = string.IsNullOrWhiteSpace(_editingTitleValue) ? "Untitled" : _editingTitleValue;
+        if (value.Contains('/'))
+        {
+            _error = "Notebook title cannot contain '/'.";
+            return;
+        }
+        _notebook.Title = value;
         _notebook.IsDirty = true;
         _editingTitle = false;
     }

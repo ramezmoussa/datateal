@@ -11,6 +11,7 @@ internal class UpdateNotebookHandler(IWorkspaceRepository repository) : IRequest
 {
     public async Task<NotebookSummary?> Handle(UpdateNotebookRequest request, CancellationToken cancellationToken)
     {
+        WorkspaceNameValidationException.ValidateNoSlash(request.Title);
         if (await repository.WorkspaceItemTitleExistsAsync(request.Title, request.FolderId, excludeId: request.Id, cancellationToken: cancellationToken))
             throw new WorkspaceTitleConflictException(request.Title, request.FolderId is null ? "the root folder" : "this folder");
 

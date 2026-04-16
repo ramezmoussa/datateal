@@ -70,9 +70,13 @@ else
                    Style="width: 220px;"
                    OnPressEnter="@(_ => ConfirmNewFolderAsync())" />
             <Button Size="ButtonSize.Small" Type="ButtonType.Primary" OnClick="ConfirmNewFolderAsync"
-                    Disabled="@string.IsNullOrWhiteSpace(_newFolderName)">Create</Button>
+                    Disabled="@(string.IsNullOrWhiteSpace(_newFolderName) || _newFolderName.Contains('/'))">Create</Button>
             <Button Size="ButtonSize.Small" OnClick="CancelNewFolder">Cancel</Button>
         </Flex>
+        @if (_newFolderName.Contains('/'))
+        {
+            <span style="font-size: 0.75rem; color: #ff4d4f; margin-bottom: 8px; display: block;">Folder name cannot contain '/'.</span>
+        }
     }
 
     @* Combined folders + notebooks + queries table *@
@@ -214,8 +218,12 @@ else
        OnOk="ConfirmRenameFolderAsync"
        OnCancel="CancelRenameFolder"
        OkText="@("Rename")"
-       OkButtonProps="@(new ButtonProps { Disabled = string.IsNullOrWhiteSpace(_renameFolderName) })">
+       OkButtonProps="@(new ButtonProps { Disabled = string.IsNullOrWhiteSpace(_renameFolderName) || _renameFolderName.Contains('/') })">
     <Input @bind-Value="_renameFolderName" Placeholder="Folder name" />
+    @if (_renameFolderName.Contains('/'))
+    {
+        <span style="font-size: 0.75rem; color: #ff4d4f; margin-top: 4px; display: block;">Folder name cannot contain '/'.</span>
+    }
 </Modal>
 
 @* Rename notebook modal *@
@@ -224,8 +232,12 @@ else
        OnOk="ConfirmRenameNotebookAsync"
        OnCancel="CancelRenameNotebook"
        OkText="@("Rename")"
-       OkButtonProps="@(new ButtonProps { Disabled = string.IsNullOrWhiteSpace(_renameNotebookName) })">
+       OkButtonProps="@(new ButtonProps { Disabled = string.IsNullOrWhiteSpace(_renameNotebookName) || _renameNotebookName.Contains('/') })">
     <Input @bind-Value="_renameNotebookName" Placeholder="Notebook title" />
+    @if (_renameNotebookName.Contains('/'))
+    {
+        <span style="font-size: 0.75rem; color: #ff4d4f; margin-top: 4px; display: block;">Notebook title cannot contain '/'.</span>
+    }
 </Modal>
 
 @* Rename query modal *@
@@ -234,8 +246,12 @@ else
        OnOk="ConfirmRenameQueryAsync"
        OnCancel="CancelRenameQuery"
        OkText="@("Rename")"
-       OkButtonProps="@(new ButtonProps { Disabled = string.IsNullOrWhiteSpace(_renameQueryName) })">
+       OkButtonProps="@(new ButtonProps { Disabled = string.IsNullOrWhiteSpace(_renameQueryName) || _renameQueryName.Contains('/') })">
     <Input @bind-Value="_renameQueryName" Placeholder="Query title" />
+    @if (_renameQueryName.Contains('/'))
+    {
+        <span style="font-size: 0.75rem; color: #ff4d4f; margin-top: 4px; display: block;">Query title cannot contain '/'.</span>
+    }
 </Modal>
 
 @* Move folder picker *@

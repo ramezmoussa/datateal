@@ -11,6 +11,7 @@ internal class CreateNotebookHandler(IWorkspaceRepository repository) : IRequest
 {
     public async Task<NotebookSummary> Handle(CreateNotebookRequest request, CancellationToken cancellationToken)
     {
+        WorkspaceNameValidationException.ValidateNoSlash(request.Title);
         if (await repository.WorkspaceItemTitleExistsAsync(request.Title, request.FolderId, cancellationToken: cancellationToken))
             throw new WorkspaceTitleConflictException(request.Title, request.FolderId is null ? "the root folder" : "this folder");
 

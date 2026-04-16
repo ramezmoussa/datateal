@@ -1,5 +1,6 @@
 using DuckHouse.Core.Mediator;
 using DuckHouse.Ui.Server.Core.Repositories;
+using DuckHouse.Ui.Server.Core.Workspace;
 using DuckHouse.Ui.Shared.Workspace;
 
 namespace DuckHouse.Ui.Server.Application.Mediator.Commands;
@@ -10,6 +11,7 @@ internal class CreateFolderHandler(IWorkspaceRepository repository) : IRequestHa
 {
     public async Task<FolderSummary> Handle(CreateFolderRequest request, CancellationToken cancellationToken)
     {
+        WorkspaceNameValidationException.ValidateNoSlash(request.Name);
         var folder = await repository.CreateFolderAsync(request.Name, request.ParentId, cancellationToken);
         return new FolderSummary(folder.Id, folder.Name, folder.ParentId, folder.CreatedAt);
     }
