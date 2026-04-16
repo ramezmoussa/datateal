@@ -38,6 +38,8 @@ internal class NodePoolConfigRepository(OrchestratorDbContext db) : INodePoolCon
         existing.KernelRequirements = config.KernelRequirements;
         existing.Description = config.Description;
         existing.WheelPackageIds = config.WheelPackageIds;
+        existing.EnvironmentVariableIds = config.EnvironmentVariableIds;
+        existing.SecretIds = config.SecretIds;
         existing.UpdatedAt = DateTime.UtcNow;
 
         await db.SaveChangesAsync(cancellationToken);

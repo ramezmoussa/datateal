@@ -56,8 +56,10 @@ public class NodeManager(
             config.EnvironmentVariableIds, config.SecretIds, ct);
 
         await controlPlane.CreateNodeAsync(
-            nodeName, config.VmSize,
-            config.KernelIdleTimeout, config.NodeIdleTimeout,
+            nodeName,
+            config.VmSize,
+            config.KernelIdleTimeout,
+            config.NodeIdleTimeout,
             config.KernelRequirements,
             wheelContents,
             resolved.Variables.Count > 0 ? resolved.Variables : null,

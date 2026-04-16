@@ -6,12 +6,15 @@ namespace DuckHouse.Orchestrator.Core.Interfaces;
 public interface IControlPlaneClient
 {
     // Nodes
-    Task<NodeInfo> CreateNodeAsync(string name, string vmSize,
-        TimeSpan? kernelIdleTimeout = null, TimeSpan? nodeIdleTimeout = null,
-        string? kernelRequirements = null,
-        IReadOnlyList<WheelContent>? wheelContents = null,
-        IReadOnlyDictionary<string, string>? environmentVariables = null,
-        IReadOnlyDictionary<string, string>? secrets = null,
+    Task<NodeInfo> CreateNodeAsync(
+        string name,
+        string vmSize,
+        TimeSpan? kernelIdleTimeout,
+        TimeSpan? nodeIdleTimeout,
+        string? kernelRequirements,
+        IReadOnlyList<WheelContent>? wheelContents,
+        IReadOnlyDictionary<string, string>? environmentVariables,
+        IReadOnlyDictionary<string, string>? secrets,
         CancellationToken ct = default);
     Task<NodeInfo?> GetNodeAsync(string name, CancellationToken ct = default);
     Task DeleteNodeAsync(string name, CancellationToken ct = default);

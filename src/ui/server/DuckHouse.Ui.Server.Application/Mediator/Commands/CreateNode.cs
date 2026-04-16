@@ -7,12 +7,12 @@ namespace DuckHouse.Ui.Server.Application.Mediator.Commands;
 public record CreateNodeRequest(
     string Name,
     string VmSize,
-    TimeSpan? KernelIdleTimeout = null,
-    TimeSpan? NodeIdleTimeout = null,
-    string? KernelRequirements = null,
-    IReadOnlyList<WheelContent>? WheelContents = null,
-    IReadOnlyDictionary<string, string>? EnvironmentVariables = null,
-    IReadOnlyDictionary<string, string>? Secrets = null) : IRequest<NodeInfo>;
+    TimeSpan? KernelIdleTimeout,
+    TimeSpan? NodeIdleTimeout,
+    string? KernelRequirements,
+    IReadOnlyList<WheelContent>? WheelContents,
+    IReadOnlyDictionary<string, string>? EnvironmentVariables,
+    IReadOnlyDictionary<string, string>? Secrets) : IRequest<NodeInfo>;
 
 internal class CreateNodeHandler(INodeRepository nodeRepository) : IRequestHandler<CreateNodeRequest, NodeInfo>
 {

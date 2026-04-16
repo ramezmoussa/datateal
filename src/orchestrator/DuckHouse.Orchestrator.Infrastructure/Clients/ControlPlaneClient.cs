@@ -19,8 +19,11 @@ internal class ControlPlaneClient(IHttpClientFactory httpClientFactory) : IContr
 
     // ── Nodes ───────────────────────────────────────────────────────
 
-    public async Task<NodeInfo> CreateNodeAsync(string name, string vmSize,
-        TimeSpan? kernelIdleTimeout, TimeSpan? nodeIdleTimeout,
+    public async Task<NodeInfo> CreateNodeAsync(
+        string name,
+        string vmSize,
+        TimeSpan? kernelIdleTimeout,
+        TimeSpan? nodeIdleTimeout,
         string? kernelRequirements,
         IReadOnlyList<WheelContent>? wheelContents,
         IReadOnlyDictionary<string, string>? environmentVariables,
@@ -28,7 +31,13 @@ internal class ControlPlaneClient(IHttpClientFactory httpClientFactory) : IContr
         CancellationToken ct)
     {
         using var client = CreateClient();
-        var request = new CreateNodeRequest(name, vmSize, kernelIdleTimeout, nodeIdleTimeout, kernelRequirements, wheelContents,
+        var request = new CreateNodeRequest(
+            name,
+            vmSize,
+            kernelIdleTimeout,
+            nodeIdleTimeout,
+            kernelRequirements,
+            wheelContents,
             environmentVariables, secrets);
         var response = await client.PostAsJsonAsync("/nodes", request, JsonOptions, ct);
         response.EnsureSuccessStatusCode();

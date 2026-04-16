@@ -10,11 +10,13 @@ namespace DuckHouse.ControlPlane.Application.Mediator.Commands;
 
 public record CreateNodeRequest(
     string Name,
-    string? VmSize = null,
-    TimeSpan? KernelIdleTimeout = null,
-    TimeSpan? NodeIdleTimeout = null,
-    string? KernelRequirements = null,
-    IReadOnlyList<WheelContent>? WheelContents = null) : IRequest<NodeInfo>;
+    string? VmSize,
+    TimeSpan? KernelIdleTimeout,
+    TimeSpan? NodeIdleTimeout,
+    string? KernelRequirements,
+    IReadOnlyList<WheelContent>? WheelContents,
+    IReadOnlyDictionary<string, string>? EnvironmentVariables,
+    IReadOnlyDictionary<string, string>? Secrets) : IRequest<NodeInfo>;
 
 internal class CreateNodeHandler(
     INodeService nodeService,
@@ -36,7 +38,9 @@ internal class CreateNodeHandler(
         var node = await nodeService.CreateNodeAsync(
             new DuckHouse.Core.Nodes.CreateNodeRequest(request.Name, request.VmSize,
                 KernelRequirements: request.KernelRequirements,
-                WheelContents: request.WheelContents),
+                WheelContents: request.WheelContents,
+                EnvironmentVariables: request.EnvironmentVariables,
+                Secrets: request.Secrets),
             cancellationToken);
 
         return node;

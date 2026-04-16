@@ -11,9 +11,9 @@ public record CreateNodePoolConfigRequest(
     TimeSpan? NodeIdleTimeout,
     string? KernelRequirements,
     string? Description,
-    List<Guid>? WheelPackageIds = null,
-    List<Guid>? EnvironmentVariableIds = null,
-    List<Guid>? SecretIds = null) : IRequest<NodePoolConfig>;
+    List<Guid>? WheelPackageIds,
+    List<Guid>? EnvironmentVariableIds,
+    List<Guid>? SecretIds) : IRequest<NodePoolConfig>;
 
 internal class CreateNodePoolConfigHandler(INodePoolConfigRepository repository)
     : IRequestHandler<CreateNodePoolConfigRequest, NodePoolConfig>
