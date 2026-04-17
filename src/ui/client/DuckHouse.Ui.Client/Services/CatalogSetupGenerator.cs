@@ -9,7 +9,8 @@ namespace DuckHouse.Ui.Client.Services;
 public static class CatalogSetupGenerator
 {
     /// <summary>
-    /// Generates the complete setup script for the given resolved catalogs.
+    /// Generates the complete setup script for the given resolved catalogs as Python code
+    /// that runs DuckDB commands via <c>duckdb.execute()</c>, matching the kernel's Python environment.
     /// </summary>
     public static string GenerateSetupScript(IReadOnlyList<ResolvedCatalogDto> catalogs, bool isLinux = false)
     {
@@ -17,59 +18,56 @@ public static class CatalogSetupGenerator
 
         var sb = new StringBuilder();
 
-        // Extension installations
-        sb.AppendLine("INSTALL ducklake;");
-        sb.AppendLine("LOAD ducklake;");
+        sb.AppendLine("import duckdb");
+        sb.AppendLine("duckdb.execute(\"INSTALL ducklake\")");
+        sb.AppendLine("duckdb.execute(\"LOAD ducklake\")");
 
         var anyAzure = catalogs.Any(c => c.StorageConnectionString is not null);
         if (anyAzure)
         {
-            sb.AppendLine("INSTALL azure;");
-            sb.AppendLine("LOAD azure;");
+            sb.AppendLine("duckdb.execute(\"INSTALL azure\")");
+            sb.AppendLine("duckdb.execute(\"LOAD azure\")");
 
             if (isLinux)
-                sb.AppendLine("SET azure_transport_option_type = 'curl';");
+                sb.AppendLine("duckdb.execute(\"SET azure_transport_option_type = 'curl'\")");
         }
 
-        // Secrets and attachments for each catalog
         for (var i = 0; i < catalogs.Count; i++)
         {
             var catalog = catalogs[i];
             var suffix = catalogs.Count > 1 ? $"_{catalog.Name}" : "";
 
-            // Azure storage secret (if applicable)
             if (catalog.StorageConnectionString is not null)
             {
-                sb.AppendLine($"""
-                    CREATE SECRET secret{suffix}_storage (
-                        TYPE azure,
-                        CONNECTION_STRING '{EscapeSql(catalog.StorageConnectionString)}',
-                        SCOPE '{GetAzureScope(catalog.DataPath)}'
-                    );
-                    """);
+                var azureSecret = $"CREATE SECRET secret{suffix}_storage (" +
+                    $"TYPE azure, " +
+                    $"CONNECTION_STRING '{EscapeSql(catalog.StorageConnectionString)}', " +
+                    $"SCOPE '{GetAzureScope(catalog.DataPath)}'" +
+                    $")";
+                sb.AppendLine($"duckdb.execute(\"\"\"{EscapePython(azureSecret)}\"\"\")");
             }
 
-            // Postgres catalog secret
-            sb.AppendLine($"""
-                CREATE SECRET secret{suffix}_pg (
-                    TYPE postgres,
-                    HOST '{EscapeSql(catalog.CatalogHost)}',
-                    PORT {catalog.CatalogPort},
-                    DATABASE '{EscapeSql(catalog.CatalogDatabase)}',
-                    USER '{EscapeSql(catalog.CatalogUser)}',
-                    PASSWORD '{EscapeSql(catalog.CatalogPassword)}',
-                    SCOPE 'postgres://{EscapeSql(catalog.CatalogHost)}:{catalog.CatalogPort}/{EscapeSql(catalog.CatalogDatabase)}'
-                );
-                """);
+            var pgSecret = $"CREATE SECRET secret{suffix}_pg (" +
+                $"TYPE postgres, " +
+                $"HOST '{EscapeSql(catalog.CatalogHost)}', " +
+                $"PORT {catalog.CatalogPort}, " +
+                $"DATABASE '{EscapeSql(catalog.CatalogDatabase)}', " +
+                $"USER '{EscapeSql(catalog.CatalogUser)}', " +
+                $"PASSWORD '{EscapeSql(catalog.CatalogPassword)}', " +
+                $"SCOPE 'postgres://{EscapeSql(catalog.CatalogHost)}:{catalog.CatalogPort}/{EscapeSql(catalog.CatalogDatabase)}'" +
+                $")";
+            sb.AppendLine($"duckdb.execute(\"\"\"{EscapePython(pgSecret)}\"\"\")");
 
-            // Attach the catalog
-            sb.AppendLine($"ATTACH 'ducklake:postgres:' AS {catalog.Name} (DATA_PATH '{EscapeSql(catalog.DataPath)}');");
+            sb.AppendLine($"duckdb.execute(\"ATTACH 'ducklake:postgres:' AS {catalog.Name} (DATA_PATH '{EscapeSql(catalog.DataPath)}')\")");
         }
 
         return sb.ToString();
     }
 
     private static string EscapeSql(string value) => value.Replace("'", "''");
+
+    /// <summary>Escapes backslashes and triple double-quotes so values are safe inside Python triple-quoted strings.</summary>
+    private static string EscapePython(string value) => value.Replace("\\", "\\\\").Replace("\"\"\"", "\\\"\\\"\\\"");
 
     private static string GetAzureScope(string dataPath)
     {
