@@ -58,7 +58,9 @@ public static class CatalogSetupGenerator
                 $")";
             sb.AppendLine($"duckdb.execute(\"\"\"{EscapePython(pgSecret)}\"\"\")");
 
-            sb.AppendLine($"duckdb.execute(\"ATTACH 'ducklake:postgres:' AS {catalog.Name} (DATA_PATH '{EscapeSql(catalog.DataPath)}')\")");
+            sb.AppendLine(
+                $"duckdb.execute(\"ATTACH 'ducklake:postgres:' AS {catalog.Name} " +
+                $"(DATA_PATH '{EscapeSql(catalog.DataPath)}', META_SECRET 'secret{suffix}_pg', AUTOMATIC_MIGRATION true)\")");
         }
 
         return sb.ToString();
