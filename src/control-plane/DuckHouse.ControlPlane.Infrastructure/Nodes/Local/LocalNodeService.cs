@@ -3,6 +3,7 @@ using DuckHouse.Core.Nodes;
 using k8s;
 using k8s.Models;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace DuckHouse.ControlPlane.Infrastructure.Nodes.Local;
 
@@ -14,11 +15,13 @@ public sealed class LocalNodeService : INodeService
     private const string ManagedByLabelValue = "duckhouse-control-plane";
 
     private readonly IKubernetes _kubernetes;
+    private readonly LocalNodeOptions _options;
     private readonly ILogger<LocalNodeService> _logger;
 
-    public LocalNodeService(IKubernetes kubernetes, ILogger<LocalNodeService> logger)
+    public LocalNodeService(IKubernetes kubernetes, IOptions<LocalNodeOptions> options, ILogger<LocalNodeService> logger)
     {
         _kubernetes = kubernetes;
+        _options = options.Value;
         _logger = logger;
     }
 
@@ -65,6 +68,27 @@ public sealed class LocalNodeService : INodeService
         if (request.WheelContents is { Count: > 0 } wheels)
         {
             await CreateWheelConfigMapsAsync(request.Name, wheels, volumes, volumeMounts, cancellationToken);
+        }
+
+        // Mount a host directory into the pod for persistent data storage (local dev only).
+        // Requires DataVolumeHostPath and DataVolumeMountPath to both be configured.
+        if (!string.IsNullOrEmpty(_options.DataVolumeHostPath) &&
+            !string.IsNullOrEmpty(_options.DataVolumeMountPath))
+        {
+            volumes.Add(new V1Volume
+            {
+                Name = "data",
+                HostPath = new V1HostPathVolumeSource
+                {
+                    Path = _options.DataVolumeHostPath,
+                    Type = "DirectoryOrCreate",
+                },
+            });
+            volumeMounts.Add(new V1VolumeMount
+            {
+                Name = "data",
+                MountPath = _options.DataVolumeMountPath,
+            });
         }
 
         // Build container environment variables

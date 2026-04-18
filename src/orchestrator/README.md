@@ -392,3 +392,48 @@ Valid dependency conditions: `onSuccess`, `onFailure`, `onCompletion`, `onSkip`.
 | `History:PurgeIntervalHours`           | `1`                    | How often `HistoryRetentionService` runs the purge               |
 
 The shared PostgreSQL connection is registered under the Aspire resource name `duckhouse-ui` (same database used by the UI server).
+
+---
+
+## DuckLake Catalogs
+
+When a notebook or SQL task runs, the orchestrator automatically attaches any DuckLake catalogs that are associated with the workspace item. Before the first cell is executed, it generates and sends a Python setup script to the kernel that:
+
+1. Installs and loads the `ducklake` DuckDB extension (and the `azure` extension if Azure storage is used).
+2. Creates a DuckDB `SECRET` for the Postgres catalog metadata store.
+3. Creates a DuckDB `SECRET` for Azure blob storage (if applicable).
+4. Executes `ATTACH 'ducklake:postgres:' AS catalog_name (DATA_PATH '...')`.
+
+Catalog connection details for **managed** catalogs are read entirely from the `Catalogs` configuration section — nothing is stored in the database. **External** catalogs store their connection details (encrypted via ASP.NET Data Protection) in the database.
+
+### Configuration
+
+| Key                                | Default                         | Description                                                                                                                                              |
+| ---------------------------------- | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Catalogs:BaseDataPath`            | _(none)_                        | Base path for managed catalog parquet data. Final path = `BaseDataPath/catalogName`. Can be a local path or `abfss://` for Azure Data Lake               |
+| `Catalogs:StorageConnectionString` | _(none)_                        | Azure Data Lake connection string. Required when `BaseDataPath` uses `az://` or `abfss://`                                                               |
+| `Catalogs:CatalogHost`             | `localhost`                     | Postgres host for **direct connections** made by the orchestrator process itself (admin operations)                                                      |
+| `Catalogs:CatalogPodHost`          | _(falls back to `CatalogHost`)_ | Postgres host as seen **from inside kernel pods**. Set this when the pod-side address differs from the server-side address (see local development below) |
+| `Catalogs:CatalogPort`             | `5432`                          | Postgres port                                                                                                                                            |
+| `Catalogs:CatalogUser`             | _(none)_                        | Postgres user                                                                                                                                            |
+| `Catalogs:CatalogPassword`         | _(none)_                        | Postgres password                                                                                                                                        |
+
+### Local development
+
+Kernel pods run in Kubernetes (Docker Desktop) and cannot reach `localhost` on the developer machine. Set `CatalogPodHost` to `host.docker.internal` so the DuckDB `CREATE SECRET` commands inside pods resolve to the host:
+
+```json
+// appsettings.Development.json
+"Catalogs": {
+  "BaseDataPath": "/data/ducklake",
+  "CatalogHost": "localhost",
+  "CatalogPodHost": "host.docker.internal",
+  "CatalogPort": 5432,
+  "CatalogUser": "postgres",
+  "CatalogPassword": "..."
+}
+```
+
+`CatalogHost` continues to be used for any direct Postgres connections made by the orchestrator process. `CatalogPodHost` is only injected into the DuckDB setup scripts executed by kernel pods. In production, where both the service and pods reach Postgres via the same Kubernetes service DNS name, `CatalogPodHost` can be left unset.
+
+For persistent parquet storage across pod restarts, set `BaseDataPath` to the `DataVolumeMountPath` configured in the Control Plane's `NodeService:Local` section. See the [Control Plane README](../control-plane/README.md#persistent-data-volume-local-development) for details.
