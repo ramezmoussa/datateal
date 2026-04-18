@@ -29,7 +29,7 @@
             <h2 style="margin: 0;">
                 @if (_editingTitle)
                 {
-                    <Input Style="width: 24ch; font-size: inherit;"
+                    <Input Style="width: 32ch; font-size: inherit;"
                            @bind-Value="_editingTitleValue"
                            OnPressEnter="@(_ => CommitTitleEdit())"
                            OnBlur="@(_ => CommitTitleEdit())" />
