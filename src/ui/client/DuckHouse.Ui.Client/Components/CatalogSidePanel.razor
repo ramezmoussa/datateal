@@ -1,0 +1,103 @@
+@using DuckHouse.Ui.Shared.Catalogs
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+
+@if (_collapsed)
+{
+    <div class="cp-collapsed-strip">
+        <button class="cp-collapse-btn" title="Show catalog explorer" @onclick="@(() => SetCollapsed(false))">
+            <Icon Type="@IconType.Outline.DoubleRight" />
+        </button>
+    </div>
+}
+else
+{
+    <div id="cp-panel" class="cp-side-panel" style="width: @(_widthPx)px;">
+        <div class="cp-panel-header">
+            <span class="cp-panel-title">
+                <Icon Type="@IconType.Outline.Database" />
+                <span style="margin-left: 6px;">Catalogs</span>
+            </span>
+            <button class="cp-collapse-btn" title="Collapse catalog explorer" @onclick="@(() => SetCollapsed(true))">
+                <Icon Type="@IconType.Outline.DoubleLeft" />
+            </button>
+        </div>
+        <div class="cp-panel-body">
+            <div class="cp-panel-section">
+                <Select TItemValue="string"
+                        TItem="CatalogDto"
+                        DataSource="@AllCatalogs.ToList()"
+                        Values="@SelectedCatalogNames"
+                        ValuesChanged="HandleValuesChanged"
+                        ItemValue="c => c.Name"
+                        ItemLabel="c => c.Name"
+                        Placeholder="— select catalogs —"
+                        AllowClear
+                        Mode="@SelectMode.Multiple"
+                        DropdownMatchSelectWidth="false"
+                        Style="width: 100%;"
+                        OnSelectedItemsChanged="@OnCatalogSelectionChanged" />
+                @if (CatalogSetupRunning)
+                {
+                    <div style="display: flex; align-items: center; gap: 6px; margin-top: 6px;">
+                        <Spin Size="SpinSize.Small" />
+                        <span style="font-size: 0.8rem; opacity: 0.6;">Attaching catalogs…</span>
+                    </div>
+                }
+            </div>
+            <CatalogExplorer CatalogNames="@SelectedCatalogNames.ToList()" />
+        </div>
+    </div>
+    <div id="cp-handle" class="cp-drag-handle">
+        <div class="cp-drag-handle-inner"></div>
+    </div>
+}
+
+@code {
+    [Parameter] public IReadOnlyList<CatalogDto> AllCatalogs { get; set; } = [];
+    [Parameter] public IEnumerable<string> SelectedCatalogNames { get; set; } = [];
+    [Parameter] public EventCallback<IEnumerable<string>> SelectedCatalogNamesChanged { get; set; }
+    [Parameter] public EventCallback<IEnumerable<CatalogDto>> OnCatalogSelectionChanged { get; set; }
+    [Parameter] public bool CatalogSetupRunning { get; set; }
+
+    private bool _collapsed;
+    private int _widthPx = 260;
+    private bool _splitterInitialized;
+
+    private DotNetObjectReference<CatalogSidePanel>? _dotNetRef;
+
+    private async Task HandleValuesChanged(IEnumerable<string> values)
+    {
+        await SelectedCatalogNamesChanged.InvokeAsync(values);
+    }
+
+    private void SetCollapsed(bool value)
+    {
+        _collapsed = value;
+        if (!value)
+            _splitterInitialized = false; // re-init drag handle after DOM update
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_collapsed && !_splitterInitialized)
+        {
+            _splitterInitialized = true;
+            _dotNetRef ??= DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("initCatalogPanelSplitter", "cp-panel", "cp-handle", _dotNetRef);
+        }
+    }
+
+    [JSInvokable]
+    public void OnCatalogPanelDragEnd(double width)
+    {
+        _widthPx = Math.Max(160, (int)width);
+        StateHasChanged();
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        _dotNetRef?.Dispose();
+        return ValueTask.CompletedTask;
+    }
+}

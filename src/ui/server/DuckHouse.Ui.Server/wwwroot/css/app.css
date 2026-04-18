@@ -56,11 +56,140 @@ html.ant-dark .df-table td {
     color: rgba(255, 255, 255, 0.85);
 }
 
+/* Catalog side panel layout */
+.cp-layout {
+    display: flex;
+    flex-direction: row;
+    height: calc(100vh - 48px);
+    overflow: hidden;
+}
+
+.cp-main {
+    flex: 1 1 0%;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.cp-side-panel {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: #fff;
+    border-right: 1px solid #d9d9d9;
+    flex-shrink: 0;
+}
+
+html.ant-dark .cp-side-panel {
+    background: #141414;
+    border-right-color: #434343;
+}
+
+.cp-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    border-bottom: 1px solid #d9d9d9;
+    flex-shrink: 0;
+}
+
+html.ant-dark .cp-panel-header {
+    border-bottom-color: #434343;
+}
+
+.cp-panel-title {
+    font-size: 0.875rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+}
+
+.cp-panel-body {
+    flex: 1 1 0%;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+.cp-panel-section {
+    padding: 8px;
+}
+
+.cp-collapse-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: rgba(0, 0, 0, 0.45);
+    border-radius: 4px;
+    line-height: 1;
+}
+
+.cp-collapse-btn:hover {
+    background: #f0f0f0;
+    color: rgba(0, 0, 0, 0.85);
+}
+
+html.ant-dark .cp-collapse-btn {
+    color: rgba(255, 255, 255, 0.45);
+}
+
+html.ant-dark .cp-collapse-btn:hover {
+    background: #2a2a2a;
+    color: rgba(255, 255, 255, 0.85);
+}
+
+.cp-drag-handle {
+    width: 6px;
+    background: #e8e8e8;
+    cursor: ew-resize;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+html.ant-dark .cp-drag-handle {
+    background: #2a2a2a;
+}
+
+.cp-drag-handle-inner {
+    height: 36px;
+    width: 3px;
+    background: #bfbfbf;
+    border-radius: 2px;
+}
+
+html.ant-dark .cp-drag-handle-inner {
+    background: #434343;
+}
+
+.cp-collapsed-strip {
+    width: 32px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding-top: 8px;
+    border-right: 1px solid #d9d9d9;
+    background: #fafafa;
+    flex-shrink: 0;
+}
+
+html.ant-dark .cp-collapsed-strip {
+    border-right-color: #434343;
+    background: #1d1d1d;
+}
+
 /* Query page */
 .qp-page {
     display: flex;
     flex-direction: column;
-    height: calc(100vh - 48px);
+    flex: 1 1 0%;
+    overflow: hidden;
 }
 
 .qp-split {

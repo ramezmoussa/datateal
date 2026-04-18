@@ -73,6 +73,40 @@ window.setItemNodePref = function (itemId, nodeName) {
     localStorage.setItem('duckhouse-node:' + itemId, nodeName);
 };
 
+window.initCatalogPanelSplitter = function (panelId, handleId, dotNetRef) {
+    const panel = document.getElementById(panelId);
+    const handle = document.getElementById(handleId);
+    if (!panel || !handle) return;
+
+    let dragging = false;
+    let startX = 0;
+    let startWidth = 0;
+
+    handle.addEventListener('mousedown', function (e) {
+        dragging = true;
+        startX = e.clientX;
+        startWidth = panel.offsetWidth;
+        document.body.style.cursor = 'ew-resize';
+        document.body.style.userSelect = 'none';
+        e.preventDefault();
+    });
+
+    document.addEventListener('mousemove', function (e) {
+        if (!dragging) return;
+        const delta = e.clientX - startX;
+        const newWidth = Math.max(160, startWidth + delta);
+        panel.style.width = newWidth + 'px';
+    });
+
+    document.addEventListener('mouseup', function (e) {
+        if (!dragging) return;
+        dragging = false;
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+        dotNetRef.invokeMethodAsync('OnCatalogPanelDragEnd', panel.offsetWidth);
+    });
+};
+
 window.initQueryPageSplitter = function (topPaneId, handleId, dotNetRef) {
     const topPane = document.getElementById(topPaneId);
     const handle = document.getElementById(handleId);
