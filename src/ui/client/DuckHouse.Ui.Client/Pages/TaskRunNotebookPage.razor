@@ -19,7 +19,7 @@
                 </Button>
             </SpaceItem>
             <SpaceItem>
-                <h2 style="margin: 0;">Notebook output</h2>
+                <h2 style="margin: 0;">@(_taskName ?? "Notebook output")</h2>
             </SpaceItem>
         </Space>
         @if (_hasRunningCells)
@@ -211,6 +211,7 @@
     private IReadOnlyList<CellOutputDto> _cells = [];
     private bool _loading = true;
     private bool _hasRunningCells;
+    private string? _taskName;
     private string? _error;
 
     protected override async Task OnParametersSetAsync()
@@ -223,8 +224,13 @@
         _loading = true;
         try
         {
-            _cells = await JobService.GetCellOutputsAsync(RunId, TaskRunId);
+            var cellsTask = JobService.GetCellOutputsAsync(RunId, TaskRunId);
+            var runTask = JobService.GetRunAsync(RunId);
+            await Task.WhenAll(cellsTask, runTask);
+
+            _cells = cellsTask.Result;
             _hasRunningCells = _cells.Any(c => c.Status is "Running" or "Pending");
+            _taskName = runTask.Result?.TaskRuns.FirstOrDefault(t => t.Id == TaskRunId)?.TaskName;
         }
         catch (Exception ex)
         {

@@ -18,7 +18,7 @@
                 </Button>
             </SpaceItem>
             <SpaceItem>
-                <h2 style="margin: 0;">SQL query output</h2>
+                <h2 style="margin: 0;">@(_taskName ?? "SQL query output")</h2>
             </SpaceItem>
         </Space>
         @if (_hasRunningCell)
@@ -169,6 +169,7 @@
     private CellOutputDto? _cell;
     private bool _loading = true;
     private bool _hasRunningCell;
+    private string? _taskName;
     private string? _error;
 
     protected override async Task OnParametersSetAsync()
@@ -181,10 +182,15 @@
         _loading = true;
         try
         {
-            var cells = await JobService.GetCellOutputsAsync(RunId, TaskRunId);
+            var cellsTask = JobService.GetCellOutputsAsync(RunId, TaskRunId);
+            var runTask = JobService.GetRunAsync(RunId);
+            await Task.WhenAll(cellsTask, runTask);
+
+            var cells = cellsTask.Result;
             // SQL tasks produce one cell per attempt; use the last one (latest attempt).
             _cell = cells.LastOrDefault();
             _hasRunningCell = _cell?.Status is "Running" or "Pending";
+            _taskName = runTask.Result?.TaskRuns.FirstOrDefault(t => t.Id == TaskRunId)?.TaskName;
         }
         catch (Exception ex)
         {
