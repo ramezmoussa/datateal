@@ -137,7 +137,7 @@ internal sealed class CatalogSession
         try
         {
             var poll = await ExecuteAndPollAsync(script, pollDelayMs: 500);
-            if (poll.Result?.Error is not null) return;
+            if (poll.Result is null || poll.Result.Error is not null) return;
 
             var knownNames = new HashSet<string>(
                 _allCatalogs().Select(c => c.Name), StringComparer.OrdinalIgnoreCase);
