@@ -19,8 +19,17 @@ public class CatalogSettings
 
     /// <summary>
     /// PostgreSQL host for the DuckLake metadata catalog.
+    /// Used for direct server-side connections (admin operations, metadata queries).
     /// </summary>
     public string CatalogHost { get; set; } = "localhost";
+
+    /// <summary>
+    /// PostgreSQL host as seen from inside kernel pods.
+    /// When set, overrides <see cref="CatalogHost"/> in DuckDB setup scripts executed by kernels.
+    /// Useful for local development where the server reaches Postgres at "localhost" but pods
+    /// must use "host.docker.internal". Defaults to <see cref="CatalogHost"/> when not set.
+    /// </summary>
+    public string? CatalogPodHost { get; set; }
 
     /// <summary>
     /// PostgreSQL port.
