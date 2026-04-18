@@ -55,15 +55,16 @@ internal sealed class CatalogSession
     /// </summary>
     public async Task OnSelectionChangedAsync(
         IEnumerable<CatalogDto> selectedItems,
-        IEnumerable<string> selectedNames,
         Guid? workspaceItemId)
     {
+        var names = selectedItems.Select(c => c.Name).ToList();
+
         if (workspaceItemId.HasValue)
         {
             try
             {
                 await _catalogService.UpdateWorkspaceItemCatalogsAsync(
-                    workspaceItemId.Value, selectedNames.ToList());
+                    workspaceItemId.Value, names);
             }
             catch (Exception ex) { _setError($"Failed to save catalog selection: {ex.Message}"); }
         }
@@ -74,7 +75,7 @@ internal sealed class CatalogSession
         // reflected in _attachedNames before we compute what to change.
         await SyncAsync();
 
-        var desired = new HashSet<string>(selectedItems.Select(c => c.Name), StringComparer.OrdinalIgnoreCase);
+        var desired = new HashSet<string>(names, StringComparer.OrdinalIgnoreCase);
         var toDetach = _attachedNames.Except(desired, StringComparer.OrdinalIgnoreCase).ToList();
         var toAttach = desired.Except(_attachedNames, StringComparer.OrdinalIgnoreCase).ToList();
 

@@ -733,6 +733,8 @@
             var json = NotebookSerializer.Serialize(_notebook);
             await WorkspaceService.UpdateNotebookAsync(_workspaceNotebookId.Value,
                 new UpdateNotebookRequest(_notebook.Title, json, _workspaceNotebookFolderId));
+            try { await CatalogService.UpdateWorkspaceItemCatalogsAsync(_workspaceNotebookId.Value, _selectedCatalogNames.ToList()); }
+            catch (Exception ex) { _error = $"Notebook saved but failed to save catalog selection: {ex.Message}"; }
             _notebook.IsDirty = false;
         }
         catch (Exception ex)
@@ -759,6 +761,12 @@
                 new CreateNotebookRequest(_notebook.Title, json, folderId));
             _workspaceNotebookId = summary.Id;
             _workspaceNotebookFolderId = folderId;
+
+            if (_selectedCatalogNames.Any())
+            {
+                try { await CatalogService.UpdateWorkspaceItemCatalogsAsync(summary.Id, _selectedCatalogNames.ToList()); }
+                catch (Exception ex) { _error = $"Notebook saved but failed to save catalog selection: {ex.Message}"; }
+            }
 
             if (folderId is not null)
             {
@@ -795,8 +803,11 @@
 
     // ── Catalog management ───────────────────────────────────────────
 
-    private Task OnCatalogSelectionChanged(IEnumerable<CatalogDto> selectedItems) =>
-        _catalog.OnSelectionChangedAsync(selectedItems, _selectedCatalogNames, _workspaceNotebookId);
+    private Task OnCatalogSelectionChanged(IEnumerable<CatalogDto> selectedItems)
+    {
+        _notebook.IsDirty = true;
+        return _catalog.OnSelectionChangedAsync(selectedItems, _workspaceNotebookId);
+    }
 
     public async ValueTask DisposeAsync()
     {

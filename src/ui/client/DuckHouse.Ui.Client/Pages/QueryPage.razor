@@ -466,6 +466,13 @@
             var summary = await WorkspaceService.CreateQueryAsync(new CreateQueryRequest(_title, _sql, folderId));
             _workspaceQueryId = summary.Id;
             _workspaceQueryFolderId = folderId;
+
+            if (_selectedCatalogNames.Any())
+            {
+                try { await CatalogService.UpdateWorkspaceItemCatalogsAsync(summary.Id, _selectedCatalogNames.ToList()); }
+                catch (Exception ex) { _error = $"Query saved but failed to save catalog selection: {ex.Message}"; }
+            }
+
             _isDirty = false;
 
             if (folderId is not null)
@@ -490,6 +497,8 @@
         {
             await WorkspaceService.UpdateQueryAsync(_workspaceQueryId.Value,
                 new UpdateQueryRequest(_title, _sql, _workspaceQueryFolderId));
+            try { await CatalogService.UpdateWorkspaceItemCatalogsAsync(_workspaceQueryId.Value, _selectedCatalogNames.ToList()); }
+            catch (Exception ex) { _error = $"Query saved but failed to save catalog selection: {ex.Message}"; }
             _isDirty = false;
         }
         catch (Exception ex) { _error = $"Failed to save query: {ex.Message}"; }
@@ -717,8 +726,11 @@
 
     // ── Catalog management ───────────────────────────────────────────
 
-    private Task OnCatalogSelectionChanged(IEnumerable<CatalogDto> selectedItems) =>
-        _catalog.OnSelectionChangedAsync(selectedItems, _selectedCatalogNames, _workspaceQueryId);
+    private Task OnCatalogSelectionChanged(IEnumerable<CatalogDto> selectedItems)
+    {
+        _isDirty = true;
+        return _catalog.OnSelectionChangedAsync(selectedItems, _workspaceQueryId);
+    }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
