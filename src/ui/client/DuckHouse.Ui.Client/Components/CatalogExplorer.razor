@@ -86,6 +86,7 @@
                     NodeType = ExplorerNodeType.Catalog,
                     CatalogName = name,
                 })
+                .OrderBy(n => n.Title)
                 .ToList();
         }
         catch (Exception ex)
