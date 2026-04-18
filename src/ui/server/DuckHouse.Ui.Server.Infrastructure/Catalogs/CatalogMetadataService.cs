@@ -25,6 +25,9 @@ internal class CatalogMetadataService : ICatalogMetadataService
         await using var conn = new NpgsqlConnection(connectionString);
         await conn.OpenAsync(cancellationToken);
 
+        if (!await DuckLakeTablesExistAsync(conn, cancellationToken))
+            return new CatalogMetadataResult([]);
+
         var snapshotId = await GetCurrentSnapshotAsync(conn, cancellationToken);
         if (snapshotId is null)
             return new CatalogMetadataResult([]);
@@ -65,6 +68,23 @@ internal class CatalogMetadataService : ICatalogMetadataService
             .ToList();
 
         return new CatalogMetadataResult(schemaResults);
+    }
+
+    private static async Task<bool> DuckLakeTablesExistAsync(NpgsqlConnection conn, CancellationToken ct)
+    {
+        // Check all four DuckLake catalog tables are present in one query.
+        const string sql = """
+            SELECT COUNT(*)
+            FROM information_schema.tables
+            WHERE table_schema = 'public'
+              AND table_name IN (
+                'ducklake_snapshot', 'ducklake_schema',
+                'ducklake_table', 'ducklake_view', 'ducklake_column'
+              )
+            """;
+        await using var cmd = new NpgsqlCommand(sql, conn);
+        var count = (long)(await cmd.ExecuteScalarAsync(ct))!;
+        return count == 5;
     }
 
     private static async Task<long?> GetCurrentSnapshotAsync(NpgsqlConnection conn, CancellationToken ct)
