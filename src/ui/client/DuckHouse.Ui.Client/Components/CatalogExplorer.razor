@@ -24,6 +24,8 @@
         <Tree TItem="ExplorerNode"
               DataSource="_treeData"
               ShowIcon
+              ShowLine
+              ShowLeafIcon="false"
               TitleExpression="x => x.DataItem.Title"
               ChildrenExpression="x => x.DataItem.Children"
               IsLeafExpression="x => x.DataItem.IsLeaf"
@@ -149,7 +151,7 @@
             {
                 Title = schema.Name,
                 Key = $"{catalogNode.Key}:{schema.Name}",
-                Icon = IconType.Outline.AppstoreAdd,
+                Icon = IconType.Outline.Folder,
                 NodeType = ExplorerNodeType.Schema,
                 CatalogName = catalogNode.CatalogName,
                 SchemaName = schema.Name,
@@ -163,7 +165,7 @@
             {
                 Title = "(no schemas)",
                 Key = $"{catalogNode.Key}:empty",
-                Icon = IconType.Outline.Info,
+                Icon = "",
                 IsLeaf = true,
                 NodeType = ExplorerNodeType.Leaf,
             });
@@ -234,7 +236,7 @@
             {
                 Title = $"{col.Name} ({col.DataType}{nullable})",
                 Key = $"{tableNode.Key}:{col.Name}",
-                Icon = IconType.Outline.UnorderedList,
+                Icon = "",
                 IsLeaf = true,
                 NodeType = ExplorerNodeType.Leaf,
             });
@@ -246,7 +248,7 @@
             {
                 Title = "(no columns)",
                 Key = $"{tableNode.Key}:empty",
-                Icon = IconType.Outline.Info,
+                Icon = "",
                 IsLeaf = true,
                 NodeType = ExplorerNodeType.Leaf,
             });
