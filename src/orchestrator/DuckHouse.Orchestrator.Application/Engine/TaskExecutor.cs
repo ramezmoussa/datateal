@@ -2,7 +2,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using DuckHouse.Core.Kernels;
 using DuckHouse.Core.Mediator;
-using DuckHouse.Orchestrator.Application.Catalogs;
+using DuckHouse.Core.Catalogs;
 using DuckHouse.Orchestrator.Application.Mediator.Commands;
 using DuckHouse.Orchestrator.Core.Entities;
 using DuckHouse.Orchestrator.Core.Enums;

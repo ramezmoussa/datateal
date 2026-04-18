@@ -1,23 +1,23 @@
+using DuckHouse.Core.Catalogs;
 using DuckHouse.Core.Mediator;
 using DuckHouse.Ui.Server.Core.Catalogs;
 using DuckHouse.Ui.Server.Core.Repositories;
-using DuckHouse.Ui.Shared.Catalogs;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Options;
 
 namespace DuckHouse.Ui.Server.Application.Mediator.Queries;
 
-public record ResolveCatalogsRequest(IReadOnlyList<string> CatalogNames) : IRequest<IReadOnlyList<ResolvedCatalogDto>>;
+public record ResolveCatalogsRequest(IReadOnlyList<string> CatalogNames) : IRequest<IReadOnlyList<ResolvedCatalog>>;
 
 internal class ResolveCatalogsHandler(
     ICatalogRepository repository,
     IDataProtectionProvider dataProtection,
     IOptions<CatalogSettings> settings)
-    : IRequestHandler<ResolveCatalogsRequest, IReadOnlyList<ResolvedCatalogDto>>
+    : IRequestHandler<ResolveCatalogsRequest, IReadOnlyList<ResolvedCatalog>>
 {
     private readonly IDataProtector _protector = dataProtection.CreateProtector("DuckHouse.Catalogs");
 
-    public async Task<IReadOnlyList<ResolvedCatalogDto>> Handle(ResolveCatalogsRequest request, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<ResolvedCatalog>> Handle(ResolveCatalogsRequest request, CancellationToken cancellationToken)
     {
         if (request.CatalogNames.Count == 0) return [];
 
@@ -28,7 +28,7 @@ internal class ResolveCatalogsHandler(
         {
             if (c.IsManaged)
             {
-                return new ResolvedCatalogDto(
+                return new ResolvedCatalog(
                     c.Name,
                     DataPath: opts.BaseDataPath.TrimEnd('/') + "/" + c.Name,
                     StorageConnectionString: !string.IsNullOrEmpty(opts.StorageConnectionString)
@@ -41,7 +41,7 @@ internal class ResolveCatalogsHandler(
                     CatalogPassword: opts.CatalogPassword);
             }
 
-            return new ResolvedCatalogDto(
+            return new ResolvedCatalog(
                 c.Name,
                 DataPath: c.DataPath ?? string.Empty,
                 StorageConnectionString: c.EncryptedStorageConnectionString is not null

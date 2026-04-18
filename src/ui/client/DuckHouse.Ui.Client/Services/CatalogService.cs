@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using DuckHouse.Core.Catalogs;
 using DuckHouse.Ui.Shared.Catalogs;
 
 namespace DuckHouse.Ui.Client.Services;
@@ -41,12 +42,12 @@ internal class CatalogService(HttpClient httpClient) : ICatalogService
         await httpClient.GetFromJsonAsync<CatalogMetadataDto>($"api/catalogs/{catalogId}/metadata", JsonOptions, ct)
         ?? new CatalogMetadataDto([]);
 
-    public async Task<IReadOnlyList<ResolvedCatalogDto>> ResolveCatalogsAsync(List<string> catalogNames, CancellationToken ct = default)
+    public async Task<IReadOnlyList<ResolvedCatalog>> ResolveCatalogsAsync(List<string> catalogNames, CancellationToken ct = default)
     {
         var response = await httpClient.PostAsJsonAsync("api/catalogs/resolve",
             new ResolveCatalogsRequest(catalogNames), JsonOptions, ct);
         response.EnsureSuccessStatusCode();
-        return (await response.Content.ReadFromJsonAsync<IReadOnlyList<ResolvedCatalogDto>>(JsonOptions, ct)) ?? [];
+        return (await response.Content.ReadFromJsonAsync<IReadOnlyList<ResolvedCatalog>>(JsonOptions, ct)) ?? [];
     }
 
     public async Task<List<string>> GetWorkspaceItemCatalogsAsync(Guid itemId, CancellationToken ct = default) =>

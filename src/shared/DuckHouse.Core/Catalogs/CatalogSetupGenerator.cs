@@ -1,7 +1,6 @@
 using System.Text;
-using DuckHouse.Orchestrator.Core.Interfaces;
 
-namespace DuckHouse.Orchestrator.Application.Catalogs;
+namespace DuckHouse.Core.Catalogs;
 
 /// <summary>
 /// Generates DuckDB setup commands for attaching DuckLake catalogs to a kernel session.
@@ -11,9 +10,12 @@ public static class CatalogSetupGenerator
     /// <summary>
     /// Generates the complete setup script for the given resolved catalogs as Python code
     /// that runs DuckDB commands via <c>duckdb.execute()</c>, matching the kernel's Python environment.
-    /// Runtime containers always run Linux, so the Azure curl transport option is always applied.
     /// </summary>
-    public static string GenerateSetupScript(IReadOnlyList<ResolvedCatalog> catalogs)
+    /// <param name="isLinux">
+    /// When <c>true</c>, sets <c>azure_transport_option_type = 'curl'</c> which is required on Linux.
+    /// Runtime containers always run Linux, so pass <c>true</c> for any server-side execution.
+    /// </param>
+    public static string GenerateSetupScript(IReadOnlyList<ResolvedCatalog> catalogs, bool isLinux = false)
     {
         if (catalogs.Count == 0) return string.Empty;
 
@@ -28,8 +30,9 @@ public static class CatalogSetupGenerator
         {
             sb.AppendLine("duckdb.execute(\"INSTALL azure\")");
             sb.AppendLine("duckdb.execute(\"LOAD azure\")");
-            // Runtime containers run Linux
-            sb.AppendLine("duckdb.execute(\"SET azure_transport_option_type = 'curl'\")");
+
+            if (isLinux)
+                sb.AppendLine("duckdb.execute(\"SET azure_transport_option_type = 'curl'\")");
         }
 
         for (var i = 0; i < catalogs.Count; i++)
@@ -73,6 +76,8 @@ public static class CatalogSetupGenerator
 
     private static string GetAzureScope(string dataPath)
     {
+        // Extract the container-level scope from the data path
+        // e.g., abfss://container@account.dfs.core.windows.net/path → az://account.dfs.core.windows.net/container
         if (dataPath.StartsWith("abfss://", StringComparison.OrdinalIgnoreCase) ||
             dataPath.StartsWith("az://", StringComparison.OrdinalIgnoreCase))
         {

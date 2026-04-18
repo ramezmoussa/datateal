@@ -1,10 +1,9 @@
-namespace DuckHouse.Ui.Shared.Catalogs;
+namespace DuckHouse.Core.Catalogs;
 
 /// <summary>
-/// Contains fully resolved (decrypted) catalog connection details.
-/// Only returned by the resolve endpoint — never persisted on the client.
+/// Fully resolved (decrypted) catalog connection details for attaching a DuckLake catalog to a kernel session.
 /// </summary>
-public record ResolvedCatalogDto(
+public record ResolvedCatalog(
     string Name,
     string DataPath,
     string? StorageConnectionString,
