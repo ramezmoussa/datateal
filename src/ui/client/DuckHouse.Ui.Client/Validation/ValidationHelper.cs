@@ -5,20 +5,18 @@ namespace DuckHouse.Ui.Client.Validation;
 public static partial class ValidationHelper
 {
     /// <summary>
-    /// The fixed prefix added to a node pool name when constructing a job-run node name:
-    /// "job-{8-char-run-id}-" = 13 characters.
+    /// Maximum length for a node pool name. Matches the AKS node pool name limit,
+    /// which is the binding constraint (more restrictive than the 63-character Kubernetes limit).
     /// </summary>
-    public const int JobNodeNamePrefix = 13; // "job-XXXXXXXX-"
-
-    /// <summary>
-    /// Maximum length for a node pool name so that the resulting job-run node name
-    /// stays within the 63-character Kubernetes DNS label limit.
-    /// </summary>
-    public const int MaxNodePoolNameLength = 63 - JobNodeNamePrefix; // 50
+    public const int MaxNodePoolNameLength = 12;
 
     // Kubernetes DNS label: lowercase alphanumeric and hyphens, start/end with alphanumeric, max 63 chars.
     [GeneratedRegex(@"^[a-z0-9]([a-z0-9\-]{0,61}[a-z0-9])?$")]
     private static partial Regex KubernetesNameRegex();
+
+    // AKS node pool name: lowercase letters and digits only, 1-12 chars, must start with a letter.
+    [GeneratedRegex(@"^[a-z][a-z0-9]{0,11}$")]
+    private static partial Regex AksNodePoolNameRegex();
 
     // Python identifier: letter or underscore, followed by letters, digits, or underscores.
     [GeneratedRegex(@"^[a-zA-Z_][a-zA-Z0-9_]*$")]
@@ -66,22 +64,38 @@ public static partial class ValidationHelper
     }
 
     /// <summary>
-    /// Validates a node pool name. Same Kubernetes naming rules as <see cref="ValidateKubernetesName"/>,
-    /// but limited to <see cref="MaxNodePoolNameLength"/> characters so that the generated
-    /// job-run node name ("job-{8-char-id}-{poolName}") fits within the 63-character Kubernetes limit.
+    /// Validates a node name. Combines Kubernetes DNS label rules with AKS node pool name rules:
+    /// only lowercase letters and digits (no hyphens), must start with a letter, max 12 characters.
+    /// Returns an error message, or null if valid.
     /// </summary>
-    public static string? ValidateNodePoolName(string? name)
+    public static string? ValidateNodeName(string? name)
     {
         if (string.IsNullOrEmpty(name))
             return null;
 
-        if (name.Length > MaxNodePoolNameLength)
-            return $"Node pool name must be {MaxNodePoolNameLength} characters or fewer " +
-                   $"(the name is embedded in job-run node names which have a 63-character Kubernetes limit).";
+        if (name.Length > 12)
+            return "Name must be 12 characters or fewer (AKS node pool name limit).";
 
-        // Reuse standard k8s rules (length already checked above so this won't duplicate the >63 message)
-        return ValidateKubernetesName(name);
+        if (!AksNodePoolNameRegex().IsMatch(name))
+        {
+            if (name != name.ToLowerInvariant())
+                return "Name must be lowercase.";
+            if (!char.IsLetter(name[0]))
+                return "Name must start with a letter.";
+            return "Name may only contain lowercase letters and digits (no hyphens).";
+        }
+
+        return null;
     }
+
+    /// <summary>
+    /// Validates a node pool name. Combines Kubernetes DNS label rules with AKS node pool name rules:
+    /// only lowercase letters and digits (no hyphens), must start with a letter, max 12 characters.
+    /// The AKS 12-character limit is the binding constraint (more restrictive than the
+    /// Kubernetes-derived <see cref="MaxNodePoolNameLength"/> of 50 characters).
+    /// Returns an error message, or null if valid.
+    /// </summary>
+    public static string? ValidateNodePoolName(string? name) => ValidateNodeName(name);
 
     /// <summary>
     /// Validates a Python identifier (variable/parameter name).

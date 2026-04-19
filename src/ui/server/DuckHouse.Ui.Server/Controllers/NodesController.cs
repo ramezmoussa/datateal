@@ -27,6 +27,10 @@ public class NodesController(IMediator mediator, IWheelPackageRepository wheelPa
     [HttpPost]
     public async Task<IActionResult> CreateNode(SharedNodes.CreateNodeRequest body, CancellationToken ct)
     {
+        var nameError = ValidateNodeName(body.Name);
+        if (nameError is not null)
+            return BadRequest(nameError);
+
         IReadOnlyList<WheelContent>? wheelContents = null;
         if (body.WheelPackageIds is { Count: > 0 })
         {
@@ -76,5 +80,22 @@ public class NodesController(IMediator mediator, IWheelPackageRepository wheelPa
     {
         await mediator.SendAsync(new Cmd.StartNodeRequest(name), ct);
         return NoContent();
+    }
+
+    private static string? ValidateNodeName(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            return "Node name is required.";
+        if (name.Length > 12)
+            return "Node name must be 12 characters or fewer (AKS node pool name limit).";
+        if (!System.Text.RegularExpressions.Regex.IsMatch(name, @"^[a-z][a-z0-9]{0,11}$"))
+        {
+            if (name != name.ToLowerInvariant())
+                return "Node name must be lowercase.";
+            if (!char.IsLetter(name[0]))
+                return "Node name must start with a letter.";
+            return "Node name may only contain lowercase letters and digits (no hyphens).";
+        }
+        return null;
     }
 }

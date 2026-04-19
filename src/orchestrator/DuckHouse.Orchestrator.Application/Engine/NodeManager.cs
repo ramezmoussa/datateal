@@ -1,5 +1,8 @@
 using System.Collections.Concurrent;
+using System.Security.Cryptography;
+using System.Text;
 using DuckHouse.Core.Nodes;
+using DuckHouse.Orchestrator.Application.Validation;
 using DuckHouse.Orchestrator.Core.Interfaces;
 using DuckHouse.Orchestrator.Core.Repositories;
 using Microsoft.Extensions.Logging;
@@ -37,12 +40,16 @@ public class NodeManager(
             ?? throw new InvalidOperationException(
                 $"Node pool configuration '{nodePoolRef}' not found.");
 
-        var nodeName = $"job-{jobRunId.ToString()[..8]}-{nodePoolRef}".ToLowerInvariant();
-
-        if (nodeName.Length > 63)
+        var nameError = NodeNameValidator.ValidateNodePoolName(nodePoolRef);
+        if (nameError is not null)
             throw new InvalidOperationException(
-                $"Generated node name '{nodeName}' exceeds the 63-character Kubernetes limit. " +
-                $"Node pool name '{nodePoolRef}' must be {63 - 13} characters or fewer.");
+                $"Node pool name '{nodePoolRef}' is not a valid AKS node pool name: {nameError}");
+
+        // Generate an AKS-valid node name: 'j' + 11 lowercase hex chars from the SHA-256
+        // hash of (runId, poolRef). Always exactly 12 characters, starts with a letter,
+        // and unique per (run, pool) pair while still being identifiable as job-run generated.
+        var hashInput = SHA256.HashData(Encoding.UTF8.GetBytes($"{jobRunId:N}{nodePoolRef}"));
+        var nodeName = "j" + Convert.ToHexString(hashInput)[..11].ToLowerInvariant();
         logger.LogInformation("Provisioning node '{NodeName}' for pool '{PoolRef}' (VM: {VmSize})",
             nodeName, nodePoolRef, config.VmSize);
 
