@@ -34,7 +34,9 @@ internal class ResolveCatalogsHandler(
                     StorageConnectionString: !string.IsNullOrEmpty(opts.StorageConnectionString)
                         ? opts.StorageConnectionString
                         : null,
-                    CatalogHost: opts.CatalogPodHost ?? opts.CatalogHost,
+                    CatalogHost: !string.IsNullOrEmpty(opts.CatalogPodHost)
+                        ? opts.CatalogPodHost
+                        : opts.CatalogHost,
                     CatalogPort: opts.CatalogPort,
                     CatalogDatabase: c.Name,
                     CatalogUser: opts.CatalogUser,

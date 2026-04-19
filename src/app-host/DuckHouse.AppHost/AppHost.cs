@@ -1,10 +1,26 @@
+using Microsoft.Extensions.Configuration;
+
 var builder = DistributedApplication.CreateBuilder(args);
 
-var postgres = builder.AddPostgres("postgres")
-    .WithDataVolume()
-    .WithLifetime(ContainerLifetime.Persistent);
-var controlPlaneDb = postgres.AddDatabase("duckhouse-control-plane");
-var uiDb = postgres.AddDatabase("duckhouse-ui");
+// When ConnectionStrings:duckhouse-ui is present in AppHost configuration (e.g. appsettings.Development.json),
+// Aspire forwards those connection strings to the services instead of starting a local Postgres container.
+// This allows running all services through Aspire while targeting external Azure resources.
+IResourceBuilder<IResourceWithConnectionString> controlPlaneDb;
+IResourceBuilder<IResourceWithConnectionString> uiDb;
+
+if (builder.Configuration.GetConnectionString("duckhouse-ui") is not null)
+{
+    controlPlaneDb = builder.AddConnectionString("duckhouse-control-plane");
+    uiDb = builder.AddConnectionString("duckhouse-ui");
+}
+else
+{
+    var postgres = builder.AddPostgres("postgres")
+        .WithDataVolume()
+        .WithLifetime(ContainerLifetime.Persistent);
+    controlPlaneDb = postgres.AddDatabase("duckhouse-control-plane");
+    uiDb = postgres.AddDatabase("duckhouse-ui");
+}
 
 var controlPlane = builder.AddProject<Projects.DuckHouse_ControlPlane>("control-plane")
     .WithReference(controlPlaneDb)
