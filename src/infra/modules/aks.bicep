@@ -13,11 +13,24 @@ param nodeResourceGroupName string
 @description('VM size for the system node pool.')
 param systemNodePoolVmSize string = 'Standard_D2as_v5'
 
+@description('IP address to be whitelisted to the PostgreSQL Flexible Server and ADLS')
+param firewallWhitelistIp string = ''
+
+@description('Admin password for the PostgreSQL Flexible Server')
+@secure()
+param postgresAdminPassword string = ''
+
 @description('Object ID of the principal that will manage node pools. Empty = skip role assignment.')
 param apiPrincipalId string = ''
 
 @description('Name of the Azure Container Registry. Must be globally unique and alphanumeric only.')
 param acrName string
+
+@description('Name of the PostgreSQL Flexible Server. Must be globally unique.')
+param psqlName string = ''
+
+@description('Name of the storage account for ADLS Gen2. Must be globally unique and lowercase only.')
+param storageAccountName string = ''
 
 @description('Address space for the cluster VNet.')
 param vnetAddressPrefix string = '10.0.0.0/8'
@@ -72,6 +85,11 @@ resource nodeSubnet 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' = {
   name: 'nodes'
   properties: {
     addressPrefix: nodeSubnetAddressPrefix
+    serviceEndpoints: [
+      {
+        service: 'Microsoft.Storage'
+      }
+    ]
   }
 }
 
@@ -204,6 +222,110 @@ resource acrPullAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' 
     roleDefinitionId: acrPullRoleId
     principalId: systemPoolManagedIdentity.properties.principalId
     principalType: 'ServicePrincipal'
+  }
+}
+
+// ── PostgreSQL Flexible Server ──────────────────────────────────────────────────
+
+resource postgresServerResource 'Microsoft.DBforPostgreSQL/flexibleServers@2023-06-01-preview' = {
+  name: psqlName
+  location: location
+  sku: {
+    name: 'Standard_B1ms'
+    tier: 'Burstable'
+  }
+  properties: {
+    administratorLogin: 'postgres'
+    administratorLoginPassword: postgresAdminPassword
+    version: '18'
+    storage: {
+      storageSizeGB: 32
+      tier: 'P4'
+    }
+    network: {
+      publicNetworkAccess: 'Enabled'
+    }
+  }
+}
+
+resource postgresFirewallAllowAzure 'Microsoft.DBforPostgreSQL/flexibleServers/firewallRules@2023-06-01-preview' = {
+  parent: postgresServerResource
+  name: 'AllowAzureServices'
+  properties: {
+    startIpAddress: '0.0.0.0'
+    endIpAddress: '0.0.0.0'
+  }
+}
+
+resource postgresFirewallWhitelist 'Microsoft.DBforPostgreSQL/flexibleServers/firewallRules@2023-06-01-preview' = if (!empty(firewallWhitelistIp)) {
+  parent: postgresServerResource
+  name: 'AllowWhitelistIp'
+  properties: {
+    startIpAddress: firewallWhitelistIp
+    endIpAddress: firewallWhitelistIp
+  }
+}
+
+resource postgresUiDatabaseResource 'Microsoft.DBforPostgreSQL/flexibleServers/databases@2023-06-01-preview' = {
+  parent: postgresServerResource
+  name: 'duckhouse_ui'
+  properties: {
+    charset: 'UTF8'
+    collation: 'en_US.utf8'
+  }
+}
+
+resource postgresControlPlaneDatabaseResource 'Microsoft.DBforPostgreSQL/flexibleServers/databases@2023-06-01-preview' = {
+  parent: postgresServerResource
+  name: 'duckhouse_control_plane'
+  properties: {
+    charset: 'UTF8'
+    collation: 'en_US.utf8'
+  }
+}
+
+// ── Storage Account ──────────────────────────────────────────────────
+
+resource storageAccountResource 'Microsoft.Storage/storageAccounts@2023-05-01' = {
+  name: storageAccountName
+  location: location
+  kind: 'StorageV2'
+  sku: {
+    name: 'Standard_LRS'
+  }
+  properties: {
+    accessTier: 'Hot'
+    isHnsEnabled: true
+    minimumTlsVersion: 'TLS1_2'
+    allowBlobPublicAccess: false
+    publicNetworkAccess: 'Enabled'
+    networkAcls: {
+      bypass: 'None'
+      defaultAction: 'Deny'
+      ipRules: empty(firewallWhitelistIp) ? [] : [
+        {
+          value: firewallWhitelistIp
+        }
+      ]
+      virtualNetworkRules: [
+        {
+          id: nodeSubnet.id
+        }
+      ]
+    }
+  }
+}
+
+resource storageBlobService 'Microsoft.Storage/storageAccounts/blobServices@2023-05-01' existing = {
+  parent: storageAccountResource
+  name: 'default'
+}
+
+resource storageContainerBasinData 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-05-01' = {
+  parent: storageBlobService
+  name: 'duckhouse-data'
+  properties: {
+    publicAccess: 'None'
   }
 }
 
