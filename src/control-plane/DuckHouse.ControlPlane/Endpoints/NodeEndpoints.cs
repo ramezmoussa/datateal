@@ -35,19 +35,13 @@ public static class NodeEndpoints
         })
         .WithName("RemoveNode");
 
-        group.MapPost("/{name}/stop", async (string name, IMediator mediator, CancellationToken ct) =>
+        group.MapPut("/{name}/config", async (string name, UpdateNodeConfigRequest request, IMediator mediator, CancellationToken ct) =>
         {
-            await mediator.SendAsync(new StopNodeRequest(name), ct);
+            var updated = request with { Name = name };
+            await mediator.SendAsync(updated, ct);
             return Results.NoContent();
         })
-        .WithName("StopNode");
-
-        group.MapPost("/{name}/start", async (string name, IMediator mediator, CancellationToken ct) =>
-        {
-            await mediator.SendAsync(new StartNodeRequest(name), ct);
-            return Results.NoContent();
-        })
-        .WithName("StartNode");
+        .WithName("UpdateNodeConfig");
 
         // ── Kernel proxy endpoints ────────────────────────────────────────────
         // These forward to the duckhouse-runtime FastAPI running on the pod via

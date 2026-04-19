@@ -7,6 +7,7 @@ namespace DuckHouse.Orchestrator.Application.Mediator.Commands;
 
 public record CreateNodePoolConfigRequest(
     string Name,
+    string PoolType,
     string VmSize,
     TimeSpan? KernelIdleTimeout,
     TimeSpan? NodeIdleTimeout,
@@ -25,21 +26,31 @@ internal class CreateNodePoolConfigHandler(INodePoolConfigRepository repository)
         if (nameError is not null)
             throw new ArgumentException(nameError, nameof(request.Name));
 
-        var config = new NodePoolConfig
-        {
-            Id = Guid.NewGuid(),
-            Name = request.Name,
-            VmSize = request.VmSize,
-            KernelIdleTimeout = request.KernelIdleTimeout,
-            NodeIdleTimeout = request.NodeIdleTimeout,
-            KernelRequirements = request.KernelRequirements,
-            Description = request.Description,
-            WheelPackageIds = request.WheelPackageIds,
-            EnvironmentVariableIds = request.EnvironmentVariableIds,
-            SecretIds = request.SecretIds,
-            CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow,
-        };
+        NodePoolConfig config = request.PoolType == "Interactive"
+            ? new InteractiveNodePoolConfig
+            {
+                Name = request.Name,
+                VmSize = request.VmSize,
+                KernelIdleTimeout = request.KernelIdleTimeout,
+                NodeIdleTimeout = request.NodeIdleTimeout,
+                KernelRequirements = request.KernelRequirements,
+                Description = request.Description,
+                WheelPackageIds = request.WheelPackageIds,
+                EnvironmentVariableIds = request.EnvironmentVariableIds,
+                SecretIds = request.SecretIds,
+            }
+            : new JobNodePoolConfig
+            {
+                Name = request.Name,
+                VmSize = request.VmSize,
+                KernelIdleTimeout = request.KernelIdleTimeout,
+                NodeIdleTimeout = request.NodeIdleTimeout,
+                KernelRequirements = request.KernelRequirements,
+                Description = request.Description,
+                WheelPackageIds = request.WheelPackageIds,
+                EnvironmentVariableIds = request.EnvironmentVariableIds,
+                SecretIds = request.SecretIds,
+            };
 
         return await repository.CreateAsync(config, cancellationToken);
     }

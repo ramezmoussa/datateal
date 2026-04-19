@@ -235,6 +235,10 @@ public class DuckHouseDbContext(DbContextOptions<DuckHouseDbContext> options)
             entity.Property(e => e.WheelPackageIds).HasColumnType("jsonb").HasConversion(GuidListJsonConverter);
             entity.Property(e => e.EnvironmentVariableIds).HasColumnType("jsonb").HasConversion(GuidListJsonConverter);
             entity.Property(e => e.SecretIds).HasColumnType("jsonb").HasConversion(GuidListJsonConverter);
+            entity.HasDiscriminator(e => e.PoolType)
+                .HasValue<InteractiveNodePoolConfig>("Interactive")
+                .HasValue<JobNodePoolConfig>("Job");
+            entity.Property(e => e.PoolType).HasMaxLength(32).IsRequired();
         });
 
         modelBuilder.Entity<JobRun>(entity =>

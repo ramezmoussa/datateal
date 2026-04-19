@@ -1,14 +1,9 @@
 @page "/nodes"
 
 @using DuckHouse.Core.Nodes
-@using DuckHouse.Ui.Client.Validation
-@using DuckHouse.Ui.Shared.Packages
-@using DuckHouse.Ui.Shared.Environment
 @inject INodeService NodeService
-@inject IWheelPackageService WheelPackageService
-@inject IEnvironmentService EnvironmentService
 
-<PageTitle>Nodes — DuckHouse</PageTitle>
+<PageTitle>Active nodes — DuckHouse</PageTitle>
 
 <Flex Justify="FlexJustify.SpaceBetween" Align="FlexAlign.Center" Style="margin-bottom: 24px;" Gap="FlexGap.Small">
     <Space Align="SpaceAlign.End" Size="SpaceSize.Middle">
@@ -16,7 +11,7 @@
             <Icon Height="24px" Width="24px" Type="@IconType.Outline.CloudServer" />
         </SpaceItem>
         <SpaceItem>
-            <h2 style="margin: 0;">Nodes</h2>
+            <h2 style="margin: 0;">Active nodes</h2>
         </SpaceItem>
     </Space>
     <Space>
@@ -25,13 +20,6 @@
                     Disabled="@(_loading || _busy is not null)"
                     Icon=@IconType.Outline.Reload>
                 Refresh
-            </Button>
-        </SpaceItem>
-        <SpaceItem>
-            <Button Type="ButtonType.Primary"
-                    Icon="@IconType.Outline.Plus"
-                    OnClick="OpenCreateDrawer">
-                New node
             </Button>
         </SpaceItem>
     </Space>
@@ -51,7 +39,7 @@
 }
 else if (_nodes.Count == 0)
 {
-    <p><Text Type="TextElementType.Secondary">No nodes yet. Create one to get started.</Text></p>
+    <p><Text Type="TextElementType.Secondary">No active nodes.</Text></p>
 }
 else
 {
@@ -81,30 +69,6 @@ else
                         Kernels
                     </Button>
                 </SpaceItem>
-                @if (context.State is NodeState.Stopped)
-                {
-                    var name = context.Name;
-                    <SpaceItem>
-                        <Button Size="ButtonSize.Small" Type="ButtonType.Primary"
-                                Loading="@(_busy == name)" Disabled="@(_busy == name)"
-                                Icon="@IconType.Outline.PlayCircle"
-                                OnClick="@(() => StartNodeAsync(name))">
-                            Start
-                        </Button>
-                    </SpaceItem>
-                }
-                @if (context.State is NodeState.Running)
-                {
-                    var name = context.Name;
-                    <SpaceItem>
-                        <Button Size="ButtonSize.Small"
-                                Loading="@(_busy == name)" Disabled="@(_busy == name)"
-                                Icon="@IconType.Outline.PauseCircle"
-                                OnClick="@(() => StopNodeAsync(name))">
-                            Stop
-                        </Button>
-                    </SpaceItem>
-                }
                 @{
                     var nodeName = context.Name;
                     var nodeBusy = _busy == nodeName;
@@ -128,97 +92,6 @@ else
     </Table>
 }
 
-<Drawer @bind-Visible="_createOpen" Title='("New node")' Placement="DrawerPlacement.Right" Width="440" OnClose="CloseCreateDrawer">
-    <div style="margin-bottom: 16px;">
-        <label style="display: block; font-weight: 600; margin-bottom: 4px;">Name</label>
-        <Input @bind-Value="_createName" Placeholder="mynode"
-               Status="@(ValidationHelper.ValidateNodeName(_createName) is not null ? "error" : "")" />
-        @if (ValidationHelper.ValidateNodeName(_createName) is { } nameErr)
-        {
-            <div style="color: #ff4d4f; font-size: 12px; margin-top: 2px;">@nameErr</div>
-        }
-    </div>
-    <div style="margin-bottom: 16px;">
-        <label style="display: block; font-weight: 600; margin-bottom: 4px;">VM Size</label>
-        <Input @bind-Value="_createVmSize" Placeholder="Standard_D2as_v5" />
-    </div>
-    <div style="margin-bottom: 4px;">
-        <label style="display: block; font-weight: 600; margin-bottom: 4px;">Kernel idle timeout
-            <Text Type="TextElementType.Secondary" Style="font-weight: normal; margin-left: 4px;">(minutes)</Text>
-        </label>
-        <AntDesign.InputNumber TValue="int?" @bind-Value="_createKernelIdleMinutes" Min="1" Style="width: 100%;" Placeholder="Default" />
-        <Text Type="TextElementType.Secondary" Style="font-size: 0.8rem;">How long a kernel can be idle before it is deleted. Leave blank to use the server default.</Text>
-    </div>
-    <div style="margin-bottom: 16px; margin-top: 12px;">
-        <label style="display: block; font-weight: 600; margin-bottom: 4px;">Node idle timeout
-            <Text Type="TextElementType.Secondary" Style="font-weight: normal; margin-left: 4px;">(minutes)</Text>
-        </label>
-        <AntDesign.InputNumber TValue="int?" @bind-Value="_createNodeIdleMinutes" Min="1" Style="width: 100%;" Placeholder="Default" />
-        <Text Type="TextElementType.Secondary" Style="font-size: 0.8rem;">How long a node with no kernels can be idle before it is stopped. Leave blank to use the server default.</Text>
-    </div>
-    <div style="margin-bottom: 16px;">
-        <label style="display: block; font-weight: 600; margin-bottom: 4px;">Kernel requirements (pip)</label>
-        <TextArea @bind-Value="_createKernelReqs" Rows="3" Placeholder="@("scipy>=1.14\nscikit-learn>=1.6")" />
-        <Text Type="TextElementType.Secondary" Style="font-size: 0.8rem;">One package per line. Installed in the kernel venv at node startup.</Text>
-    </div>
-    <div style="margin-bottom: 16px;">
-        <label style="display: block; font-weight: 600; margin-bottom: 4px;">Wheel packages</label>
-        <Select Mode="SelectMode.Multiple"
-                TItem="WheelPackageDto"
-                TItemValue="Guid"
-                DataSource="_availablePackages"
-                LabelName="@nameof(WheelPackageDto.Name)"
-                ValueName="@nameof(WheelPackageDto.Id)"
-                @bind-Values="_createWheelPackageIds"
-                Placeholder="Select packages to install"
-                Style="width: 100%;" />
-        <Text Type="TextElementType.Secondary" Style="font-size: 0.8rem;">Custom .whl packages installed in the kernel venv at startup.</Text>
-    </div>
-    <div style="margin-bottom: 16px;">
-        <label style="display: block; font-weight: 600; margin-bottom: 4px;">Environment variables</label>
-        <Select Mode="SelectMode.Multiple"
-                TItem="EnvironmentVariableDto"
-                TItemValue="Guid"
-                DataSource="_availableEnvVars"
-                LabelName="@nameof(EnvironmentVariableDto.Key)"
-                ValueName="@nameof(EnvironmentVariableDto.Id)"
-                @bind-Values="_createEnvVarIds"
-                Placeholder="Select environment variables"
-                Style="width: 100%;" />
-        <Text Type="TextElementType.Secondary" Style="font-size: 0.8rem;">Environment variables injected into the node container.</Text>
-    </div>
-    <div style="margin-bottom: 16px;">
-        <label style="display: block; font-weight: 600; margin-bottom: 4px;">Secrets</label>
-        <Select Mode="SelectMode.Multiple"
-                TItem="SecretDto"
-                TItemValue="Guid"
-                DataSource="_availableSecrets"
-                LabelName="@nameof(SecretDto.Key)"
-                ValueName="@nameof(SecretDto.Id)"
-                @bind-Values="_createSecretIds"
-                Placeholder="Select secrets"
-                Style="width: 100%;" />
-        <Text Type="TextElementType.Secondary" Style="font-size: 0.8rem;">Secrets injected as environment variables via Kubernetes Secrets.</Text>
-    </div>
-    @if (_createError is not null)
-    {
-        <Alert Type="AlertType.Error" Message="@_createError" ShowIcon="true" Style="margin-bottom: 16px;" />
-    }
-    <Space>
-        <SpaceItem>
-            <Button OnClick="CloseCreateDrawer">Cancel</Button>
-        </SpaceItem>
-        <SpaceItem>
-            <Button Type="ButtonType.Primary" Loading="_creating"
-                    Disabled="@(string.IsNullOrWhiteSpace(_createName) || string.IsNullOrWhiteSpace(_createVmSize) || ValidationHelper.ValidateNodeName(_createName) is not null)"
-                    Icon="@IconType.Outline.Plus"
-                    OnClick="CreateNodeAsync">
-                Create
-            </Button>
-        </SpaceItem>
-    </Space>
-</Drawer>
-
 @code {
     @inject NavigationManager Navigation
 
@@ -227,45 +100,7 @@ else
     private string? _error;
     private string? _busy;
 
-    private bool _createOpen;
-    private string _createName = "";
-    private string _createVmSize = "";
-    private int? _createKernelIdleMinutes;
-    private int? _createNodeIdleMinutes;
-    private string? _createKernelReqs;
-    private IEnumerable<Guid> _createWheelPackageIds = [];
-    private IEnumerable<Guid> _createEnvVarIds = [];
-    private IEnumerable<Guid> _createSecretIds = [];
-    private bool _creating;
-    private string? _createError;
-
-    private List<WheelPackageDto> _availablePackages = [];
-    private List<EnvironmentVariableDto> _availableEnvVars = [];
-    private List<SecretDto> _availableSecrets = [];
-
-    protected override async Task OnInitializedAsync()
-    {
-        await Task.WhenAll(LoadNodesAsync(), LoadPackagesAsync(), LoadEnvironmentAsync());
-    }
-
-    private async Task LoadPackagesAsync()
-    {
-        try { _availablePackages = [.. await WheelPackageService.GetPackagesAsync()]; }
-        catch { /* non-fatal; packages selector will be empty */ }
-    }
-
-    private async Task LoadEnvironmentAsync()
-    {
-        try
-        {
-            var varsTask = EnvironmentService.GetVariablesAsync();
-            var secretsTask = EnvironmentService.GetSecretsAsync();
-            await Task.WhenAll(varsTask, secretsTask);
-            _availableEnvVars = [.. await varsTask];
-            _availableSecrets = [.. await secretsTask];
-        }
-        catch { /* non-fatal; selectors will be empty */ }
-    }
+    protected override async Task OnInitializedAsync() => await LoadNodesAsync();
 
     private async Task LoadNodesAsync()
     {
@@ -285,81 +120,18 @@ else
         }
     }
 
-    private void OpenCreateDrawer()
-    {
-        _createName = "";
-        _createVmSize = "";
-        _createKernelIdleMinutes = null;
-        _createNodeIdleMinutes = null;
-        _createKernelReqs = null;
-        _createWheelPackageIds = [];
-        _createEnvVarIds = [];
-        _createSecretIds = [];
-        _createError = null;
-        _createOpen = true;
-    }
-
-    private void CloseCreateDrawer() => _createOpen = false;
-
-    private async Task CreateNodeAsync()
-    {
-        _createError = null;
-        _creating = true;
-        try
-        {
-            var request = new DuckHouse.Ui.Shared.Nodes.CreateNodeRequest(
-                _createName.Trim(),
-                _createVmSize.Trim(),
-                _createKernelIdleMinutes is > 0 ? TimeSpan.FromMinutes(_createKernelIdleMinutes.Value) : null,
-                _createNodeIdleMinutes is > 0 ? TimeSpan.FromMinutes(_createNodeIdleMinutes.Value) : null,
-                string.IsNullOrWhiteSpace(_createKernelReqs) ? null : _createKernelReqs.Trim(),
-                _createWheelPackageIds.Any() ? [.. _createWheelPackageIds] : null,
-                _createEnvVarIds.Any() ? [.. _createEnvVarIds] : null,
-                _createSecretIds.Any() ? [.. _createSecretIds] : null);
-            var node = await NodeService.CreateNodeAsync(request);
-            _nodes.Add(node);
-            _createOpen = false;
-        }
-        catch (Exception ex)
-        {
-            _createError = $"Failed to create node: {ex.Message}";
-        }
-        finally
-        {
-            _creating = false;
-        }
-    }
-
-    private async Task StartNodeAsync(string name) =>
-        await RunActionAsync(name, NodeService.StartNodeAsync, "start");
-
-    private async Task StopNodeAsync(string name) =>
-        await RunActionAsync(name, NodeService.StopNodeAsync, "stop");
-
-    private async Task RemoveNodeAsync(string name) =>
-        await RunActionAsync(name, NodeService.RemoveNodeAsync, "remove");
-
-    private async Task RunActionAsync(string name, Func<string, CancellationToken, Task> action, string verb)
+    private async Task RemoveNodeAsync(string name)
     {
         _busy = name;
         _error = null;
         try
         {
-            await action(name, CancellationToken.None);
-            var updated = await NodeService.GetNodeAsync(name);
-            if (updated is not null)
-            {
-                var idx = _nodes.FindIndex(n => n.Name == name);
-                if (idx >= 0) _nodes[idx] = updated;
-            }
-            else
-            {
-                _nodes.RemoveAll(n => n.Name == name);
-            }
+            await NodeService.RemoveNodeAsync(name);
+            _nodes.RemoveAll(n => n.Name == name);
         }
         catch (Exception ex)
         {
-            _error = $"Failed to {verb} node '{name}': {ex.Message}";
+            _error = $"Failed to remove node '{name}': {ex.Message}";
         }
         finally
         {
@@ -370,7 +142,6 @@ else
     private static string StateTagColor(NodeState state) => state switch
     {
         NodeState.Running => "success",
-        NodeState.Stopped => "default",
         NodeState.Failure => "error",
         _ => "warning"
     };

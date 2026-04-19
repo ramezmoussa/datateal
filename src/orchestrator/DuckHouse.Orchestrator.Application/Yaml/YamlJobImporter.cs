@@ -44,9 +44,8 @@ public class YamlJobImporter(
             var existing = await nodePoolConfigRepository.GetByNameAsync(pool.Name, ct);
             if (existing is null)
             {
-                await nodePoolConfigRepository.CreateAsync(new NodePoolConfig
+                await nodePoolConfigRepository.CreateAsync(new JobNodePoolConfig
                 {
-                    Id = Guid.NewGuid(),
                     Name = pool.Name,
                     VmSize = string.IsNullOrWhiteSpace(pool.VmSize) ? "Standard_D2s_v3" : pool.VmSize,
                     KernelRequirements = pool.KernelRequirements,

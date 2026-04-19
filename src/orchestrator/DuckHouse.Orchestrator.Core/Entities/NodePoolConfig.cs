@@ -1,9 +1,10 @@
 namespace DuckHouse.Orchestrator.Core.Entities;
 
-public class NodePoolConfig
+public abstract class NodePoolConfig
 {
     public Guid Id { get; set; }
     public required string Name { get; set; }
+    public string PoolType { get; set; } = string.Empty;
     public required string VmSize { get; set; }
     public TimeSpan? KernelIdleTimeout { get; set; }
     public TimeSpan? NodeIdleTimeout { get; set; }

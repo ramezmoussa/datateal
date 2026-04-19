@@ -3,6 +3,7 @@ namespace DuckHouse.Ui.Shared.Orchestration;
 public record NodePoolConfigDto(
     Guid Id,
     string Name,
+    string PoolType,
     string VmSize,
     TimeSpan? KernelIdleTimeout,
     TimeSpan? NodeIdleTimeout,
@@ -16,6 +17,7 @@ public record NodePoolConfigDto(
 
 public record CreateNodePoolRequest(
     string Name,
+    string PoolType,
     string VmSize,
     TimeSpan? KernelIdleTimeout,
     TimeSpan? NodeIdleTimeout,

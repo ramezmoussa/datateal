@@ -18,7 +18,7 @@ public interface IControlPlaneClient
         CancellationToken ct = default);
     Task<NodeInfo?> GetNodeAsync(string name, CancellationToken ct = default);
     Task DeleteNodeAsync(string name, CancellationToken ct = default);
-    Task StartNodeAsync(string name, CancellationToken ct = default);
+    Task UpdateNodeEvictionConfigAsync(string name, TimeSpan? kernelIdleTimeout, TimeSpan? nodeIdleTimeout, CancellationToken ct = default);
 
     // Kernels
     Task<KernelInfo> CreateKernelAsync(string nodeName, CancellationToken ct = default);

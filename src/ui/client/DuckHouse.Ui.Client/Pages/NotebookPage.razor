@@ -8,8 +8,10 @@
 @using DuckHouse.Ui.Shared.Kernels
 @using DuckHouse.Ui.Shared.Workspace
 @using DuckHouse.Ui.Shared.Catalogs
+@using DuckHouse.Ui.Shared.Nodes
 @inject IKernelService KernelService
 @inject INodeService NodeService
+@inject IInteractivePoolService InteractivePoolService
 @inject IWorkspaceService WorkspaceService
 @inject ICatalogService CatalogService
 @inject IJSRuntime JS
@@ -136,9 +138,9 @@
                 <Icon Type="@IconType.Outline.CloudServer" />
             </SpaceItem>
             <SpaceItem>
-                <Text Type="TextElementType.Secondary" Style="font-size: 0.875rem;">Node:</Text>
+                <Text Type="TextElementType.Secondary" Style="font-size: 0.875rem;">Pool:</Text>
             </SpaceItem>
-            @if (_loadingNodes)
+            @if (_loadingPools)
             {
                 <SpaceItem><Spin Size="SpinSize.Small" /></SpaceItem>
             }
@@ -146,20 +148,27 @@
             {
                 <SpaceItem>
                     <Select TItemValue="string"
-                            TItem="NodeInfo"
-                            DataSource="@_nodes.ToList()"
-                            @bind-Value="@_nodeName"
-                            ItemValue="n => n.Name"
-                            ItemLabel="n => n.Name"
-                            Placeholder="— select node —"
+                            TItem="InteractivePoolDto"
+                            DataSource="@_pools.ToList()"
+                            @bind-Value="@_poolName"
+                            ItemValue="p => p.Name"
+                            ItemLabel="p => p.Name"
+                            Placeholder="— select pool —"
                             AllowClear
                             Disabled="@(_connecting || HasKernel)"
                             DropdownMatchSelectWidth="false"
                             Style="min-width: 150px;">
                         <ItemTemplate>
-                            @{ var node = (NodeInfo)context!; }
-                            <span>@node.Name</span>
-                            <Tag Color="@NodeStateTagColor(node.State)" Style="margin-left: 6px; font-size: 0.75rem;">@node.State</Tag>
+                            @{ var pool = (InteractivePoolDto)context!; }
+                            <span>@pool.Name</span>
+                            @if (pool.NodeState.HasValue)
+                            {
+                                <Tag Color="@NodeStateTagColor(pool.NodeState.Value)" Style="margin-left: 6px; font-size: 0.75rem;">@pool.NodeState.Value</Tag>
+                            }
+                            else
+                            {
+                                <Tag Color="@("default")" Style="margin-left: 6px; font-size: 0.75rem;">Idle</Tag>
+                            }
                         </ItemTemplate>
                     </Select>
                 </SpaceItem>
@@ -169,15 +178,15 @@
             {
                 <SpaceItem>
                     <Button Type="ButtonType.Primary" Size="ButtonSize.Small"
-                            Disabled="@(string.IsNullOrEmpty(_nodeName) || _connecting)"
+                            Disabled="@(string.IsNullOrEmpty(_poolName) || _connecting)"
                             Loading="_connecting"
                             Icon="@IconType.Outline.Api"
                             OnClick="ConnectAsync">
-                        @(SelectedNode?.State switch
+                        @(SelectedPool?.NodeState switch
                         {
                             NodeState.Running => "Connect",
-                            NodeState.Creating or NodeState.Resuming => "Wait and connect",
-                            _ => "Start and connect"
+                            NodeState.Creating => "Wait and connect",
+                            _ => "Create and connect"
                         })
                     </Button>
                 </SpaceItem>
@@ -259,11 +268,12 @@
     private Guid? _workspaceNotebookId;
     private Guid? _workspaceNotebookFolderId;
     private List<(Guid? Id, string Name)> _breadcrumbs = [];
+    private string? _poolName;
     private string? _nodeName;
     private string? _kernelId;
     private KernelInfo? _kernel;
-    private IReadOnlyList<NodeInfo> _nodes = [];
-    private bool _loadingNodes;
+    private IReadOnlyList<InteractivePoolDto> _pools = [];
+    private bool _loadingPools;
     private bool _connecting;
     private bool _disconnecting;
     private string? _error;
@@ -283,7 +293,7 @@
 
     private bool HasKernel => !string.IsNullOrEmpty(_kernelId);
     private bool AnyExecuting => _notebook.Cells.Any(c => c.IsExecuting);
-    private NodeInfo? SelectedNode => _nodes.FirstOrDefault(n => n.Name == _nodeName);
+    private InteractivePoolDto? SelectedPool => _pools.FirstOrDefault(p => p.Name == _poolName);
 
     private void NavigateToWorkspace(Guid? folderId) =>
         Navigation.NavigateTo(folderId is null ? "/workspace" : $"/workspace?folder={folderId}");
@@ -355,10 +365,10 @@
             _notebook.IsDirty = true;
         }
 
-        _loadingNodes = true;
-        try { _nodes = await NodeService.GetNodesAsync(); }
-        catch (Exception ex) { _error = $"Failed to load nodes: {ex.Message}"; }
-        finally { _loadingNodes = false; }
+        _loadingPools = true;
+        try { _pools = await InteractivePoolService.GetInteractivePoolsAsync(); }
+        catch (Exception ex) { _error = $"Failed to load pools: {ex.Message}"; }
+        finally { _loadingPools = false; }
 
         // Load available catalogs
         try { _allCatalogs = await CatalogService.GetCatalogsAsync(); }
@@ -375,19 +385,19 @@
             catch { /* non-fatal */ }
         }
 
-        // Restore last-used node preference
+        // Restore last-used pool preference
         if (_workspaceNotebookId.HasValue)
         {
             try
             {
-                var storedNode = await JS.InvokeAsync<string>("getItemNodePref", _workspaceNotebookId.Value.ToString());
-                if (!string.IsNullOrEmpty(storedNode))
+                var storedPool = await JS.InvokeAsync<string>("getItemNodePref", _workspaceNotebookId.Value.ToString());
+                if (!string.IsNullOrEmpty(storedPool))
                 {
-                    var match = _nodes.FirstOrDefault(n => n.Name == storedNode);
+                    var match = _pools.FirstOrDefault(p => p.Name == storedPool);
                     if (match is not null)
                     {
-                        _nodeName = match.Name;
-                        if (match.State == NodeState.Running)
+                        _poolName = match.Name;
+                        if (match.NodeState == NodeState.Running)
                             _ = ConnectAsync();
                     }
                 }
@@ -398,41 +408,46 @@
 
     private async Task ConnectAsync()
     {
-        if (string.IsNullOrEmpty(_nodeName)) return;
+        if (string.IsNullOrEmpty(_poolName)) return;
         _connecting = true;
         _error = null;
         _connectCts = new CancellationTokenSource();
         var ct = _connectCts.Token;
         try
         {
-            // Start node first if it isn't already running or being provisioned
-            if (SelectedNode?.State != NodeState.Running)
-            {
-                if (SelectedNode?.State is not (NodeState.Creating or NodeState.Resuming))
-                    await NodeService.StartNodeAsync(_nodeName, ct);
+            // Ensure the interactive pool's node exists (creates it if needed)
+            var nodeInfo = await InteractivePoolService.EnsureNodeAsync(_poolName, ct);
+            if (nodeInfo is null) throw new Exception("Interactive pool not found.");
 
+            var nodeName = nodeInfo.Name;
+
+            // Poll until running if the node is still being provisioned
+            if (nodeInfo.State != NodeState.Running)
+            {
                 var deadline = DateTime.UtcNow.AddMinutes(10);
                 while (DateTime.UtcNow < deadline)
                 {
                     await Task.Delay(3000, ct);
-                    var updated = await NodeService.GetNodeAsync(_nodeName, ct);
+                    var updated = await NodeService.GetNodeAsync(nodeName, ct);
                     if (updated is null) throw new Exception("Node not found.");
-                    _nodes = _nodes.Select(n => n.Name == _nodeName ? updated : n).ToList();
+                    _pools = _pools.Select(p => p.NodeName == nodeName ? p with { NodeState = updated.State } : p).ToList();
                     StateHasChanged();
                     if (updated.State == NodeState.Running) break;
                     if (updated.State == NodeState.Failure) throw new Exception("Node failed to start.");
                 }
-                if (SelectedNode?.State != NodeState.Running)
+                var finalNode = await NodeService.GetNodeAsync(nodeName, ct);
+                if (finalNode?.State != NodeState.Running)
                     throw new Exception("Node did not reach Running state in time.");
             }
 
-            var kernel = await CreateKernelWithRetryAsync(_nodeName, ct);
+            _nodeName = nodeName;
+            var kernel = await CreateKernelWithRetryAsync(nodeName, ct);
             _kernelId = kernel.Id;
             _kernel = kernel;
             _kernelPollingCts = new CancellationTokenSource();
             _ = PollKernelStatusAsync(_kernelPollingCts.Token);
             if (_workspaceNotebookId.HasValue)
-                await JS.InvokeVoidAsync("setItemNodePref", _workspaceNotebookId.Value.ToString(), _nodeName);
+                await JS.InvokeVoidAsync("setItemNodePref", _workspaceNotebookId.Value.ToString(), _poolName);
 
             // Attach catalogs if any are selected
             await _catalog.SetupAllAsync(_selectedCatalogNames);
@@ -882,7 +897,6 @@
     private static string NodeStateTagColor(NodeState state) => state switch
     {
         NodeState.Running => "success",
-        NodeState.Stopped => "default",
         NodeState.Failure => "error",
         _                 => "warning",
     };

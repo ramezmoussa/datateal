@@ -2,9 +2,13 @@
 
 @using DuckHouse.Ui.Shared.Orchestration
 @using DuckHouse.Ui.Shared.Environment
+@using DuckHouse.Ui.Shared.Nodes
+@using DuckHouse.Core.Nodes
 @using DuckHouse.Ui.Client.Validation
 @using DuckHouse.Ui.Shared.Packages
 @inject INodePoolService NodePoolService
+@inject IInteractivePoolService InteractivePoolService
+@inject INodeService NodeService
 @inject IWheelPackageService WheelPackageService
 @inject IEnvironmentService EnvironmentService
 
@@ -34,41 +38,122 @@
             Style="margin-bottom: 16px;" />
 }
 
-<Spin Spinning="_loading">
-    <Table TItem="NodePoolConfigDto" DataSource="_pools" Size="@TableSize.Small">
-        <PropertyColumn Property="c => c.Name" Title="Name" Sortable />
-        <PropertyColumn Property="c => c.VmSize" Title="VM size" />
-        <PropertyColumn Property="c => c.KernelIdleTimeout" Title="Kernel idle timeout">
-            @(context.KernelIdleTimeout.HasValue ? $"{context.KernelIdleTimeout.Value.TotalMinutes:F0} min" : "Default")
-        </PropertyColumn>
-        <PropertyColumn Property="c => c.NodeIdleTimeout" Title="Node idle timeout">
-            @(context.NodeIdleTimeout.HasValue ? $"{context.NodeIdleTimeout.Value.TotalMinutes:F0} min" : "Default")
-        </PropertyColumn>
-        <PropertyColumn Property="c => c.Description" Title="Description">
-            @(context.Description ?? "—")
-        </PropertyColumn>
-        <PropertyColumn Property="c => c.UpdatedAt" Title="Updated" Sortable>
-            @context.UpdatedAt.ToString("yyyy-MM-dd")
-        </PropertyColumn>
-        <ActionColumn Title="Actions">
-            <Space>
-                <SpaceItem>
-                    <Button Size="@ButtonSize.Small" OnClick="() => StartEdit(context)">
-                        <Icon Type="@IconType.Outline.Edit" />
-                    </Button>
-                </SpaceItem>
-                <SpaceItem>
-                    <Popconfirm Title="@($"Delete node pool '{context.Name}'?")"
-                                OnConfirm="() => DeleteAsync(context)">
-                        <Button Danger Size="@ButtonSize.Small">
-                            <Icon Type="@IconType.Outline.Delete" />
-                        </Button>
-                    </Popconfirm>
-                </SpaceItem>
-            </Space>
-        </ActionColumn>
-    </Table>
-</Spin>
+<Tabs ActiveKey="@_activeTab" OnChange="key => _activeTab = key">
+    <TabPane Key="interactive" Tab="Interactive">
+        <Spin Spinning="_loading">
+            @if (_interactivePools.Count == 0 && !_loading)
+            {
+                <p><Text Type="TextElementType.Secondary">No interactive node pools. Create one to connect from Notebook and Query pages.</Text></p>
+            }
+            else
+            {
+                <Table TItem="InteractivePoolDto" DataSource="_interactivePools" Size="@TableSize.Small">
+                    <PropertyColumn Property="c => c.Name" Title="Name" Sortable />
+                    <PropertyColumn Property="c => c.VmSize" Title="VM size" />
+                    <PropertyColumn Property="c => c.KernelIdleTimeout" Title="Kernel idle">
+                        @(context.KernelIdleTimeout.HasValue ? $"{context.KernelIdleTimeout.Value.TotalMinutes:F0} min" : "Default")
+                    </PropertyColumn>
+                    <PropertyColumn Property="c => c.NodeIdleTimeout" Title="Node idle">
+                        @(context.NodeIdleTimeout.HasValue ? $"{context.NodeIdleTimeout.Value.TotalMinutes:F0} min" : "Default")
+                    </PropertyColumn>
+                    <PropertyColumn Property="c => c.Description" Title="Description">
+                        @(context.Description ?? "—")
+                    </PropertyColumn>
+                    <PropertyColumn Property="c => c.NodeState" Title="Node">
+                        @if (context.NodeState.HasValue)
+                        {
+                            <Tag Color="@NodeStateTagColor(context.NodeState.Value)">@context.NodeState.Value</Tag>
+                        }
+                        else
+                        {
+                            <Tag Color="@("default")">Idle</Tag>
+                        }
+                    </PropertyColumn>
+                    <ActionColumn Title="Actions">
+                        <Space>
+                            @{
+                                var poolForEdit = _jobAndInteractivePools.FirstOrDefault(p => p.Id == context.Id);
+                            }
+                            <SpaceItem>
+                                <Button Size="@ButtonSize.Small"
+                                        Disabled="@(poolForEdit is null)"
+                                        OnClick="() => StartEdit(poolForEdit!)">
+                                    <Icon Type="@IconType.Outline.Edit" />
+                                </Button>
+                            </SpaceItem>
+                            <SpaceItem>
+                                <Popconfirm Title="@($"Delete pool '{context.Name}'?")"
+                                            OnConfirm="() => DeleteInteractiveAsync(context)">
+                                    <Button Danger Size="@ButtonSize.Small">
+                                        <Icon Type="@IconType.Outline.Delete" />
+                                    </Button>
+                                </Popconfirm>
+                            </SpaceItem>
+                            @if (context.NodeState is NodeState.Running or NodeState.Creating)
+                            {
+                                var nodeName = context.NodeName;
+                                <SpaceItem>
+                                    <Popconfirm Title="@($"Remove the running node for '{context.Name}'? The pool config will remain.")"
+                                                OnConfirm="() => RemoveInteractiveNodeAsync(nodeName)">
+                                        <Button Size="@ButtonSize.Small"
+                                                Loading="@(_busyNode == nodeName)"
+                                                Disabled="@(_busyNode is not null)">
+                                            Remove node
+                                        </Button>
+                                    </Popconfirm>
+                                </SpaceItem>
+                            }
+                        </Space>
+                    </ActionColumn>
+                </Table>
+            }
+        </Spin>
+    </TabPane>
+    <TabPane Key="job" Tab="Job">
+        <Spin Spinning="_loading">
+            @if (_jobPools.Count == 0 && !_loading)
+            {
+                <p><Text Type="TextElementType.Secondary">No job node pools.</Text></p>
+            }
+            else
+            {
+                <Table TItem="NodePoolConfigDto" DataSource="_jobPools" Size="@TableSize.Small">
+                    <PropertyColumn Property="c => c.Name" Title="Name" Sortable />
+                    <PropertyColumn Property="c => c.VmSize" Title="VM size" />
+                    <PropertyColumn Property="c => c.KernelIdleTimeout" Title="Kernel idle timeout">
+                        @(context.KernelIdleTimeout.HasValue ? $"{context.KernelIdleTimeout.Value.TotalMinutes:F0} min" : "Default")
+                    </PropertyColumn>
+                    <PropertyColumn Property="c => c.NodeIdleTimeout" Title="Node idle timeout">
+                        @(context.NodeIdleTimeout.HasValue ? $"{context.NodeIdleTimeout.Value.TotalMinutes:F0} min" : "Default")
+                    </PropertyColumn>
+                    <PropertyColumn Property="c => c.Description" Title="Description">
+                        @(context.Description ?? "—")
+                    </PropertyColumn>
+                    <PropertyColumn Property="c => c.UpdatedAt" Title="Updated" Sortable>
+                        @context.UpdatedAt.ToString("yyyy-MM-dd")
+                    </PropertyColumn>
+                    <ActionColumn Title="Actions">
+                        <Space>
+                            <SpaceItem>
+                                <Button Size="@ButtonSize.Small" OnClick="() => StartEdit(context)">
+                                    <Icon Type="@IconType.Outline.Edit" />
+                                </Button>
+                            </SpaceItem>
+                            <SpaceItem>
+                                <Popconfirm Title="@($"Delete node pool '{context.Name}'?")"
+                                            OnConfirm="() => DeleteAsync(context)">
+                                    <Button Danger Size="@ButtonSize.Small">
+                                        <Icon Type="@IconType.Outline.Delete" />
+                                    </Button>
+                                </Popconfirm>
+                            </SpaceItem>
+                        </Space>
+                    </ActionColumn>
+                </Table>
+            }
+        </Spin>
+    </TabPane>
+</Tabs>
 
 <Modal Title="@(_editTarget is null ? "New node pool" : "Edit node pool")"
         Visible="_showModal"
@@ -145,9 +230,15 @@
 </Modal>
 
 @code {
-    private IReadOnlyList<NodePoolConfigDto> _pools = [];
+    private IReadOnlyList<NodePoolConfigDto> _jobAndInteractivePools = [];
+    private IReadOnlyList<InteractivePoolDto> _interactivePools = [];
     private bool _loading = true;
     private string? _error;
+    private string _activeTab = "interactive";
+    private string? _busyNode;
+
+    private List<NodePoolConfigDto> _jobPools => _jobAndInteractivePools
+        .Where(p => p.PoolType == "Job").ToList();
 
     // Modal state
     private bool _showModal;
@@ -194,7 +285,11 @@
         _loading = true;
         try
         {
-            _pools = await NodePoolService.GetNodePoolsAsync();
+            var allTask = NodePoolService.GetNodePoolsAsync();
+            var interactiveTask = InteractivePoolService.GetInteractivePoolsAsync();
+            await Task.WhenAll(allTask, interactiveTask);
+            _jobAndInteractivePools = await allTask;
+            _interactivePools = [.. await interactiveTask];
         }
         catch (Exception ex)
         {
@@ -247,8 +342,9 @@
         {
             if (_editTarget is null)
             {
+                var poolType = _activeTab == "interactive" ? "Interactive" : "Job";
                 await NodePoolService.CreateNodePoolAsync(new CreateNodePoolRequest(
-                    _formName.Trim(), _formVmSize.Trim(), kernelTimeout, nodeTimeout,
+                    _formName.Trim(), poolType, _formVmSize.Trim(), kernelTimeout, nodeTimeout,
                     _formKernelReqs?.Trim(), _formDescription?.Trim(),
                     _formWheelPackageIds.Any() ? [.. _formWheelPackageIds] : null,
                     _formEnvVarIds.Any() ? [.. _formEnvVarIds] : null,
@@ -284,4 +380,37 @@
             _error = $"Failed to delete: {ex.Message}";
         }
     }
+
+    private async Task DeleteInteractiveAsync(InteractivePoolDto pool)
+    {
+        var dto = _jobAndInteractivePools.FirstOrDefault(p => p.Id == pool.Id);
+        if (dto is null) return;
+        await DeleteAsync(dto);
+    }
+
+    private async Task RemoveInteractiveNodeAsync(string nodeName)
+    {
+        _busyNode = nodeName;
+        _error = null;
+        try
+        {
+            await NodeService.RemoveNodeAsync(nodeName);
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to remove node: {ex.Message}";
+        }
+        finally
+        {
+            _busyNode = null;
+        }
+    }
+
+    private static string NodeStateTagColor(NodeState state) => state switch
+    {
+        NodeState.Running => "success",
+        NodeState.Failure => "error",
+        _ => "warning"
+    };
 }

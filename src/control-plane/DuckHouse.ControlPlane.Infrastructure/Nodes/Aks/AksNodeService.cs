@@ -47,9 +47,6 @@ public sealed class AksNodeService : INodeService
             ("failed", _) => NodeState.Failure,
             ("deleting", _) => NodeState.Deleting,
             ("creating", _) => NodeState.Creating,
-            ("starting", _) => NodeState.Resuming,
-            ("stopping", _) => NodeState.Stopping,
-            ("succeeded", "stopped") => NodeState.Stopped,
             ("succeeded", "running") => NodeState.Running,
             _ => NodeState.Unknown
         };
@@ -239,37 +236,6 @@ public sealed class AksNodeService : INodeService
         var pool = await cluster.GetContainerServiceAgentPoolAsync(name, cancellationToken);
         await pool.Value.DeleteAsync(WaitUntil.Started, cancellationToken);
         _logger.LogInformation("Started deletion of node pool {PoolName}", name);
-    }
-
-    public Task StopNodeAsync(string name, CancellationToken cancellationToken = default) =>
-        SetPowerStateAsync(name, ContainerServiceStateCode.Stopped, cancellationToken);
-
-    public Task StartNodeAsync(string name, CancellationToken cancellationToken = default) =>
-        SetPowerStateAsync(name, ContainerServiceStateCode.Running, cancellationToken);
-
-    private async Task SetPowerStateAsync(string name, ContainerServiceStateCode state, CancellationToken cancellationToken)
-    {
-        var cluster = GetClusterResource();
-        var pool = (await cluster.GetContainerServiceAgentPoolAsync(name, cancellationToken)).Value;
-        var existing = pool.Data;
-
-        var updated = new ContainerServiceAgentPoolData
-        {
-            Count = existing.Count,
-            VmSize = existing.VmSize,
-            OSType = existing.OSType,
-            OSSku = existing.OSSku,
-            Mode = existing.Mode,
-            PowerStateCode = state,
-        };
-
-        await cluster.GetContainerServiceAgentPools().CreateOrUpdateAsync(
-            WaitUntil.Started,
-            name,
-            updated,
-            cancellationToken);
-
-        _logger.LogInformation("Set power state of node pool {PoolName} to {State}", name, state);
     }
 
     private async Task CreateWheelConfigMapsAsync(

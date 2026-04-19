@@ -68,20 +68,6 @@ public class NodesController(IMediator mediator, IWheelPackageRepository wheelPa
         return NoContent();
     }
 
-    [HttpPost("{name}/stop")]
-    public async Task<IActionResult> StopNode(string name, CancellationToken ct)
-    {
-        await mediator.SendAsync(new Cmd.StopNodeRequest(name), ct);
-        return NoContent();
-    }
-
-    [HttpPost("{name}/start")]
-    public async Task<IActionResult> StartNode(string name, CancellationToken ct)
-    {
-        await mediator.SendAsync(new Cmd.StartNodeRequest(name), ct);
-        return NoContent();
-    }
-
     private static string? ValidateNodeName(string? name)
     {
         if (string.IsNullOrWhiteSpace(name))

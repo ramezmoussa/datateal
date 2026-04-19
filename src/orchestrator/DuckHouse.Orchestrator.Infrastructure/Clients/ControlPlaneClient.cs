@@ -60,10 +60,12 @@ internal class ControlPlaneClient(IHttpClientFactory httpClientFactory) : IContr
         response.EnsureSuccessStatusCode();
     }
 
-    public async Task StartNodeAsync(string name, CancellationToken ct)
+    public async Task UpdateNodeEvictionConfigAsync(string name, TimeSpan? kernelIdleTimeout, TimeSpan? nodeIdleTimeout, CancellationToken ct)
     {
         using var client = CreateClient();
-        var response = await client.PostAsync($"/nodes/{Uri.EscapeDataString(name)}/start", null, ct);
+        var request = new { KernelIdleTimeout = kernelIdleTimeout, NodeIdleTimeout = nodeIdleTimeout };
+        var response = await client.PutAsJsonAsync($"/nodes/{Uri.EscapeDataString(name)}/config", request, JsonOptions, ct);
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound) return;
         response.EnsureSuccessStatusCode();
     }
 

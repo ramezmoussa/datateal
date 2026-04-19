@@ -45,21 +45,30 @@ internal class NodeRepository(HttpClient httpClient) : INodeRepository
         return (await response.Content.ReadFromJsonAsync<NodeInfo>(JsonOptions, cancellationToken))!;
     }
 
+    public async Task<NodeInfo?> TryCreateNodeAsync(
+        string name,
+        string vmSize,
+        TimeSpan? kernelIdleTimeout = null,
+        TimeSpan? nodeIdleTimeout = null,
+        string? kernelRequirements = null,
+        IReadOnlyList<WheelContent>? wheelContents = null,
+        IReadOnlyDictionary<string, string>? environmentVariables = null,
+        IReadOnlyDictionary<string, string>? secrets = null,
+        CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.PostAsJsonAsync(
+            "/nodes",
+            new CreateNodeRequest(name, vmSize, kernelIdleTimeout, nodeIdleTimeout, kernelRequirements, wheelContents, environmentVariables, secrets),
+            JsonOptions,
+            cancellationToken);
+        if (response.StatusCode == HttpStatusCode.Conflict) return null;
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<NodeInfo>(JsonOptions, cancellationToken))!;
+    }
+
     public async Task RemoveNodeAsync(string name, CancellationToken cancellationToken = default)
     {
         var response = await httpClient.DeleteAsync($"/nodes/{name}", cancellationToken);
-        response.EnsureSuccessStatusCode();
-    }
-
-    public async Task StopNodeAsync(string name, CancellationToken cancellationToken = default)
-    {
-        var response = await httpClient.PostAsync($"/nodes/{name}/stop", content: null, cancellationToken);
-        response.EnsureSuccessStatusCode();
-    }
-
-    public async Task StartNodeAsync(string name, CancellationToken cancellationToken = default)
-    {
-        var response = await httpClient.PostAsync($"/nodes/{name}/start", content: null, cancellationToken);
         response.EnsureSuccessStatusCode();
     }
 }

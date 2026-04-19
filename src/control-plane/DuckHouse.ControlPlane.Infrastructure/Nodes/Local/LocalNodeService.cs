@@ -175,25 +175,13 @@ public sealed class LocalNodeService : INodeService
             ProvisioningState: created.Status?.Phase ?? "Pending",
             VmSize: null,
             PowerState: null,
-            State: NodeState.Resuming);
+            State: NodeState.Creating);
     }
 
     public async Task RemoveNodeAsync(string name, CancellationToken cancellationToken = default)
     {
         await _kubernetes.CoreV1.DeleteNamespacedPodAsync(name, Namespace, cancellationToken: cancellationToken);
         _logger.LogInformation("Deleted pod {PodName} from namespace {Namespace}", name, Namespace);
-    }
-
-    public Task StopNodeAsync(string name, CancellationToken cancellationToken = default)
-    {
-        _logger.LogDebug("Stop is a no-op for local pods ({PodName})", name);
-        return Task.CompletedTask;
-    }
-
-    public Task StartNodeAsync(string name, CancellationToken cancellationToken = default)
-    {
-        _logger.LogDebug("Start is a no-op for local pods ({PodName})", name);
-        return Task.CompletedTask;
     }
 
     private async Task CreateWheelConfigMapsAsync(

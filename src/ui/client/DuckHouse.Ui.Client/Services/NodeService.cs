@@ -37,16 +37,4 @@ internal class NodeService(HttpClient httpClient) : INodeService
         var response = await httpClient.DeleteAsync($"api/nodes/{name}", cancellationToken);
         response.EnsureSuccessStatusCode();
     }
-
-    public async Task StopNodeAsync(string name, CancellationToken cancellationToken = default)
-    {
-        var response = await httpClient.PostAsync($"api/nodes/{name}/stop", content: null, cancellationToken);
-        response.EnsureSuccessStatusCode();
-    }
-
-    public async Task StartNodeAsync(string name, CancellationToken cancellationToken = default)
-    {
-        var response = await httpClient.PostAsync($"api/nodes/{name}/start", content: null, cancellationToken);
-        response.EnsureSuccessStatusCode();
-    }
 }

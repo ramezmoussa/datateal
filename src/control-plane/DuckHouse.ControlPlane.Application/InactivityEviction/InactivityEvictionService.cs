@@ -135,7 +135,7 @@ internal sealed class InactivityEvictionService(
             }
         }
 
-        // Phase 2: stop idle empty node.
+        // Phase 2: delete idle empty node.
         // Re-list kernels; also skip if any kernel is still active (not Idle/Dead).
         var remainingKernels = await runtimeClient.ListKernelsAsync(nodeName, cancellationToken);
         bool anyActive = remainingKernels.Any(k => k.Status is KernelStatus.Busy or KernelStatus.Starting or KernelStatus.Restarting);
@@ -144,11 +144,10 @@ internal sealed class InactivityEvictionService(
             if (now - lastActivity > nodeIdleTimeout)
             {
                 logger.LogInformation(
-                    "Stopping idle node {NodeName} (no kernels, last activity {Idle} ago).",
+                    "Removing idle node {NodeName} (no kernels, last activity {Idle} ago).",
                     nodeName, now - lastActivity);
 
-                await nodeService.StopNodeAsync(nodeName, cancellationToken);
-                _nodeLastActivity.Remove(nodeName);
+                await nodeService.RemoveNodeAsync(nodeName, cancellationToken);
             }
         }
     }

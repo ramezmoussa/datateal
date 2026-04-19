@@ -26,5 +26,6 @@ public static class ServiceExtensions
         services.AddScoped<ICatalogRepository, CatalogRepository>();
         services.AddScoped<ICatalogDatabaseService, CatalogDatabaseService>();
         services.AddScoped<ICatalogMetadataService, CatalogMetadataService>();
+        services.AddScoped<IInteractivePoolRepository, InteractivePoolRepository>();
     }
 }
