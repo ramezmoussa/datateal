@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Net.Http;
 using System.Security.Cryptography;
 using System.Text;
 using DuckHouse.Core.Nodes;
@@ -24,6 +25,8 @@ public class NodeManager(
     private readonly ConcurrentDictionary<string, NodeAllocation> _allocations = new();
     private static readonly TimeSpan NodeReadyTimeout = TimeSpan.FromMinutes(10);
     private static readonly TimeSpan NodePollInterval = TimeSpan.FromSeconds(5);
+    private static readonly TimeSpan KernelCreateRetryInterval = TimeSpan.FromSeconds(5);
+    private const int KernelCreateMaxRetries = 6;
 
     private record NodeAllocation(string NodeName, bool Provisioned);
 
@@ -101,16 +104,50 @@ public class NodeManager(
 
     /// <summary>
     /// Creates a kernel on the node associated with the given NodePoolRef.
+    /// Retries on transient runtime errors — on AKS the pod may not be ready
+    /// immediately after the node pool reports Running.
     /// </summary>
     public async Task<(string nodeName, string kernelId)> CreateKernelAsync(
         string nodePoolRef, CancellationToken ct)
     {
         var nodeName = await EnsureNodeAsync(nodePoolRef, ct);
-        var kernel = await controlPlane.CreateKernelAsync(nodeName, ct);
-        logger.LogInformation("Created kernel '{KernelId}' on node '{NodeName}'",
-            kernel.Id, nodeName);
-        return (nodeName, kernel.Id);
+
+        HttpRequestException? lastEx = null;
+        for (var attempt = 0; attempt <= KernelCreateMaxRetries; attempt++)
+        {
+            if (attempt > 0)
+            {
+                logger.LogWarning(
+                    "Kernel creation on node '{NodeName}' failed with {StatusCode} — runtime may not be ready yet. " +
+                    "Retrying in {Interval}s (attempt {Attempt}/{Max})",
+                    nodeName, (int?)lastEx!.StatusCode, KernelCreateRetryInterval.TotalSeconds,
+                    attempt, KernelCreateMaxRetries);
+                await Task.Delay(KernelCreateRetryInterval, ct);
+            }
+
+            try
+            {
+                var kernel = await controlPlane.CreateKernelAsync(nodeName, ct);
+                logger.LogInformation("Created kernel '{KernelId}' on node '{NodeName}'",
+                    kernel.Id, nodeName);
+                return (nodeName, kernel.Id);
+            }
+            catch (HttpRequestException ex) when (IsTransientRuntimeError(ex))
+            {
+                lastEx = ex;
+            }
+        }
+
+        throw lastEx!;
     }
+
+    private static bool IsTransientRuntimeError(HttpRequestException ex) =>
+        ex.StatusCode is
+            System.Net.HttpStatusCode.BadRequest            // 400 — runtime not fully initialised
+            or System.Net.HttpStatusCode.InternalServerError // 500 — unexpected startup error
+            or System.Net.HttpStatusCode.BadGateway          // 502 — pod not yet reachable
+            or System.Net.HttpStatusCode.ServiceUnavailable  // 503 — pod not ready
+            or System.Net.HttpStatusCode.GatewayTimeout;     // 504 — pod responded too slowly
 
     /// <summary>
     /// Deletes a specific kernel.

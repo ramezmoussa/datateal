@@ -416,7 +416,7 @@
                     throw new Exception("Node did not reach Running state in time.");
             }
 
-            var kernel = await KernelService.CreateKernelAsync(_nodeName);
+            var kernel = await CreateKernelWithRetryAsync(_nodeName);
             _kernelId = kernel.Id;
             _kernel = kernel;
             _kernelPollingCts = new CancellationTokenSource();
@@ -437,6 +437,36 @@
         }
         StateHasChanged();
     }
+
+    private static readonly int KernelCreateMaxRetries = 6;
+    private static readonly TimeSpan KernelCreateRetryInterval = TimeSpan.FromSeconds(5);
+
+    private async Task<KernelInfo> CreateKernelWithRetryAsync(string nodeName)
+    {
+        HttpRequestException? lastEx = null;
+        for (var attempt = 0; attempt <= KernelCreateMaxRetries; attempt++)
+        {
+            if (attempt > 0)
+                await Task.Delay(KernelCreateRetryInterval);
+            try
+            {
+                return await KernelService.CreateKernelAsync(nodeName);
+            }
+            catch (HttpRequestException ex) when (IsTransientRuntimeError(ex.StatusCode))
+            {
+                lastEx = ex;
+            }
+        }
+        throw lastEx!;
+    }
+
+    private static bool IsTransientRuntimeError(System.Net.HttpStatusCode? statusCode) =>
+        statusCode is
+            System.Net.HttpStatusCode.BadRequest            // 400 — runtime not fully initialised
+            or System.Net.HttpStatusCode.InternalServerError // 500 — unexpected startup error
+            or System.Net.HttpStatusCode.BadGateway          // 502 — pod not yet reachable
+            or System.Net.HttpStatusCode.ServiceUnavailable  // 503 — pod not ready
+            or System.Net.HttpStatusCode.GatewayTimeout;     // 504 — pod responded too slowly
 
     private async Task DisconnectAsync()
     {
