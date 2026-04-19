@@ -26,7 +26,7 @@ Domain types (`NodeInfo`, `NodeState`, `KernelInfo`, `KernelStatus`, kernel requ
 | `Local` | `LocalNodeService` | Kubernetes pod in Docker Desktop |
 | `Aks` | `AksNodeService` | AKS agent pool (one VM, one pod) |
 
-**Local**: creates pods from `duckhouse-runtime:latest` with `ImagePullPolicy: Never`. Uses `~/.kube/config` with context from `NodeService:Local:KubeContext` (default `"docker-desktop"`). Stop/Start are no-ops.
+**Local**: creates pods from `duckhouse-runtime:latest` with `ImagePullPolicy: Never`. Uses `~/.kube/config` with context from `NodeService:Local:KubeContext` (default `"docker-desktop"`). Stop/Start are not supported (removed).
 
 **AKS**: creates an AKS agent pool (`Count=1`, `Mode=User`) then deploys one pod pinned to that pool via `nodeSelector`. Pods are deleted before the agent pool is removed.
 
@@ -36,17 +36,19 @@ Domain types (`NodeInfo`, `NodeState`, `KernelInfo`, `KernelStatus`, kernel requ
 
 `KubernetesRuntimeClient` tunnels all kernel API calls through the Kubernetes API server HTTP proxy: `/api/v1/namespaces/default/pods/{pod}:8000/proxy/{path}`. No Kubernetes Service, public IP, or VNet access is required — the K8s API server acts as the transport.
 
-## Inactivity eviction
+## Inactivity Eviction
 
 `InactivityEvictionService` (a `BackgroundService`) runs on a configurable interval and:
 1. Deletes idle kernels whose `LastActivity` exceeds `KernelIdleTimeout` (default 10 min)
-2. Stops nodes with no remaining kernels whose last kernel activity exceeds `NodeIdleTimeout` (default 20 min)
+2. **Deletes** nodes with no remaining kernels whose last kernel activity exceeds `NodeIdleTimeout` (default 20 min) — this applies to both interactive nodes left idle and job nodes leaked by orchestrator failures
 
 Configured via `InactivityEviction` section. Set `Enabled: false` to disable.
 
 ## API
 
-Minimal API routes in `NodeEndpoints.MapNodeEndpoints()`. Pattern: node CRUD + stop/start at `/nodes/{name}`; kernel CRUD + execute/poll/restart/interrupt/completions/diagnostics at `/nodes/{name}/kernels/{kernelId}`.
+Minimal API routes in `NodeEndpoints.MapNodeEndpoints()`. Pattern: node CRUD + config update at `/nodes/{name}`; kernel CRUD + execute/poll/restart/interrupt/completions/diagnostics at `/nodes/{name}/kernels/{kernelId}`.
+
+- `PUT /nodes/{name}/config` — updates the live eviction timeouts for a running node (used when an interactive pool's timeouts are edited). Nullable fields fall back to the global `InactivityEviction` defaults.
 
 Kernel execution is **async/poll**: `POST .../execute` returns HTTP 202 + `ExecutionHandle`; poll `GET .../executions/{executionId}` until `IsComplete`.
 

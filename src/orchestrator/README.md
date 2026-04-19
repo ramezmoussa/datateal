@@ -53,8 +53,8 @@ The orchestrator never executes code directly. It translates job tasks into kern
 | **`%run` magic**               | Python cells may use `%run path/to/notebook` to inline another notebook; recursive with cycle detection (depth limit 10)                                       |
 | **SQL wrapping**               | SQL cells and `SqlQueryTask` content are wrapped as `import duckdb; duckdb.sql("""...""")` before kernel execution                                             |
 | **Cell-level output tracking** | Each notebook cell has its own `TaskRunCellOutput` row with status, outputs, timing, and errors                                                                |
-| **Node pool configs**          | Named node pool configurations (VM size, pip requirements, wheel packages, environment variables, secrets, idle timeouts) stored in DB and referenced by tasks |
-| **Node provisioning**          | `NodeManager` lazily provisions one node per distinct `NodePoolRef` used by a run; multiple tasks sharing the same ref share the node                          |
+| **Node pool configs**          | Two types: `JobNodePoolConfig` (run-scoped nodes, deleted on run end) and `InteractiveNodePoolConfig` (stable pool node, persists until evicted). Stored in DB and referenced by tasks via `NodePoolRef`. |
+| **Node provisioning**          | `NodeManager` lazily provisions a node per distinct `NodePoolRef` per run. Job pool nodes are created fresh each run and deleted on completion; interactive pool nodes are joined if already running |
 | **Per-task kernels**           | Each notebook/SQL task gets its own kernel, deleted immediately after the task completes                                                                       |
 | **Crash recovery**             | `RecoveryService` re-dispatches any `Running` or `Pending` runs found in the DB on startup                                                                     |
 | **Concurrent run cap**         | Per-job `MaxConcurrentRuns` limit enforced at trigger time                                                                                                     |
@@ -104,9 +104,16 @@ An edge in the task DAG. `DependsOnTaskId` points to the upstream task; `Conditi
 
 A cron rule attached to a job. `CronExpression` supports both 5-field (standard) and 6-field (with seconds) formats. `TimeZone` accepts any IANA or Windows timezone ID. `NextFireTime` is maintained by `SchedulerService`. Optional `Parameters` override job defaults for scheduled runs.
 
-### `NodePoolConfig`
+### `NodePoolConfig` (abstract)
 
 A named configuration for a compute node. Referenced from tasks via `NodePoolRef` string. Carries `VmSize`, `KernelRequirements` (pip requirements text), optional `WheelPackageIds`, `EnvironmentVariableIds`, and `SecretIds` (resolved at node provisioning time), and idle timeout settings forwarded to the Control Plane.
+
+`NodePoolConfig` is **abstract** with TPH discrimination (column `PoolType varchar(32)`). The two concrete subtypes are:
+
+| Subtype | PoolType | Behaviour |
+|---|---|---|
+| `JobNodePoolConfig` | `"Job"` | Run-scoped node; created on demand per run, deleted when the run finishes |
+| `InteractiveNodePoolConfig` | `"Interactive"` | Pool has a stable node name (`i` + 11 GUID hex chars); node is created on demand and persists until deleted by the inactivity eviction service |
 
 ### `JobRun`
 
@@ -196,12 +203,9 @@ while (true):
 **`EnsureNodeAsync(nodePoolRef)`** — called before any kernel is created for a pool ref:
 
 1. Returns the cached node name if the pool ref has already been provisioned for this run.
-2. Loads the `NodePoolConfig` by name.
-3. Derives the node name as `job-{runId[..8]}-{poolRef}` (lower-case, ≤ 63 characters).
-4. Resolves wheel package contents (via `IWheelPackageReader`) and environment/secret key-value pairs (via `IEnvironmentResolver`).
-5. Calls `IControlPlaneClient.CreateNodeAsync` with all node configuration.
-6. Polls `GetNodeAsync` every 5 seconds until `NodeState.Running` (10-minute timeout).
-7. Caches the allocation so all subsequent tasks referencing the same pool share the node.
+2. Loads the `NodePoolConfig` by name; branches on the concrete type:
+   - **`JobNodePoolConfig`**: derives node name as `j` + 11 lowercase hex chars from SHA-256 of `(runId, poolRef)`. Creates the node via the control plane and polls until `Running`. Sets `Provisioned = true` (deleted on cleanup).
+   - **`InteractiveNodePoolConfig`**: derives node name via `pool.GetNodeName()` (`i` + 11 GUID hex chars). If the node is already `Running`, returns it immediately. Otherwise creates it (handling 409 race) and polls until `Running`. Sets `Provisioned = false` (not deleted on cleanup — eviction handles teardown).
 
 **`CreateKernelAsync(nodePoolRef)`** — called by `TaskExecutor` per task:
 
@@ -210,7 +214,7 @@ while (true):
 
 **`CleanupKernelAsync`** — called by `TaskExecutor` in the `finally` block of each task, regardless of success or failure.
 
-**`CleanupAllAsync`** — called by `RunCoordinator` in its `finally` block; deletes every provisioned node (all kernels on a node are removed when the node is deleted).
+**`CleanupAllAsync`** — called by `RunCoordinator` in its `finally` block; deletes every node where `Provisioned = true` (job pool nodes). Interactive pool nodes (`Provisioned = false`) are left running; the inactivity eviction service handles their teardown.
 
 ### 5. Task Execution (`TaskExecutor`)
 

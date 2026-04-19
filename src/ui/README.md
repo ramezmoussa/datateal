@@ -1,6 +1,6 @@
 # DuckHouse UI
 
-Blazor Web App: an ASP.NET Core server host (`DuckHouse.Ui.Server`) with a WebAssembly client (`DuckHouse.Ui.Client`). Provides the notebook editor, SQL query editor, workspace browser, catalog management, and node/kernel management.
+Blazor Web App: an ASP.NET Core server host (`DuckHouse.Ui.Server`) with a WebAssembly client (`DuckHouse.Ui.Client`). Provides the notebook editor, SQL query editor, workspace browser, catalog management, and interactive node pool management.
 
 ---
 
@@ -74,17 +74,25 @@ During local development the UI server runs on the developer machine and can rea
 
 ---
 
-### Compiling the UI CSS
+## Pages
 
-The UI uses the Bootstrap frontend toolkit (CSS, JavaScript and icons) and the Blazor.Bootstrap NuGet package for reusable Blazor components. The app CSS is generated from the Bootstrap SCSS files using SASS. This allows for easier customization of the Bootstrap theme. The following guide describes how to compile the CSS using SASS.
+| Page | Route | Description |
+|---|---|---|
+| `Home.razor` | `/` | Welcome page |
+| `WorkspacePage.razor` | `/workspace` | Workspace browser: create, rename, move, clone, delete notebooks and queries |
+| `NotebookPage.razor` | `/notebook`, `/notebook/{id}` | Polyglot notebook editor; connects to an interactive node pool |
+| `QueryPage.razor` | `/query`, `/query/{id}` | SQL editor with results panel; connects to an interactive node pool |
+| `NodePoolsPage.razor` | `/node-pools` | Node pool config management with separate tabs for Interactive and Job pools |
+| `Nodes.razor` | `/nodes` | Active nodes monitoring (admin view; admins can manually remove nodes) |
+| `Kernels.razor` | `/nodes/{name}/kernels` | Kernel management per node |
+| `KernelSession.razor` | `/nodes/{name}/kernels/{id}` | Interactive kernel REPL |
+| `CatalogsPage.razor` | `/catalogs` | DuckLake catalog management |
+| `Settings.razor` | `/settings` | Theme settings |
 
-#### Install SASS
+---
 
-1. Install [Node.js](https://nodejs.org/en/download)
-2. Install [SASS](https://sass-lang.com/install) using npm
-   - `npm install -g sass`
+## Styling
 
-#### Compile the CSS
+Custom CSS in `DuckHouse.Ui.Server/wwwroot/css/app.css`. Component-scoped CSS in `DuckHouse.Ui.Client.Components/wwwroot/defaults.css`. Dark mode class `ant-dark` is toggled on `<html>`.
 
-1. In a terminal, navigate to the `DuckHouse.Ui/wwwroot/css` folder
-2. Run `sass bootstrap.custom.scss:bootstrap.custom.css`
+Do not use `var(--ant-*)` CSS custom properties — they do not exist in this build of Ant Design Blazor. Use hardcoded hex values and target dark mode with `html.ant-dark` selectors in `app.css`. Typical values: borders `#d9d9d9` / `#434343` (dark), subtle backgrounds `#fafafa` / `#1d1d1d` (dark).

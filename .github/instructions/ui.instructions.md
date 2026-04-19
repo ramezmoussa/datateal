@@ -40,6 +40,20 @@ Workspaces store **notebooks** and **SQL query files** in a folder hierarchy bac
 
 **NotebookPage** (`/notebook`, `/notebook/{id}`): polyglot notebook with Python, SQL, and Markdown cells. SQL cells are wrapped as `import duckdb; duckdb.sql("""...""")` before kernel execution.
 
+## Interactive node pools
+
+Interactive node pools are a class of `NodePoolConfig` with `PoolType = "Interactive"`. They have 0 or 1 live compute nodes at any time. Users connect to them from `NotebookPage` and `QueryPage` by selecting a pool; if the pool's node isn't running, one is created on demand.
+
+- Server: `InteractivePoolsController` at `api/interactive-pools`; key endpoints:
+  - `GET api/interactive-pools` — lists all `InteractiveNodePoolConfig` entries with live node state (fetched from the control plane per pool)
+  - `POST api/interactive-pools/{name}/ensure-node` — idempotent "start or join" call; returns `NodeInfo`; handles 409 race by retrying GET
+- Client: `IInteractivePoolService` / `InteractivePoolService` in `DuckHouse.Ui.Client/Services/`; registered in `Program.cs`
+- DTO: `InteractivePoolDto` in `DuckHouse.Ui.Shared/Nodes/`; carries `Name`, `VmSize`, `Description`, `NodeState`
+
+**Node naming**: `"i" + pool.Id.ToString("N")[..11].ToLowerInvariant()` — stable across pool renames; always 12 characters.
+
+**Job tasks on interactive pools**: if an orchestrator job task references an interactive pool, `NodeManager` joins or creates the pool's node but does **not** delete it when the run completes. Eviction handles teardown.
+
 ## Client pages
 
 | Page | Route | Description |
@@ -48,7 +62,8 @@ Workspaces store **notebooks** and **SQL query files** in a folder hierarchy bac
 | `WorkspacePage.razor` | `/workspace` | Workspace browser |
 | `NotebookPage.razor` | `/notebook` | Polyglot notebook editor |
 | `QueryPage.razor` | `/query` | SQL query editor with results panel |
-| `Nodes.razor` | `/nodes` | Node management |
+| `Nodes.razor` | `/nodes` | Active nodes monitoring (admin view; no create/stop/start) |
+| `NodePoolsPage.razor` | `/node-pools` | Node pool config management; separate tabs for Interactive and Job pools |
 | `Kernels.razor` | `/nodes/{name}/kernels` | Kernel management per node |
 | `KernelSession.razor` | `/nodes/{name}/kernels/{id}` | Interactive kernel REPL |
 | `Settings.razor` | `/settings` | Theme settings |

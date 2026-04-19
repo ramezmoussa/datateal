@@ -42,15 +42,31 @@ The DAG loop in `RunCoordinator.RunDagAsync` runs a fixed-point **skip propagati
 
 **One node per `NodePoolRef` per run.** `NodeManager` provisions a node on the first `EnsureNodeAsync` call for a given pool ref and returns the cached name on every subsequent call. Tasks that share the same `NodePoolRef` therefore share the same node — by design, to avoid redundant provisioning costs.
 
+**Interactive vs Job pool behaviour in `NodeManager`.** The pool type determines how node allocation works:
+
+- **`JobNodePoolConfig`** — a run-scoped node is created with a deterministic name `j` + 11 hex chars from SHA-256 of `(runId, poolRef)`. The node is marked `Provisioned = true` and deleted by `CleanupAllAsync` when the run finishes.
+- **`InteractiveNodePoolConfig`** — the deterministic pool node name (`i` + 11 hex chars of the pool GUID, from `GetNodeName()`) is used. If the node is already Running, the task joins it immediately. Otherwise it is created (with 409 race handling) and polled until Running. The node is marked `Provisioned = false` so `CleanupAllAsync` **does not delete it** — the inactivity eviction service handles teardown.
+
 **One kernel per task.** `TaskExecutor` creates a kernel at the start of each notebook/SQL task and deletes it in the `finally` block, even on failure. Kernels are not shared between tasks. This ensures no Python state leaks between tasks.
 
-Node names are derived as `job-{runId[..8]}-{poolRef}` (lower-case). The 63-character Kubernetes name limit applies — keep `NodePoolRef` names short (≤ 50 characters).
+Node names:
+- Job pool nodes: `j` + 11 lowercase hex chars (SHA-256 of runId + poolRef). Unique per (run, pool) pair.
+- Interactive pool nodes: `i` + first 11 hex chars of the pool GUID (from `InteractiveNodePoolConfig.GetNodeName()`). Stable across pool renames; max 12 characters.
 
-Node cleanup (`CleanupAllAsync`) happens in `RunCoordinator`'s `finally` block using `CancellationToken.None` so it runs even after cancellation.
+The 63-character Kubernetes name limit applies. Keep `NodePoolRef` names short (≤ 50 characters for job pools).
 
-## Task types
+Node cleanup (`CleanupAllAsync`) happens in `RunCoordinator`'s `finally` block using `CancellationToken.None` so it runs even after cancellation. Only nodes with `Provisioned = true` (job pool nodes) are deleted; interactive pool nodes are left running.
 
-`JobTask` uses TPH in EF Core (discriminator `TaskType`) and JSON polymorphism (`[JsonDerivedType]`). The three concrete types are:
+## Node pool config types
+
+`NodePoolConfig` is **abstract** with TPH in EF Core (discriminator `PoolType varchar(32)`). The two concrete types are:
+
+- **`JobNodePoolConfig`** (PoolType = `"Job"`) — used by the orchestrator for run-scoped nodes. A new node is created per pool ref per run and deleted when the run ends.
+- **`InteractiveNodePoolConfig`** (PoolType = `"Interactive"`) — used by interactive sessions from NotebookPage and QueryPage. Has a stable K8s node name derived from the pool GUID (`GetNodeName()`). The node is created on demand and deleted by the inactivity eviction service — not when a job run ends.
+
+When a job task references an interactive pool, `NodeManager` joins the existing running node (or creates one if idle). The node is **not** stopped when the job completes — this mirrors interactive user behaviour.
+
+`YamlJobImporter` always creates `JobNodePoolConfig` rows for inline `nodePools` entries in YAML (job pools are the only appropriate pool type for YAML-defined pipelines).
 
 - **`NotebookTask`** — executes a workspace notebook cell-by-cell on a kernel. Requires `NodePoolRef`.
 - **`SqlQueryTask`** — executes a workspace SQL query file on a kernel, wrapped as `import duckdb; duckdb.sql("""...""")`. Requires `NodePoolRef`.

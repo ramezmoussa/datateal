@@ -19,7 +19,7 @@ ASP.NET Core Web API that provisions and manages compute nodes and Jupyter kerne
 │  • Provisions / removes compute nodes                                │
 │  • Creates / deletes Jupyter kernels on those nodes                  │
 │  • Tunnels kernel API calls through the K8s API server proxy         │
-│  • Evicts idle kernels and stops idle nodes automatically            │
+│  • Evicts idle kernels and deletes idle nodes automatically          │
 └──────────────────────┬───────────────────────────────────────────────┘
                        │ Kubernetes API + HTTP proxy
                        ▼
@@ -53,7 +53,6 @@ The active backend is selected by `NodeService:Backend` in configuration.
 
 `LocalNodeService` creates Kubernetes pods in the `default` namespace of the Docker Desktop cluster. All pods use the locally-built `duckhouse-runtime:latest` image with `ImagePullPolicy: Never`.
 
-- `Stop` / `Start` are no-ops.
 - Node names are the pod names.
 - A `ManagedByLabel` (`app.kubernetes.io/managed-by=duckhouse-control-plane`) marks all managed pods so they can be listed and cleaned up.
 
@@ -104,7 +103,7 @@ Then set `Catalogs:BaseDataPath` in the UI server and orchestrator to the same v
 
 **Authentication**: the cluster has `disableLocalAccounts: true`. The service fetches a kubeconfig from AKS ARM and then replaces the `kubelogin` exec plugin with `AksTokenProvider`, which acquires Entra ID tokens using the registered `TokenCredential`. When `TenantId`, `ClientId`, and `ClientSecret` are all set, `ClientSecretCredential` is used; otherwise it falls back to `DefaultAzureCredential`.
 
-Node names are derived as `job-{runId[..8]}-{poolRef}` (lower-case). The 63-character Kubernetes name limit applies — keep `NodePoolRef` names short.
+- Node names must be ≤ 63 characters (Kubernetes limit). Names assigned by the orchestrator use `j` + 11 hex chars (job pools) or `i` + 11 GUID hex chars (interactive pools).
 
 ---
 
@@ -129,7 +128,7 @@ This means:
 `InactivityEvictionService` is a `BackgroundService` that runs on a configurable `CheckInterval`:
 
 1. Deletes kernels whose `LastActivity` exceeds `KernelIdleTimeout`.
-2. Stops nodes where all kernels have been idle for longer than `NodeIdleTimeout` (measured from the most recent kernel activity on that node).
+2. **Deletes** nodes where all kernels have been idle for longer than `NodeIdleTimeout` (measured from the most recent kernel activity on that node). This applies to both interactive pool nodes left idle by users and job pool nodes leaked by orchestrator failures.
 
 Eviction can be disabled entirely by setting `InactivityEviction:Enabled` to `false`.
 
@@ -139,24 +138,23 @@ Eviction can be disabled entirely by setting `InactivityEviction:Enabled` to `fa
 
 All routes are under `/nodes`. Kernel routes are nested under `/nodes/{name}/kernels`.
 
-| Method   | Path                                                        | Description                                        |
-| -------- | ----------------------------------------------------------- | -------------------------------------------------- |
-| `GET`    | `/nodes`                                                    | List all managed nodes                             |
-| `GET`    | `/nodes/{name}`                                             | Get a node                                         |
-| `POST`   | `/nodes`                                                    | Create a node (provisions a pod or AKS agent pool) |
-| `DELETE` | `/nodes/{name}`                                             | Remove a node                                      |
-| `POST`   | `/nodes/{name}/stop`                                        | Stop a node (AKS: deallocate; Local: no-op)        |
-| `POST`   | `/nodes/{name}/start`                                       | Start a node (AKS: reallocate; Local: no-op)       |
-| `GET`    | `/nodes/{name}/kernels`                                     | List kernels on a node                             |
-| `POST`   | `/nodes/{name}/kernels`                                     | Create a kernel                                    |
-| `GET`    | `/nodes/{name}/kernels/{kernelId}`                          | Get a kernel                                       |
-| `DELETE` | `/nodes/{name}/kernels/{kernelId}`                          | Delete a kernel                                    |
-| `POST`   | `/nodes/{name}/kernels/{kernelId}/execute`                  | Start code execution → HTTP 202 + `executionId`    |
-| `GET`    | `/nodes/{name}/kernels/{kernelId}/executions/{executionId}` | Poll execution until `isComplete`                  |
-| `POST`   | `/nodes/{name}/kernels/{kernelId}/restart`                  | Restart a kernel                                   |
-| `POST`   | `/nodes/{name}/kernels/{kernelId}/interrupt`                | Interrupt a running execution                      |
-| `POST`   | `/nodes/{name}/kernels/{kernelId}/completions`              | Code completions (Jedi-backed)                     |
-| `POST`   | `/nodes/{name}/kernels/{kernelId}/diagnostics`              | Syntax and lint diagnostics (pyflakes-backed)      |
+| Method   | Path                                                        | Description                                          |
+| -------- | ----------------------------------------------------------- | ---------------------------------------------------- |
+| `GET`    | `/nodes`                                                    | List all managed nodes                               |
+| `GET`    | `/nodes/{name}`                                             | Get a node                                           |
+| `POST`   | `/nodes`                                                    | Create a node (provisions a pod or AKS agent pool)   |
+| `DELETE` | `/nodes/{name}`                                             | Remove a node                                        |
+| `PUT`    | `/nodes/{name}/config`                                      | Update per-node eviction timeouts (used by UI server when an interactive pool's config is saved) |
+| `GET`    | `/nodes/{name}/kernels`                                     | List kernels on a node                               |
+| `POST`   | `/nodes/{name}/kernels`                                     | Create a kernel                                      |
+| `GET`    | `/nodes/{name}/kernels/{kernelId}`                          | Get a kernel                                         |
+| `DELETE` | `/nodes/{name}/kernels/{kernelId}`                          | Delete a kernel                                      |
+| `POST`   | `/nodes/{name}/kernels/{kernelId}/execute`                  | Start code execution → HTTP 202 + `executionId`      |
+| `GET`    | `/nodes/{name}/kernels/{kernelId}/executions/{executionId}` | Poll execution until `isComplete`                    |
+| `POST`   | `/nodes/{name}/kernels/{kernelId}/restart`                  | Restart a kernel                                     |
+| `POST`   | `/nodes/{name}/kernels/{kernelId}/interrupt`                | Interrupt a running execution                        |
+| `POST`   | `/nodes/{name}/kernels/{kernelId}/completions`              | Code completions (Jedi-backed)                       |
+| `POST`   | `/nodes/{name}/kernels/{kernelId}/diagnostics`              | Syntax and lint diagnostics (pyflakes-backed)        |
 
 Execution is **async/poll**: `POST .../execute` returns HTTP 202 with an `{ executionId }` body; poll the executions endpoint until `isComplete: true`.
 
@@ -198,5 +196,5 @@ Execution is **async/poll**: `POST .../execute` returns HTTP 202 with an `{ exec
 | -------------------------------------- | ---------- | --------------------------------------------------- |
 | `InactivityEviction:Enabled`           | `true`     | Set to `false` to disable eviction entirely         |
 | `InactivityEviction:KernelIdleTimeout` | `00:10:00` | Delete kernels idle longer than this                |
-| `InactivityEviction:NodeIdleTimeout`   | `00:20:00` | Stop nodes with no kernel activity longer than this |
+| `InactivityEviction:NodeIdleTimeout`   | `00:20:00` | Delete nodes with no kernel activity longer than this |
 | `InactivityEviction:CheckInterval`     | `00:01:00` | How often the eviction sweep runs                   |
