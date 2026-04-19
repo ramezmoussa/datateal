@@ -307,6 +307,7 @@
     private bool _disconnecting;
     private string? _error;
     private CancellationTokenSource? _kernelPollingCts;
+    private CancellationTokenSource? _connectCts;
 
     private bool _isExecuting;
     private double? _lastDurationMs;
@@ -521,19 +522,21 @@
         if (string.IsNullOrEmpty(_nodeName)) return;
         _connecting = true;
         _error = null;
+        _connectCts = new CancellationTokenSource();
+        var ct = _connectCts.Token;
         try
         {
             // Start node first if it isn't already running or being provisioned
             if (SelectedNode?.State != NodeState.Running)
             {
                 if (SelectedNode?.State is not (NodeState.Creating or NodeState.Resuming))
-                    await NodeService.StartNodeAsync(_nodeName);
+                    await NodeService.StartNodeAsync(_nodeName, ct);
 
                 var deadline = DateTime.UtcNow.AddMinutes(10);
                 while (DateTime.UtcNow < deadline)
                 {
-                    await Task.Delay(3000);
-                    var updated = await NodeService.GetNodeAsync(_nodeName);
+                    await Task.Delay(3000, ct);
+                    var updated = await NodeService.GetNodeAsync(_nodeName, ct);
                     if (updated is null) throw new Exception("Node not found.");
                     _nodes = _nodes.Select(n => n.Name == _nodeName ? updated : n).ToList();
                     StateHasChanged();
@@ -544,7 +547,7 @@
                     throw new Exception("Node did not reach Running state in time.");
             }
 
-            var kernel = await CreateKernelWithRetryAsync(_nodeName);
+            var kernel = await CreateKernelWithRetryAsync(_nodeName, ct);
             _kernelId = kernel.Id;
             _kernel = kernel;
             _kernelPollingCts = new CancellationTokenSource();
@@ -555,24 +558,33 @@
             // Attach catalogs if any are selected
             await _catalog.SetupAllAsync(_selectedCatalogNames);
         }
+        catch (OperationCanceledException)
+        {
+            // Page was disposed while waiting — discard silently
+        }
         catch (Exception ex) { _error = $"Failed to connect: {ex.Message}"; }
-        finally { _connecting = false; }
+        finally
+        {
+            _connecting = false;
+            _connectCts.Dispose();
+            _connectCts = null;
+        }
         StateHasChanged();
     }
 
     private static readonly int KernelCreateMaxRetries = 6;
     private static readonly TimeSpan KernelCreateRetryInterval = TimeSpan.FromSeconds(5);
 
-    private async Task<KernelInfo> CreateKernelWithRetryAsync(string nodeName)
+    private async Task<KernelInfo> CreateKernelWithRetryAsync(string nodeName, CancellationToken ct = default)
     {
         HttpRequestException? lastEx = null;
         for (var attempt = 0; attempt <= KernelCreateMaxRetries; attempt++)
         {
             if (attempt > 0)
-                await Task.Delay(KernelCreateRetryInterval);
+                await Task.Delay(KernelCreateRetryInterval, ct);
             try
             {
-                return await KernelService.CreateKernelAsync(nodeName);
+                return await KernelService.CreateKernelAsync(nodeName, ct);
             }
             catch (HttpRequestException ex) when (IsTransientRuntimeError(ex.StatusCode))
             {
@@ -788,6 +800,11 @@
     public async ValueTask DisposeAsync()
     {
         _dotNetRef?.Dispose();
+        if (_connectCts is not null)
+        {
+            await _connectCts.CancelAsync();
+            // _connectCts is disposed by ConnectAsync's finally block
+        }
         await StopKernelPollingAsync();
         if (HasKernel && !string.IsNullOrEmpty(_nodeName))
         {
