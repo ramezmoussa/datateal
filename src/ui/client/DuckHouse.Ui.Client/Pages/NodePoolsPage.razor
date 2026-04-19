@@ -99,19 +99,23 @@
                                 var poolForEdit = _jobAndInteractivePools.FirstOrDefault(p => p.Id == context.Id);
                             }
                             <SpaceItem>
-                                <Button Size="@ButtonSize.Small"
-                                        Disabled="@(poolForEdit is null)"
-                                        OnClick="() => StartEdit(poolForEdit!)">
-                                    <Icon Type="@IconType.Outline.Edit" />
-                                </Button>
+                                <Tooltip Title="Edit">
+                                    <Button Size="@ButtonSize.Small"
+                                            Disabled="@(poolForEdit is null)"
+                                            OnClick="() => StartEdit(poolForEdit!)">
+                                        <Icon Type="@IconType.Outline.Edit" />
+                                    </Button>
+                                </Tooltip>
                             </SpaceItem>
                             <SpaceItem>
-                                <Popconfirm Title="@($"Delete pool '{context.Name}'?")"
-                                            OnConfirm="() => DeleteInteractiveAsync(context)">
-                                    <Button Danger Size="@ButtonSize.Small">
-                                        <Icon Type="@IconType.Outline.Delete" />
-                                    </Button>
-                                </Popconfirm>
+                                <Tooltip Title="Delete">
+                                    <Popconfirm Title="@($"Delete pool '{context.Name}'?")"
+                                                OnConfirm="() => DeleteInteractiveAsync(context)">
+                                        <Button Danger Size="@ButtonSize.Small">
+                                            <Icon Type="@IconType.Outline.Delete" />
+                                        </Button>
+                                    </Popconfirm>
+                                </Tooltip>
                             </SpaceItem>
                             @if (!context.NodeState.HasValue || context.NodeState.Value == NodeState.Failure)
                             {
@@ -197,17 +201,21 @@
                     <ActionColumn Title="Actions">
                         <Space>
                             <SpaceItem>
-                                <Button Size="@ButtonSize.Small" OnClick="() => StartEdit(context)">
-                                    <Icon Type="@IconType.Outline.Edit" />
-                                </Button>
+                                <Tooltip Title="Edit">
+                                    <Button Size="@ButtonSize.Small" OnClick="() => StartEdit(context)">
+                                        <Icon Type="@IconType.Outline.Edit" />
+                                    </Button>
+                                </Tooltip>
                             </SpaceItem>
                             <SpaceItem>
-                                <Popconfirm Title="@($"Delete node pool '{context.Name}'?")"
-                                            OnConfirm="() => DeleteAsync(context)">
-                                    <Button Danger Size="@ButtonSize.Small">
-                                        <Icon Type="@IconType.Outline.Delete" />
-                                    </Button>
-                                </Popconfirm>
+                                <Tooltip Title="Delete">
+                                    <Popconfirm Title="@($"Delete node pool '{context.Name}'?")"
+                                                OnConfirm="() => DeleteAsync(context)">
+                                        <Button Danger Size="@ButtonSize.Small">
+                                            <Icon Type="@IconType.Outline.Delete" />
+                                        </Button>
+                                    </Popconfirm>
+                                </Tooltip>
                             </SpaceItem>
                         </Space>
                     </ActionColumn>

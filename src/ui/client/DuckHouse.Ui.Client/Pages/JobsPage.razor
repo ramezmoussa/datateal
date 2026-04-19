@@ -60,27 +60,35 @@
         <ActionColumn Title="Actions">
             <Space>
                 <SpaceItem>
-                    <Button Size="@ButtonSize.Small" OnClick="@(() => Navigation.NavigateTo($"/jobs/{context.Id}"))">
-                        <Icon Type="@IconType.Outline.Edit" />
-                    </Button>
-                </SpaceItem>
-                <SpaceItem>
-                    <Button Size="@ButtonSize.Small" OnClick="@(() => ExportAsync(context))">
-                        <Icon Type="@IconType.Outline.Download" />
-                    </Button>
-                </SpaceItem>
-                <SpaceItem>
-                    <Button Size="@ButtonSize.Small" Type="@ButtonType.Primary"
-                            OnClick="@(() => OpenTriggerModal(context.Id))">
-                        <Icon Type="@IconType.Outline.PlayCircle" />
-                    </Button>
-                </SpaceItem>
-                <SpaceItem>
-                    <Popconfirm Title="@($"Delete job '{context.Name}'?")" OnConfirm="() => DeleteAsync(context)">
-                        <Button Danger Size="@ButtonSize.Small">
-                            <Icon Type="@IconType.Outline.Delete" />
+                    <Tooltip Title="Edit">
+                        <Button Size="@ButtonSize.Small" OnClick="@(() => Navigation.NavigateTo($"/jobs/{context.Id}"))">
+                            <Icon Type="@IconType.Outline.Edit" />
                         </Button>
-                    </Popconfirm>
+                    </Tooltip>
+                </SpaceItem>
+                <SpaceItem>
+                    <Tooltip Title="Export YAML">
+                        <Button Size="@ButtonSize.Small" OnClick="@(() => ExportAsync(context))">
+                            <Icon Type="@IconType.Outline.Download" />
+                        </Button>
+                    </Tooltip>
+                </SpaceItem>
+                <SpaceItem>
+                    <Tooltip Title="Run">
+                        <Button Size="@ButtonSize.Small" Type="@ButtonType.Primary"
+                                OnClick="@(() => OpenTriggerModal(context.Id))">
+                            <Icon Type="@IconType.Outline.PlayCircle" />
+                        </Button>
+                    </Tooltip>
+                </SpaceItem>
+                <SpaceItem>
+                    <Tooltip Title="Delete">
+                        <Popconfirm Title="@($"Delete job '{context.Name}'?")" OnConfirm="() => DeleteAsync(context)">
+                            <Button Danger Size="@ButtonSize.Small">
+                                <Icon Type="@IconType.Outline.Delete" />
+                            </Button>
+                        </Popconfirm>
+                    </Tooltip>
                 </SpaceItem>
             </Space>
         </ActionColumn>

@@ -45,17 +45,21 @@
                 <ActionColumn Title="Actions">
                     <Space>
                         <SpaceItem>
-                            <Button Size="@ButtonSize.Small" OnClick="() => StartEditVariable(context)">
-                                <Icon Type="@IconType.Outline.Edit" />
-                            </Button>
+                            <Tooltip Title="Edit">
+                                <Button Size="@ButtonSize.Small" OnClick="() => StartEditVariable(context)">
+                                    <Icon Type="@IconType.Outline.Edit" />
+                                </Button>
+                            </Tooltip>
                         </SpaceItem>
                         <SpaceItem>
-                            <Popconfirm Title="@($"Delete variable '{context.Key}'?")"
-                                        OnConfirm="() => DeleteVariableAsync(context)">
-                                <Button Danger Size="@ButtonSize.Small">
-                                    <Icon Type="@IconType.Outline.Delete" />
-                                </Button>
-                            </Popconfirm>
+                            <Tooltip Title="Delete">
+                                <Popconfirm Title="@($"Delete variable '{context.Key}'?")"
+                                            OnConfirm="() => DeleteVariableAsync(context)">
+                                    <Button Danger Size="@ButtonSize.Small">
+                                        <Icon Type="@IconType.Outline.Delete" />
+                                    </Button>
+                                </Popconfirm>
+                            </Tooltip>
                         </SpaceItem>
                     </Space>
                 </ActionColumn>
@@ -83,17 +87,21 @@
                 <ActionColumn Title="Actions">
                     <Space>
                         <SpaceItem>
-                            <Button Size="@ButtonSize.Small" OnClick="() => StartEditSecret(context)">
-                                <Icon Type="@IconType.Outline.Edit" />
-                            </Button>
+                            <Tooltip Title="Edit">
+                                <Button Size="@ButtonSize.Small" OnClick="() => StartEditSecret(context)">
+                                    <Icon Type="@IconType.Outline.Edit" />
+                                </Button>
+                            </Tooltip>
                         </SpaceItem>
                         <SpaceItem>
-                            <Popconfirm Title="@($"Delete secret '{context.Key}'?")"
-                                        OnConfirm="() => DeleteSecretAsync(context)">
-                                <Button Danger Size="@ButtonSize.Small">
-                                    <Icon Type="@IconType.Outline.Delete" />
-                                </Button>
-                            </Popconfirm>
+                            <Tooltip Title="Delete">
+                                <Popconfirm Title="@($"Delete secret '{context.Key}'?")"
+                                            OnConfirm="() => DeleteSecretAsync(context)">
+                                    <Button Danger Size="@ButtonSize.Small">
+                                        <Icon Type="@IconType.Outline.Delete" />
+                                    </Button>
+                                </Popconfirm>
+                            </Tooltip>
                         </SpaceItem>
                     </Space>
                 </ActionColumn>

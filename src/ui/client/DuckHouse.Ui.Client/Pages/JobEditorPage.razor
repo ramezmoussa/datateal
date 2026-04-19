@@ -112,16 +112,20 @@
                         <ActionColumn Title="Actions">
                             <Space>
                                 <SpaceItem>
-                                    <Button Size="@ButtonSize.Small" OnClick="() => StartEditTask(context)">
-                                        <Icon Type="@IconType.Outline.Edit" />
-                                    </Button>
+                                    <Tooltip Title="Edit">
+                                        <Button Size="@ButtonSize.Small" OnClick="() => StartEditTask(context)">
+                                            <Icon Type="@IconType.Outline.Edit" />
+                                        </Button>
+                                    </Tooltip>
                                 </SpaceItem>
                                 <SpaceItem>
-                                    <Popconfirm Title="Delete this task?" OnConfirm="() => DeleteTask(context)">
-                                        <Button Danger Size="@ButtonSize.Small">
-                                            <Icon Type="@IconType.Outline.Delete" />
-                                        </Button>
-                                    </Popconfirm>
+                                    <Tooltip Title="Delete">
+                                        <Popconfirm Title="Delete this task?" OnConfirm="() => DeleteTask(context)">
+                                            <Button Danger Size="@ButtonSize.Small">
+                                                <Icon Type="@IconType.Outline.Delete" />
+                                            </Button>
+                                        </Popconfirm>
+                                    </Tooltip>
                                 </SpaceItem>
                             </Space>
                         </ActionColumn>
@@ -157,16 +161,20 @@
                         <ActionColumn Title="Actions">
                             <Space>
                                 <SpaceItem>
-                                    <Button Size="@ButtonSize.Small" OnClick="() => StartEditParameter(context)">
-                                        <Icon Type="@IconType.Outline.Edit" />
-                                    </Button>
+                                    <Tooltip Title="Edit">
+                                        <Button Size="@ButtonSize.Small" OnClick="() => StartEditParameter(context)">
+                                            <Icon Type="@IconType.Outline.Edit" />
+                                        </Button>
+                                    </Tooltip>
                                 </SpaceItem>
                                 <SpaceItem>
-                                    <Popconfirm Title="Delete this parameter?" OnConfirm="() => DeleteParameter(context)">
-                                        <Button Danger Size="@ButtonSize.Small">
-                                            <Icon Type="@IconType.Outline.Delete" />
-                                        </Button>
-                                    </Popconfirm>
+                                    <Tooltip Title="Delete">
+                                        <Popconfirm Title="Delete this parameter?" OnConfirm="() => DeleteParameter(context)">
+                                            <Button Danger Size="@ButtonSize.Small">
+                                                <Icon Type="@IconType.Outline.Delete" />
+                                            </Button>
+                                        </Popconfirm>
+                                    </Tooltip>
                                 </SpaceItem>
                             </Space>
                         </ActionColumn>
@@ -202,11 +210,13 @@
                             @(context.NextFireTime?.ToString("yyyy-MM-dd HH:mm") ?? "—")
                         </PropertyColumn>
                         <ActionColumn Title="Actions">
-                            <Popconfirm Title="Delete this schedule?" OnConfirm="() => DeleteScheduleAsync(context)">
-                                <Button Danger Size="@ButtonSize.Small">
-                                    <Icon Type="@IconType.Outline.Delete" />
-                                </Button>
-                            </Popconfirm>
+                            <Tooltip Title="Delete">
+                                <Popconfirm Title="Delete this schedule?" OnConfirm="() => DeleteScheduleAsync(context)">
+                                    <Button Danger Size="@ButtonSize.Small">
+                                        <Icon Type="@IconType.Outline.Delete" />
+                                    </Button>
+                                </Popconfirm>
+                            </Tooltip>
                         </ActionColumn>
                     </Table>
                 </div>

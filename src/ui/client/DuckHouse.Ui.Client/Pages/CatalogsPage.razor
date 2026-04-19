@@ -54,17 +54,21 @@
         <ActionColumn Title="Actions">
             <Space>
                 <SpaceItem>
-                    <Button Size="@ButtonSize.Small" OnClick="() => StartEdit(context)">
-                        <Icon Type="@IconType.Outline.Edit" />
-                    </Button>
+                    <Tooltip Title="Edit">
+                        <Button Size="@ButtonSize.Small" OnClick="() => StartEdit(context)">
+                            <Icon Type="@IconType.Outline.Edit" />
+                        </Button>
+                    </Tooltip>
                 </SpaceItem>
                 <SpaceItem>
-                    <Popconfirm Title="@(context is ManagedCatalogDto ? $"Delete catalog '{context.Name}'? The PostgreSQL database will also be dropped." : $"Delete catalog '{context.Name}'?")"
-                                OnConfirm="() => DeleteAsync(context)">
-                        <Button Danger Size="@ButtonSize.Small">
-                            <Icon Type="@IconType.Outline.Delete" />
-                        </Button>
-                    </Popconfirm>
+                    <Tooltip Title="Delete">
+                        <Popconfirm Title="@(context is ManagedCatalogDto ? $"Delete catalog '{context.Name}'? The PostgreSQL database will also be dropped." : $"Delete catalog '{context.Name}'?")"
+                                    OnConfirm="() => DeleteAsync(context)">
+                            <Button Danger Size="@ButtonSize.Small">
+                                <Icon Type="@IconType.Outline.Delete" />
+                            </Button>
+                        </Popconfirm>
+                    </Tooltip>
                 </SpaceItem>
             </Space>
         </ActionColumn>
