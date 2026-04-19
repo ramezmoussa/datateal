@@ -1,4 +1,4 @@
-namespace DuckHouse.Orchestrator.Core.Enums;
+namespace DuckHouse.Core.Orchestration;
 
 public enum JobRunStatus
 {

@@ -1,3 +1,4 @@
+using DuckHouse.Core.Orchestration;
 using DuckHouse.Ui.Shared.Orchestration;
 
 namespace DuckHouse.Ui.Client.Services;
@@ -13,7 +14,8 @@ public interface IJobService
     Task<JobRunSummary> TriggerJobAsync(Guid id, TriggerJobRequest? request = null, CancellationToken ct = default);
 
     // Runs
-    Task<IReadOnlyList<JobRunSummary>> GetRunsAsync(Guid jobId, CancellationToken ct = default);
+    Task<IReadOnlyList<JobRunSummary>> GetRunsAsync(Guid jobId, int limit = 50, CancellationToken ct = default);
+    Task<IReadOnlyList<JobRunSummary>> GetAllRunsAsync(string? jobName, JobRunStatus? status, DateTime? from, DateTime? to, int limit = 100, CancellationToken ct = default);
     Task<JobRunDetail?> GetRunAsync(Guid runId, CancellationToken ct = default);
     Task CancelRunAsync(Guid runId, CancellationToken ct = default);
 

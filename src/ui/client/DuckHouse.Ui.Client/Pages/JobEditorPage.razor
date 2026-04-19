@@ -224,6 +224,7 @@
 
             <TabPane Key="runs" Tab="Runs">
                 <div style="margin-top: 16px;">
+                    <div style="margin-bottom: 8px; color: #999; font-size: 12px;">Showing last 50 runs, newest first.</div>
                     <Table TItem="JobRunSummary" DataSource="_runs" Size="@TableSize.Small" Loading="_runsLoading" PageSize="int.MaxValue" PaginationPosition="none">
                         <PropertyColumn Property="c => c.Status" Title="Status">
                             <a @onclick="@(() => Navigation.NavigateTo($"/runs/{context.Id}"))"
@@ -396,7 +397,7 @@
 
                 _runsLoading = true;
                 StateHasChanged();
-                _runs = await JobService.GetRunsAsync(Id);
+                _runs = await JobService.GetRunsAsync(Id, 50);
                 _runsLoading = false;
             }
         }
@@ -660,13 +661,12 @@
         _ => "default",
     };
 
-    private static string GetStatusColor(string status) => status.ToLowerInvariant() switch
+    private static string GetStatusColor(JobRunStatus status) => status switch
     {
-        "succeeded" => "green",
-        "failed" => "red",
-        "running" => "blue",
-        "pending" => "default",
-        "cancelled" => "orange",
+        JobRunStatus.Succeeded => "green",
+        JobRunStatus.Failed => "red",
+        JobRunStatus.Running => "blue",
+        JobRunStatus.Cancelled => "orange",
         _ => "default",
     };
 }

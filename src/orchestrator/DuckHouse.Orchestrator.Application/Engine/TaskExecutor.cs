@@ -9,6 +9,7 @@ using DuckHouse.Orchestrator.Core.Enums;
 using DuckHouse.Orchestrator.Core.Interfaces;
 using DuckHouse.Orchestrator.Core.Repositories;
 using Microsoft.Extensions.Logging;
+using DuckHouse.Core.Orchestration;
 
 namespace DuckHouse.Orchestrator.Application.Engine;
 

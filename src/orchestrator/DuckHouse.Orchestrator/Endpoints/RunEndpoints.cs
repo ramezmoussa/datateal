@@ -10,6 +10,11 @@ public static class RunEndpoints
     {
         var group = endpoints.MapGroup("/api/runs").WithTags("Runs");
 
+        group.MapGet("/", async (string? jobName, string? status, DateTime? from, DateTime? to, int? limit, int? offset, IMediator mediator, CancellationToken ct) =>
+            Results.Ok(await mediator.SendAsync(
+                new GetAllRunsRequest(jobName, status, from, to, limit ?? 100, offset ?? 0), ct)))
+            .WithName("GetAllRuns");
+
         group.MapGet("/{id:guid}", async (Guid id, IMediator mediator, CancellationToken ct) =>
         {
             var run = await mediator.SendAsync(new GetJobRunRequest(id), ct);

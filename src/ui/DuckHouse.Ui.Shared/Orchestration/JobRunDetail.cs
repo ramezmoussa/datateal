@@ -1,11 +1,13 @@
+using DuckHouse.Core.Orchestration;
+
 namespace DuckHouse.Ui.Shared.Orchestration;
 
 public record JobRunDetail(
     Guid Id,
     Guid JobId,
     string JobName,
-    string Status,
-    string Trigger,
+    JobRunStatus Status,
+    JobRunTrigger Trigger,
     DateTime CreatedAt,
     DateTime? StartedAt,
     DateTime? CompletedAt,

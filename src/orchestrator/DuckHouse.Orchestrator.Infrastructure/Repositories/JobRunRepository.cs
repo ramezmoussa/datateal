@@ -1,6 +1,6 @@
+using DuckHouse.Core.Orchestration;
 using DuckHouse.Data;
 using DuckHouse.Orchestrator.Core.Entities;
-using DuckHouse.Orchestrator.Core.Enums;
 using DuckHouse.Orchestrator.Core.Repositories;
 using Microsoft.EntityFrameworkCore;
 
@@ -20,6 +20,32 @@ internal class JobRunRepository(DuckHouseDbContext db) : IJobRunRepository
             .Skip(offset)
             .Take(limit)
             .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<JobRun>> GetAllRunsAsync(
+        string? jobName, string? status, DateTime? from, DateTime? to,
+        int limit = 100, int offset = 0, CancellationToken cancellationToken = default)
+    {
+        var query = db.JobRuns.AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(jobName))
+            query = query.Where(r => r.JobName.ToLower().Contains(jobName.ToLower()));
+
+        if (!string.IsNullOrWhiteSpace(status) &&
+            Enum.TryParse<JobRunStatus>(status, ignoreCase: true, out var parsedStatus))
+            query = query.Where(r => r.Status == parsedStatus);
+
+        if (from.HasValue)
+            query = query.Where(r => r.CreatedAt >= from.Value);
+
+        if (to.HasValue)
+            query = query.Where(r => r.CreatedAt <= to.Value);
+
+        return await query
+            .OrderByDescending(r => r.CreatedAt)
+            .Skip(offset)
+            .Take(limit)
+            .ToListAsync(cancellationToken);
+    }
 
     public async Task<JobRun> CreateJobRunAsync(JobRun run, CancellationToken cancellationToken = default)
     {

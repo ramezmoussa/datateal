@@ -31,7 +31,7 @@
                     </SpaceItem>
                 </Space>
                 <Space>
-                    @if (_run.Status is "Running" or "Pending")
+                    @if (_run.Status is JobRunStatus.Running or JobRunStatus.Pending)
                     {
                         <SpaceItem>
                             <Popconfirm Title="Cancel this run?" OnConfirm="CancelAsync">
@@ -172,6 +172,15 @@
             _error = $"Failed to cancel: {ex.Message}";
         }
     }
+
+    private static string GetStatusColor(JobRunStatus status) => status switch
+    {
+        JobRunStatus.Succeeded => "green",
+        JobRunStatus.Failed => "red",
+        JobRunStatus.Running => "blue",
+        JobRunStatus.Cancelled => "orange",
+        _ => "default",
+    };
 
     private static string GetStatusColor(string status) => status.ToLowerInvariant() switch
     {

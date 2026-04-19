@@ -1,6 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using DuckHouse.Orchestrator.Core.Enums;
+using DuckHouse.Core.Orchestration;
 
 namespace DuckHouse.Orchestrator.Core.Entities;
 

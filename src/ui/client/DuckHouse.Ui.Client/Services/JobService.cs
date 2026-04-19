@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using DuckHouse.Core.Orchestration;
 using DuckHouse.Ui.Shared.Orchestration;
 
 namespace DuckHouse.Ui.Client.Services;
@@ -58,10 +59,21 @@ internal class JobService(HttpClient httpClient) : IJobService
         return (await response.Content.ReadFromJsonAsync<JobRunSummary>(JsonOptions, ct))!;
     }
 
-    public async Task<IReadOnlyList<JobRunSummary>> GetRunsAsync(Guid jobId, CancellationToken ct)
+    public async Task<IReadOnlyList<JobRunSummary>> GetRunsAsync(Guid jobId, int limit, CancellationToken ct)
     {
         return await httpClient.GetFromJsonAsync<IReadOnlyList<JobRunSummary>>(
-            $"api/orchestrator/jobs/{jobId}/runs", JsonOptions, ct) ?? [];
+            $"api/orchestrator/jobs/{jobId}/runs?limit={limit}", JsonOptions, ct) ?? [];
+    }
+
+    public async Task<IReadOnlyList<JobRunSummary>> GetAllRunsAsync(string? jobName, JobRunStatus? status, DateTime? from, DateTime? to, int limit, CancellationToken ct)
+    {
+        var parts = new List<string> { $"limit={limit}" };
+        if (!string.IsNullOrWhiteSpace(jobName)) parts.Add($"jobName={Uri.EscapeDataString(jobName)}");
+        if (status.HasValue) parts.Add($"status={Uri.EscapeDataString(status.Value.ToString())}");
+        if (from.HasValue) parts.Add($"from={Uri.EscapeDataString(from.Value.ToString("o"))}");
+        if (to.HasValue) parts.Add($"to={Uri.EscapeDataString(to.Value.ToString("o"))}");
+        return await httpClient.GetFromJsonAsync<IReadOnlyList<JobRunSummary>>(
+            $"api/orchestrator/runs?{string.Join("&", parts)}", JsonOptions, ct) ?? [];
     }
 
     public async Task<JobRunDetail?> GetRunAsync(Guid runId, CancellationToken ct)

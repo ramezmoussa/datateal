@@ -6,28 +6,14 @@
 
 <PageTitle>Jobs — DuckHouse</PageTitle>
 
-<Flex Justify="FlexJustify.SpaceBetween" Align="FlexAlign.Center" Style="margin-bottom: 16px; flex-wrap: wrap; gap: 8px;">
-    <Space Align="SpaceAlign.Center" Size="SpaceSize.Small">
-        <SpaceItem>
-            <Icon Height="24px" Width="24px" Type="@IconType.Outline.Partition" />
-        </SpaceItem>
-        <SpaceItem>
-            <h2 style="margin: 0;">Jobs</h2>
-        </SpaceItem>
-    </Space>
-    <Space>
-        <SpaceItem>
-            <Button Type="@ButtonType.Primary" OnClick="StartCreate">
-                <Icon Type="@IconType.Outline.Plus" /> New job
-            </Button>
-        </SpaceItem>
-        <SpaceItem>
-            <Button OnClick="StartImport" Style="margin-left: 8px;">
-                <Icon Type="@IconType.Outline.Upload" /> Import
-            </Button>
-        </SpaceItem>
-    </Space>
-</Flex>
+<Space Align="SpaceAlign.Center" Size="SpaceSize.Small" Style="margin-bottom: 16px;">
+    <SpaceItem>
+        <Icon Height="24px" Width="24px" Type="@IconType.Outline.Partition" />
+    </SpaceItem>
+    <SpaceItem>
+        <h2 style="margin: 0;">Jobs</h2>
+    </SpaceItem>
+</Space>
 
 @if (!string.IsNullOrEmpty(_error))
 {
@@ -35,65 +21,162 @@
            Style="margin-bottom: 16px;" />
 }
 
-<Spin Spinning="_loading">
-    <Table TItem="JobSummary" DataSource="_jobs" Size="@TableSize.Small" PageSize="int.MaxValue" PaginationPosition="none">
-        <PropertyColumn Property="c => c.Name" Title="Name" Sortable>
-            <a @onclick="@(() => Navigation.NavigateTo($"/jobs/{context.Id}"))"
-               @onclick:preventDefault style="cursor: pointer;">@context.Name</a>
-        </PropertyColumn>
-        <PropertyColumn Property="c => c.Description" Title="Description" />
-        <PropertyColumn Property="c => c.IsEnabled" Title="Enabled">
-            @if (context.IsEnabled)
-            {
-                <Tag Color="@("green")">Enabled</Tag>
-            }
-            else
-            {
-                <Tag>Disabled</Tag>
-            }
-        </PropertyColumn>
-        <PropertyColumn Property="c => c.TaskCount" Title="Tasks" />
-        <PropertyColumn Property="c => c.ScheduleCount" Title="Schedules" />
-        <PropertyColumn Property="c => c.UpdatedAt" Title="Updated" Sortable>
-            @FormatDate(context.UpdatedAt)
-        </PropertyColumn>
-        <ActionColumn Title="Actions">
-            <Space>
+<Tabs ActiveKey="@_activeTab" OnChange="OnTabChange">
+    <TabPane Key="jobs" Tab="Jobs">
+        <Flex Justify="FlexJustify.End" Style="margin-bottom: 12px;">
+            <Space Size="SpaceSize.Small">
                 <SpaceItem>
-                    <Tooltip Title="Edit">
-                        <Button Size="@ButtonSize.Small" OnClick="@(() => Navigation.NavigateTo($"/jobs/{context.Id}"))">
-                            <Icon Type="@IconType.Outline.Edit" />
-                        </Button>
-                    </Tooltip>
+                    <Button Type="@ButtonType.Primary" OnClick="StartCreate">
+                        <Icon Type="@IconType.Outline.Plus" /> New job
+                    </Button>
                 </SpaceItem>
                 <SpaceItem>
-                    <Tooltip Title="Export YAML">
-                        <Button Size="@ButtonSize.Small" OnClick="@(() => ExportAsync(context))">
-                            <Icon Type="@IconType.Outline.Download" />
-                        </Button>
-                    </Tooltip>
-                </SpaceItem>
-                <SpaceItem>
-                    <Tooltip Title="Run">
-                        <Button Size="@ButtonSize.Small" Type="@ButtonType.Primary"
-                                OnClick="@(() => OpenTriggerModal(context.Id))">
-                            <Icon Type="@IconType.Outline.PlayCircle" />
-                        </Button>
-                    </Tooltip>
-                </SpaceItem>
-                <SpaceItem>
-                    <Tooltip Title="Delete">
-                        <Popconfirm Title="@($"Delete job '{context.Name}'?")" OnConfirm="() => DeleteAsync(context)">
-                            <Button Danger Size="@ButtonSize.Small">
-                                <Icon Type="@IconType.Outline.Delete" />
-                            </Button>
-                        </Popconfirm>
-                    </Tooltip>
+                    <Button OnClick="StartImport">
+                        <Icon Type="@IconType.Outline.Upload" /> Import
+                    </Button>
                 </SpaceItem>
             </Space>
-        </ActionColumn>
-    </Table>
-</Spin>
+        </Flex>
+        <Spin Spinning="_loading">
+            <Table TItem="JobSummary" DataSource="_jobs" Size="@TableSize.Small" PageSize="int.MaxValue" PaginationPosition="none">
+                <PropertyColumn Property="c => c.Name" Title="Name" Sortable>
+                    <a @onclick="@(() => Navigation.NavigateTo($"/jobs/{context.Id}"))"
+                       @onclick:preventDefault style="cursor: pointer;">@context.Name</a>
+                </PropertyColumn>
+                <PropertyColumn Property="c => c.Description" Title="Description" />
+                <PropertyColumn Property="c => c.IsEnabled" Title="Enabled">
+                    @if (context.IsEnabled)
+                    {
+                        <Tag Color="@("green")">Enabled</Tag>
+                    }
+                    else
+                    {
+                        <Tag>Disabled</Tag>
+                    }
+                </PropertyColumn>
+                <PropertyColumn Property="c => c.TaskCount" Title="Tasks" />
+                <PropertyColumn Property="c => c.ScheduleCount" Title="Schedules" />
+                <PropertyColumn Property="c => c.UpdatedAt" Title="Updated" Sortable>
+                    @FormatDate(context.UpdatedAt)
+                </PropertyColumn>
+                <ActionColumn Title="Actions">
+                    <Space>
+                        <SpaceItem>
+                            <Tooltip Title="Edit">
+                                <Button Size="@ButtonSize.Small" OnClick="@(() => Navigation.NavigateTo($"/jobs/{context.Id}"))">
+                                    <Icon Type="@IconType.Outline.Edit" />
+                                </Button>
+                            </Tooltip>
+                        </SpaceItem>
+                        <SpaceItem>
+                            <Tooltip Title="Export YAML">
+                                <Button Size="@ButtonSize.Small" OnClick="@(() => ExportAsync(context))">
+                                    <Icon Type="@IconType.Outline.Download" />
+                                </Button>
+                            </Tooltip>
+                        </SpaceItem>
+                        <SpaceItem>
+                            <Tooltip Title="Run">
+                                <Button Size="@ButtonSize.Small" Type="@ButtonType.Primary"
+                                        OnClick="@(() => OpenTriggerModal(context.Id))">
+                                    <Icon Type="@IconType.Outline.PlayCircle" />
+                                </Button>
+                            </Tooltip>
+                        </SpaceItem>
+                        <SpaceItem>
+                            <Tooltip Title="Delete">
+                                <Popconfirm Title="@($"Delete job '{context.Name}'?")" OnConfirm="() => DeleteAsync(context)">
+                                    <Button Danger Size="@ButtonSize.Small">
+                                        <Icon Type="@IconType.Outline.Delete" />
+                                    </Button>
+                                </Popconfirm>
+                            </Tooltip>
+                        </SpaceItem>
+                    </Space>
+                </ActionColumn>
+            </Table>
+        </Spin>
+    </TabPane>
+
+    <TabPane Key="runs" Tab="Runs">
+        <div style="margin-top: 8px;">
+            <Flex Wrap="@("flex-wrap")" Gap="@("8px")" Style="margin-bottom: 12px;" Align="FlexAlign.End">
+                <div>
+                    <div style="font-size: 12px; margin-bottom: 4px; font-weight: 500;">Job name</div>
+                    <Input @bind-Value="_filterJobName" Placeholder="Filter by job name" Style="width: 200px;"
+                           OnPressEnter="@(_ => SearchRunsAsync())" AllowClear />
+                </div>
+                <div>
+                    <div style="font-size: 12px; margin-bottom: 4px; font-weight: 500;">Status</div>
+                    <Select TItem="Nullable<JobRunStatus>" TItemValue="Nullable<JobRunStatus>" @bind-Value="_filterStatus"
+                            Style="width: 140px;" AllowClear Placeholder="Any status">
+                        <SelectOption Value="@((JobRunStatus?)JobRunStatus.Pending)">Pending</SelectOption>
+                        <SelectOption Value="@((JobRunStatus?)JobRunStatus.Running)">Running</SelectOption>
+                        <SelectOption Value="@((JobRunStatus?)JobRunStatus.Succeeded)">Succeeded</SelectOption>
+                        <SelectOption Value="@((JobRunStatus?)JobRunStatus.Failed)">Failed</SelectOption>
+                        <SelectOption Value="@((JobRunStatus?)JobRunStatus.Cancelled)">Cancelled</SelectOption>
+                    </Select>
+                </div>
+                <div>
+                    <div style="font-size: 12px; margin-bottom: 4px; font-weight: 500;">From</div>
+                    <DatePicker TValue="Nullable<DateTime>" @bind-Value="_filterFrom" ShowTime="@true" Placeholder="@("Start time")" Style="width: 190px;" />
+                </div>
+                <div>
+                    <div style="font-size: 12px; margin-bottom: 4px; font-weight: 500;">To</div>
+                    <DatePicker TValue="Nullable<DateTime>" @bind-Value="_filterTo" ShowTime="@true" Placeholder="@("End time")" Style="width: 190px;" />
+                </div>
+                <Button Type="@ButtonType.Primary" OnClick="SearchRunsAsync">
+                    <Icon Type="@IconType.Outline.Search" /> Search
+                </Button>
+            </Flex>
+
+            <Spin Spinning="_runsLoading">
+                @if (_allRunsLoaded)
+                {
+                    <div style="margin-bottom: 8px; color: #999; font-size: 12px;">
+                        Showing up to 100 results, newest first.
+                    </div>
+                }
+                <Table TItem="JobRunSummary" DataSource="_allRuns" Size="@TableSize.Small"
+                       PageSize="int.MaxValue" PaginationPosition="none">
+                    <PropertyColumn Property="c => c.JobName" Title="Job" Sortable>
+                        <a @onclick="@(() => Navigation.NavigateTo($"/jobs/{context.JobId}"))"
+                           @onclick:preventDefault style="cursor: pointer;">@context.JobName</a>
+                    </PropertyColumn>
+                    <PropertyColumn Property="c => c.Status" Title="Status">
+                        <a @onclick="@(() => Navigation.NavigateTo($"/runs/{context.Id}"))"
+                           @onclick:preventDefault style="cursor: pointer;">
+                            <Tag Color="@GetStatusColor(context.Status)">@context.Status</Tag>
+                        </a>
+                    </PropertyColumn>
+                    <PropertyColumn Property="c => c.Trigger" Title="Trigger" />
+                    <PropertyColumn Property="c => c.CreatedAt" Title="Created" Sortable>
+                        @context.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")
+                    </PropertyColumn>
+                    <PropertyColumn Property="c => c.CompletedAt" Title="Completed" Sortable>
+                        @(context.CompletedAt?.ToString("yyyy-MM-dd HH:mm:ss") ?? "—")
+                    </PropertyColumn>
+                    <PropertyColumn Property="c => c.StartedAt" Title="Duration">
+                        @if (context.StartedAt.HasValue && context.CompletedAt.HasValue)
+                        {
+                            @FormatDuration((context.CompletedAt.Value - context.StartedAt.Value).TotalMilliseconds)
+                        }
+                        else
+                        {
+                            <span>—</span>
+                        }
+                    </PropertyColumn>
+                    <ActionColumn Title="">
+                        <Button Size="@ButtonSize.Small"
+                                OnClick="@(() => Navigation.NavigateTo($"/runs/{context.Id}"))">
+                            <Icon Type="@IconType.Outline.ArrowRight" /> View
+                        </Button>
+                    </ActionColumn>
+                </Table>
+            </Spin>
+        </div>
+    </TabPane>
+</Tabs>
 
 <Modal Title="New job"
        Visible="_showCreateModal"
@@ -140,6 +223,7 @@
     private IReadOnlyList<JobSummary> _jobs = [];
     private bool _loading = true;
     private string? _error;
+    private string _activeTab = "jobs";
 
     private bool _showCreateModal;
     private string _newJobName = "";
@@ -157,9 +241,25 @@
     private bool _showTriggerModal;
     private Guid? _triggerJobId;
 
+    // Runs tab state
+    private IReadOnlyList<JobRunSummary> _allRuns = [];
+    private bool _runsLoading;
+    private bool _allRunsLoaded;
+    private string? _filterJobName;
+    private JobRunStatus? _filterStatus;
+    private DateTime? _filterFrom;
+    private DateTime? _filterTo;
+
     protected override async Task OnInitializedAsync()
     {
         await LoadAsync();
+    }
+
+    private async Task OnTabChange(string key)
+    {
+        _activeTab = key;
+        if (key == "runs" && !_allRunsLoaded)
+            await SearchRunsAsync();
     }
 
     private async Task LoadAsync()
@@ -176,6 +276,35 @@
         finally
         {
             _loading = false;
+        }
+    }
+
+    private async Task SearchRunsAsync()
+    {
+        _runsLoading = true;
+        _error = null;
+        try
+        {
+            // Truncate to minute precision
+            var from = _filterFrom.HasValue
+                ? new DateTime(_filterFrom.Value.Year, _filterFrom.Value.Month, _filterFrom.Value.Day,
+                    _filterFrom.Value.Hour, _filterFrom.Value.Minute, 0, DateTimeKind.Utc)
+                : (DateTime?)null;
+            var to = _filterTo.HasValue
+                ? new DateTime(_filterTo.Value.Year, _filterTo.Value.Month, _filterTo.Value.Day,
+                    _filterTo.Value.Hour, _filterTo.Value.Minute, 59, DateTimeKind.Utc)
+                : (DateTime?)null;
+
+            _allRuns = await JobService.GetAllRunsAsync(_filterJobName, _filterStatus, from, to);
+            _allRunsLoaded = true;
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to load runs: {ex.Message}";
+        }
+        finally
+        {
+            _runsLoading = false;
         }
     }
 
@@ -257,19 +386,6 @@
         }
     }
 
-    private async Task TriggerAsync(JobSummary job)
-    {
-        try
-        {
-            await JobService.TriggerJobAsync(job.Id);
-            _error = null;
-        }
-        catch (Exception ex)
-        {
-            _error = $"Failed to trigger '{job.Name}': {ex.Message}";
-        }
-    }
-
     private async Task DeleteAsync(JobSummary job)
     {
         try
@@ -283,6 +399,15 @@
         }
     }
 
+    private static string GetStatusColor(JobRunStatus status) => status switch
+    {
+        JobRunStatus.Succeeded => "green",
+        JobRunStatus.Failed => "red",
+        JobRunStatus.Running => "blue",
+        JobRunStatus.Cancelled => "orange",
+        _ => "default",
+    };
+
     private static string FormatDate(DateTime dt)
     {
         var diff = DateTime.UtcNow - dt;
@@ -291,5 +416,14 @@
         if (diff.TotalDays < 1) return $"{(int)diff.TotalHours}h ago";
         if (diff.TotalDays < 30) return $"{(int)diff.TotalDays}d ago";
         return dt.ToString("yyyy-MM-dd");
+    }
+
+    private static string FormatDuration(double ms)
+    {
+        double s = ms / 1000.0;
+        if (s < 10.0) return $"{s:F1}s";
+        int total = (int)s;
+        if (total < 60) return $"{total}s";
+        return $"{total / 60}m {total % 60}s";
     }
 }
