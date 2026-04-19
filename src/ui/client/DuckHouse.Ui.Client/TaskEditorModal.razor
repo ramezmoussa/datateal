@@ -53,7 +53,15 @@
                                 LabelName="@nameof(NodePoolOption.Label)"
                                 ValueName="@nameof(NodePoolOption.Value)"
                                 Style="width: 100%;"
-                                Placeholder="Select node pool" />
+                                Placeholder="Select node pool">
+                            <ItemTemplate>
+                                @{ var pool = (NodePoolOption)(object)context!; }
+                                <div style="line-height: 1.4;">
+                                    <div>@pool.Label</div>
+                                    <div style="font-size: 11px; color: #888; margin-top: 1px;">@pool.PoolType · @pool.VmSize</div>
+                                </div>
+                            </ItemTemplate>
+                        </Select>
                         @if (_nodePoolRef is null)
                         {
                             <div style="color: #ff4d4f; font-size: 12px; margin-top: 2px;">A node pool must be selected.</div>
@@ -80,7 +88,15 @@
                                 LabelName="@nameof(NodePoolOption.Label)"
                                 ValueName="@nameof(NodePoolOption.Value)"
                                 Style="width: 100%;"
-                                Placeholder="Select node pool" />
+                                Placeholder="Select node pool">
+                            <ItemTemplate>
+                                @{ var pool = (NodePoolOption)(object)context!; }
+                                <div style="line-height: 1.4;">
+                                    <div>@pool.Label</div>
+                                    <div style="font-size: 11px; color: #888; margin-top: 1px;">@pool.PoolType · @pool.VmSize</div>
+                                </div>
+                            </ItemTemplate>
+                        </Select>
                         @if (_nodePoolRef is null)
                         {
                             <div style="color: #ff4d4f; font-size: 12px; margin-top: 2px;">A node pool must be selected.</div>
@@ -240,7 +256,7 @@
         try
         {
             var pools = await NodePoolService.GetNodePoolsAsync();
-            _nodePoolOptions = pools.Select(p => new NodePoolOption(p.Name, $"{p.Name} ({p.VmSize})")).ToList();
+            _nodePoolOptions = pools.Select(p => new NodePoolOption(p.Name, p.Name, p.PoolType ?? "Job", p.VmSize)).ToList();
         }
         catch { /* Node pools may not be available */ }
 
@@ -341,6 +357,6 @@
         await VisibleChanged.InvokeAsync(false);
     }
 
-    private record NodePoolOption(string Value, string Label);
+    private record NodePoolOption(string Value, string Label, string PoolType, string VmSize);
     private record JobOption(Guid Value, string Label);
 }
