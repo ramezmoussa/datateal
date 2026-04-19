@@ -67,7 +67,18 @@
                         @(context.KernelIdleTimeout.HasValue ? $"{context.KernelIdleTimeout.Value.TotalMinutes:F0} min" : "Default")
                     </PropertyColumn>
                     <PropertyColumn Property="c => c.NodeIdleTimeout" Title="Node idle">
-                        @(context.NodeIdleTimeout.HasValue ? $"{context.NodeIdleTimeout.Value.TotalMinutes:F0} min" : "Default")
+                        @if (!context.NodeIdleTimeout.HasValue)
+                        {
+                            <span>Default</span>
+                        }
+                        else if (context.NodeIdleTimeout.Value == TimeSpan.Zero)
+                        {
+                            <span>Never</span>
+                        }
+                        else
+                        {
+                            <span>@($"{context.NodeIdleTimeout.Value.TotalMinutes:F0} min")</span>
+                        }
                     </PropertyColumn>
                     <PropertyColumn Property="c => c.Description" Title="Description">
                         @(context.Description ?? "—")
@@ -164,7 +175,18 @@
                         @(context.KernelIdleTimeout.HasValue ? $"{context.KernelIdleTimeout.Value.TotalMinutes:F0} min" : "Default")
                     </PropertyColumn>
                     <PropertyColumn Property="c => c.NodeIdleTimeout" Title="Node idle timeout">
-                        @(context.NodeIdleTimeout.HasValue ? $"{context.NodeIdleTimeout.Value.TotalMinutes:F0} min" : "Default")
+                        @if (!context.NodeIdleTimeout.HasValue)
+                        {
+                            <span>Default</span>
+                        }
+                        else if (context.NodeIdleTimeout.Value == TimeSpan.Zero)
+                        {
+                            <span>Never</span>
+                        }
+                        else
+                        {
+                            <span>@($"{context.NodeIdleTimeout.Value.TotalMinutes:F0} min")</span>
+                        }
                     </PropertyColumn>
                     <PropertyColumn Property="c => c.Description" Title="Description">
                         @(context.Description ?? "—")
@@ -219,7 +241,10 @@
         </div>
         <div>
             <label style="display: block; margin-bottom: 4px; font-weight: 500;">Node idle timeout (minutes)</label>
-            <AntDesign.InputNumber @bind-Value="_formNodeIdleMin" Min="0" />
+            <AntDesign.InputNumber @bind-Value="_formNodeIdleMin" Min="0" Placeholder="Default" />
+            <div style="color: #888; font-size: 12px; margin-top: 4px;">
+                Leave blank to use the control plane default. Set to <strong>0</strong> to disable automatic node eviction for this pool.
+            </div>
         </div>
         <div>
             <label style="display: block; margin-bottom: 4px; font-weight: 500;">Kernel requirements (pip)</label>
@@ -294,7 +319,7 @@
     private string _formName = "";
     private string _formVmSize = "";
     private int _formKernelIdleMin;
-    private int _formNodeIdleMin;
+    private int? _formNodeIdleMin;
     private string? _formKernelReqs;
     private string? _formDescription;
     private IEnumerable<Guid> _formWheelPackageIds = [];
@@ -355,7 +380,7 @@
         _formName = "";
         _formVmSize = "";
         _formKernelIdleMin = 0;
-        _formNodeIdleMin = 0;
+        _formNodeIdleMin = null;
         _formKernelReqs = null;
         _formDescription = null;
         _formWheelPackageIds = [];
@@ -370,7 +395,7 @@
         _formName = pool.Name;
         _formVmSize = pool.VmSize;
         _formKernelIdleMin = (int)(pool.KernelIdleTimeout?.TotalMinutes ?? 0);
-        _formNodeIdleMin = (int)(pool.NodeIdleTimeout?.TotalMinutes ?? 0);
+        _formNodeIdleMin = pool.NodeIdleTimeout.HasValue ? (int)pool.NodeIdleTimeout.Value.TotalMinutes : (int?)null;
         _formKernelReqs = pool.KernelRequirements;
         _formDescription = pool.Description;
         _formWheelPackageIds = pool.WheelPackageIds ?? [];
@@ -384,7 +409,8 @@
         if (string.IsNullOrWhiteSpace(_formName) || string.IsNullOrWhiteSpace(_formVmSize)) return;
 
         var kernelTimeout = _formKernelIdleMin > 0 ? TimeSpan.FromMinutes(_formKernelIdleMin) : (TimeSpan?)null;
-        var nodeTimeout = _formNodeIdleMin > 0 ? TimeSpan.FromMinutes(_formNodeIdleMin) : (TimeSpan?)null;
+        // null → use global default; 0 → never evict; > 0 → specific timeout
+        var nodeTimeout = _formNodeIdleMin.HasValue ? TimeSpan.FromMinutes(_formNodeIdleMin.Value) : (TimeSpan?)null;
 
         _saving = true;
         try

@@ -90,8 +90,6 @@ internal sealed class InactivityEvictionService(
     {
         var nodeConfig = await nodeConfigRepo.GetAsync(nodeName, cancellationToken);
 
-        // Fall back to global defaults if no per-node config exists
-        // (e.g., nodes created before the DB was introduced).
         var kernelIdleTimeout = nodeConfig?.KernelIdleTimeout ?? options.Value.KernelIdleTimeout;
         var nodeIdleTimeout = nodeConfig?.NodeIdleTimeout ?? options.Value.NodeIdleTimeout;
 
@@ -113,30 +111,38 @@ internal sealed class InactivityEvictionService(
         // Phase 1: evict idle kernels. Never evict a kernel that is not Idle —
         // Busy/Starting/Restarting kernels are actively in use even if LastActivity
         // looks stale (it is set at execution start, not completion).
-        foreach (var kernel in kernels)
+        // kernelIdleTimeout == TimeSpan.Zero means kernel eviction is disabled for this node.
+        if (kernelIdleTimeout > TimeSpan.Zero)
         {
-            if (kernel.Status != KernelStatus.Idle)
-                continue;
-
-            if (now - kernel.LastActivity > kernelIdleTimeout)
+            foreach (var kernel in kernels)
             {
-                logger.LogInformation(
-                    "Deleting idle kernel {KernelId} on node {NodeName} (idle for {Idle}).",
-                    kernel.Id, nodeName, now - kernel.LastActivity);
+                if (kernel.Status != KernelStatus.Idle)
+                    continue;
 
-                try
+                if (now - kernel.LastActivity > kernelIdleTimeout)
                 {
-                    await runtimeClient.DeleteKernelAsync(nodeName, kernel.Id, cancellationToken);
-                }
-                catch (Exception ex)
-                {
-                    logger.LogError(ex, "Failed to delete kernel {KernelId} on node {NodeName}.", kernel.Id, nodeName);
+                    logger.LogInformation(
+                        "Deleting idle kernel {KernelId} on node {NodeName} (idle for {Idle}).",
+                        kernel.Id, nodeName, now - kernel.LastActivity);
+
+                    try
+                    {
+                        await runtimeClient.DeleteKernelAsync(nodeName, kernel.Id, cancellationToken);
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogError(ex, "Failed to delete kernel {KernelId} on node {NodeName}.", kernel.Id, nodeName);
+                    }
                 }
             }
         }
 
         // Phase 2: delete idle empty node.
         // Re-list kernels; also skip if any kernel is still active (not Idle/Dead).
+        // nodeIdleTimeout == TimeSpan.Zero means node eviction is disabled for this node.
+        if (nodeIdleTimeout == TimeSpan.Zero)
+            return;
+
         var remainingKernels = await runtimeClient.ListKernelsAsync(nodeName, cancellationToken);
         bool anyActive = remainingKernels.Any(k => k.Status is KernelStatus.Busy or KernelStatus.Starting or KernelStatus.Restarting);
         if (!anyActive && remainingKernels.Count == 0 && _nodeLastActivity.TryGetValue(nodeName, out var lastActivity))
