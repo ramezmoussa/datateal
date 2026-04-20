@@ -1,5 +1,10 @@
+using System.Text.Json.Serialization;
+
 namespace DuckHouse.Orchestrator.Core.Entities;
 
+[JsonPolymorphic(TypeDiscriminatorPropertyName = "$poolType")]
+[JsonDerivedType(typeof(JobNodePoolConfig), "Job")]
+[JsonDerivedType(typeof(InteractiveNodePoolConfig), "Interactive")]
 public abstract class NodePoolConfig
 {
     public Guid Id { get; set; }

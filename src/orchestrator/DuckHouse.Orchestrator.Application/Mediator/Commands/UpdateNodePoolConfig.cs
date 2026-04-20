@@ -25,9 +25,7 @@ public record UpdateNodePoolConfigRequest(
 internal class UpdateNodePoolConfigHandler(
     INodePoolConfigRepository repository,
     IControlPlaneClient controlPlaneClient,
-    WarmPoolManager warmPoolManager,
-    IWheelPackageReader wheelPackageReader,
-    IEnvironmentResolver environmentResolver)
+    WarmPoolManager warmPoolManager)
     : IRequestHandler<UpdateNodePoolConfigRequest, NodePoolConfig?>
 {
     public async Task<NodePoolConfig?> Handle(UpdateNodePoolConfigRequest request, CancellationToken cancellationToken)
@@ -78,10 +76,7 @@ internal class UpdateNodePoolConfigHandler(
         }
         else if (existing is JobNodePoolConfig updatedJobConfig)
         {
-            // Adjust the live warm pool state to reflect the new config
-            await warmPoolManager.AdjustPoolAsync(
-                updatedJobConfig, controlPlaneClient, wheelPackageReader, environmentResolver,
-                cancellationToken);
+            await warmPoolManager.AdjustPoolAsync(updatedJobConfig, cancellationToken);
         }
 
         return updated;

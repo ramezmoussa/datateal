@@ -5,6 +5,8 @@ using DuckHouse.Orchestrator.Core.Interfaces;
 using Microsoft.Extensions.Logging;
 
 namespace DuckHouse.Orchestrator.Application.Engine;
+
+/// <summary>
 /// Singleton that manages warm standby nodes for <see cref="JobNodePoolConfig"/> entries
 /// that have <see cref="JobNodePoolConfig.WarmNodes"/> &gt; 0 or
 /// <see cref="JobNodePoolConfig.MaxNodes"/> set.
@@ -17,7 +19,11 @@ namespace DuckHouse.Orchestrator.Application.Engine;
 /// A slot is acquired on node creation and released only when the node is deleted.
 /// This makes the semaphore an exact count of total active nodes, enforcing MaxNodes.
 /// </summary>
-public sealed class WarmPoolManager(ILogger<WarmPoolManager> logger)
+public sealed class WarmPoolManager(
+    IControlPlaneClient controlPlane,
+    IWheelPackageReader wheelPackageReader,
+    IEnvironmentResolver environmentResolver,
+    ILogger<WarmPoolManager> logger)
 {
     private static readonly TimeSpan NodeReadyTimeout = TimeSpan.FromMinutes(10);
     private static readonly TimeSpan NodePollInterval = TimeSpan.FromSeconds(5);
@@ -31,7 +37,7 @@ public sealed class WarmPoolManager(ILogger<WarmPoolManager> logger)
     /// <summary>A warm node entry whose <c>ReadyTask</c> resolves when the node is Running.</summary>
     private sealed record WarmNodeEntry(string NodeName, Task ReadyTask);
 
-    // ── Initialisation ────────────────────────────────────────────────────────
+    // -- Initialisation --------------------------------------------------------
 
     /// <summary>
     /// Discovers existing warm nodes from the control plane and seeds each pool's queue.
@@ -39,7 +45,6 @@ public sealed class WarmPoolManager(ILogger<WarmPoolManager> logger)
     /// </summary>
     public async Task InitialiseAsync(
         IReadOnlyList<JobNodePoolConfig> configs,
-        IControlPlaneClient controlPlane,
         CancellationToken ct)
     {
         IReadOnlyList<NodeInfo> allNodes;
@@ -68,8 +73,6 @@ public sealed class WarmPoolManager(ILogger<WarmPoolManager> logger)
 
             foreach (var node in warmNodes)
             {
-                // Acquire a semaphore slot for each discovered warm node.
-                // If MaxNodes is already reached by pre-existing nodes, stop discovering.
                 if (semaphore is not null && !semaphore.Wait(0))
                     break;
 
@@ -80,12 +83,11 @@ public sealed class WarmPoolManager(ILogger<WarmPoolManager> logger)
                 else if (node.State == NodeState.Creating)
                 {
                     var nodeName = node.Name;
-                    var pollTask = PollUntilRunningAsync(nodeName, controlPlane, CancellationToken.None);
+                    var pollTask = PollUntilRunningAsync(nodeName, CancellationToken.None);
                     queue.Enqueue(new WarmNodeEntry(nodeName, pollTask));
                 }
                 else
                 {
-                    // Not in a usable state — do not consume a slot.
                     semaphore?.Release();
                 }
             }
@@ -96,32 +98,20 @@ public sealed class WarmPoolManager(ILogger<WarmPoolManager> logger)
         }
     }
 
-    // ── Node claiming ─────────────────────────────────────────────────────────
+    // -- Node claiming ---------------------------------------------------------
 
     /// <summary>
     /// Claims a node for a job run.
-    /// <list type="bullet">
-    ///   <item>Dequeues a warm standby (ready or still Creating) when available.</item>
-    ///   <item>Falls back to creating a fresh node when the queue is empty.</item>
-    ///   <item>Respects <see cref="JobNodePoolConfig.MaxNodes"/> via a semaphore.</item>
-    ///   <item>Waits up to <see cref="JobNodePoolConfig.NodeAcquireTimeout"/> for a slot
-    ///         (<c>null</c> = wait indefinitely).</item>
-    /// </list>
+    /// Dequeues a warm standby when available; falls back to fresh provisioning.
+    /// Respects MaxNodes via a semaphore and NodeAcquireTimeout when the cap is reached.
     /// </summary>
-    public async Task<string> ClaimNodeAsync(
-        JobNodePoolConfig config,
-        IControlPlaneClient controlPlane,
-        IWheelPackageReader wheelPackageReader,
-        IEnvironmentResolver environmentResolver,
-        CancellationToken ct)
+    public async Task<string> ClaimNodeAsync(JobNodePoolConfig config, CancellationToken ct)
     {
         EnsurePoolState(config);
         var semaphore = _semaphores[config.Id];
         var queue = _available[config.Id];
 
-        // ── Try dequeuing an existing warm standby ────────────────────────────
-        // Warm standbys already hold a semaphore slot (acquired during replenishment),
-        // so claiming one does NOT require acquiring an additional slot.
+        // Try dequeuing an existing warm standby
         while (queue.TryDequeue(out var entry))
         {
             try
@@ -136,12 +126,11 @@ public sealed class WarmPoolManager(ILogger<WarmPoolManager> logger)
                     "WarmPoolManager: claimed warm node '{NodeName}' (pool '{PoolName}')",
                     entry.NodeName, config.Name);
 
-                ScheduleReplenishment(config, controlPlane, wheelPackageReader, environmentResolver);
+                ScheduleReplenishment(config);
                 return entry.NodeName;
             }
             catch (Exception ex)
             {
-                // This warm node's provisioning failed — release its slot and try the next entry.
                 logger.LogWarning(ex,
                     "WarmPoolManager: warm node '{NodeName}' (pool '{PoolName}') failed; trying next",
                     entry.NodeName, config.Name);
@@ -149,7 +138,7 @@ public sealed class WarmPoolManager(ILogger<WarmPoolManager> logger)
             }
         }
 
-        // ── No warm standby available — acquire a slot and create fresh ────────
+        // No warm standby available -- acquire a slot and create fresh
         if (semaphore is not null)
         {
             var timeout = config.NodeAcquireTimeout ?? Timeout.InfiniteTimeSpan;
@@ -162,14 +151,13 @@ public sealed class WarmPoolManager(ILogger<WarmPoolManager> logger)
 
         try
         {
-            var freshName = await ProvisionAndWaitAsync(
-                config, controlPlane, wheelPackageReader, environmentResolver, warmStandby: false, ct);
+            var freshName = await ProvisionAndWaitAsync(config, warmStandby: false, ct: ct);
 
             logger.LogInformation(
                 "WarmPoolManager: created fresh node '{NodeName}' (pool '{PoolName}', no standby available)",
                 freshName, config.Name);
 
-            ScheduleReplenishment(config, controlPlane, wheelPackageReader, environmentResolver);
+            ScheduleReplenishment(config);
             return freshName;
         }
         catch
@@ -179,19 +167,12 @@ public sealed class WarmPoolManager(ILogger<WarmPoolManager> logger)
         }
     }
 
-    // ── Node release ──────────────────────────────────────────────────────────
+    // -- Node release ----------------------------------------------------------
 
     /// <summary>
-    /// Called when a job run finishes. Deletes the used node (which may have dirty Python
-    /// state) and triggers replenishment to restore the warm standby count.
+    /// Called when a job run finishes. Deletes the used node and triggers replenishment.
     /// </summary>
-    public async Task ReleaseNodeAsync(
-        Guid poolId,
-        string nodeName,
-        JobNodePoolConfig config,
-        IControlPlaneClient controlPlane,
-        IWheelPackageReader wheelPackageReader,
-        IEnvironmentResolver environmentResolver)
+    public async Task ReleaseNodeAsync(Guid poolId, string nodeName, JobNodePoolConfig config)
     {
         try
         {
@@ -207,32 +188,25 @@ public sealed class WarmPoolManager(ILogger<WarmPoolManager> logger)
         }
         finally
         {
-            // Release the slot regardless of delete success so the pool doesn't stall.
             _semaphores.GetValueOrDefault(poolId)?.Release();
         }
 
-        ScheduleReplenishment(config, controlPlane, wheelPackageReader, environmentResolver);
+        ScheduleReplenishment(config);
     }
 
-    // ── Config adjustments ────────────────────────────────────────────────────
+    // -- Config adjustments ----------------------------------------------------
 
     /// <summary>
     /// Called when a pool config is updated via the UI.
-    /// Drains excess standbys if <see cref="JobNodePoolConfig.WarmNodes"/> was lowered;
-    /// replenishes if raised.  Rebuilds the semaphore if MaxNodes changed.
+    /// Drains excess standbys if WarmNodes was lowered; replenishes if raised.
+    /// Rebuilds the semaphore if MaxNodes changed.
     /// </summary>
-    public async Task AdjustPoolAsync(
-        JobNodePoolConfig newConfig,
-        IControlPlaneClient controlPlane,
-        IWheelPackageReader wheelPackageReader,
-        IEnvironmentResolver environmentResolver,
-        CancellationToken ct)
+    public Task AdjustPoolAsync(JobNodePoolConfig newConfig, CancellationToken ct)
     {
         var poolId = newConfig.Id;
         EnsurePoolState(newConfig);
 
         // Rebuild semaphore when MaxNodes changes.
-        // In-flight nodes retain their existing slots; the new semaphore only governs new claims.
         var existingSemaphore = _semaphores[poolId];
         SemaphoreSlim? newSemaphore = newConfig.MaxNodes.HasValue
             ? new SemaphoreSlim(newConfig.MaxNodes.Value, newConfig.MaxNodes.Value)
@@ -248,8 +222,6 @@ public sealed class WarmPoolManager(ILogger<WarmPoolManager> logger)
         {
             if (!queue.TryDequeue(out var entry)) break;
 
-            // Skip still-creating nodes — they're almost ready and will cost money regardless.
-            // Put them back and stop draining.
             if (!entry.ReadyTask.IsCompleted)
             {
                 queue.Enqueue(entry);
@@ -261,6 +233,7 @@ public sealed class WarmPoolManager(ILogger<WarmPoolManager> logger)
                 entry.NodeName, newConfig.Name);
 
             var capturedEntry = entry;
+            var capturedNewSemaphore = newSemaphore;
             _ = Task.Run(async () =>
             {
                 try
@@ -275,37 +248,28 @@ public sealed class WarmPoolManager(ILogger<WarmPoolManager> logger)
                 }
                 finally
                 {
-                    newSemaphore?.Release();
+                    capturedNewSemaphore?.Release();
                 }
             }, CancellationToken.None);
         }
 
-        ScheduleReplenishment(newConfig, controlPlane, wheelPackageReader, environmentResolver);
-        await Task.CompletedTask;
+        ScheduleReplenishment(newConfig);
+        return Task.CompletedTask;
     }
 
-    // ── Replenishment ─────────────────────────────────────────────────────────
+    // -- Replenishment ---------------------------------------------------------
 
-    private void ScheduleReplenishment(
-        JobNodePoolConfig config,
-        IControlPlaneClient controlPlane,
-        IWheelPackageReader wheelPackageReader,
-        IEnvironmentResolver environmentResolver)
+    private void ScheduleReplenishment(JobNodePoolConfig config)
     {
         if (config.WarmNodes == 0) return;
-        _ = Task.Run(() =>
-            ReplenishAsync(config, controlPlane, wheelPackageReader, environmentResolver));
+        _ = Task.Run(() => ReplenishAsync(config));
     }
 
     /// <summary>
-    /// Creates warm standby nodes until the pool reaches its <see cref="JobNodePoolConfig.WarmNodes"/>
-    /// target, subject to <see cref="JobNodePoolConfig.MaxNodes"/>.
+    /// Creates warm standby nodes until the pool reaches its WarmNodes target.
+    /// Called by <see cref="WarmPoolReplenishmentService"/> and by <see cref="ScheduleReplenishment"/>.
     /// </summary>
-    public async Task ReplenishAsync(
-        JobNodePoolConfig config,
-        IControlPlaneClient controlPlane,
-        IWheelPackageReader wheelPackageReader,
-        IEnvironmentResolver environmentResolver)
+    public async Task ReplenishAsync(JobNodePoolConfig config)
     {
         EnsurePoolState(config);
         var poolId = config.Id;
@@ -314,7 +278,6 @@ public sealed class WarmPoolManager(ILogger<WarmPoolManager> logger)
 
         while (queue.Count < config.WarmNodes)
         {
-            // Try to acquire a slot (non-blocking); if at cap, stop.
             if (semaphore is not null && !semaphore.Wait(0))
                 break;
 
@@ -323,7 +286,6 @@ public sealed class WarmPoolManager(ILogger<WarmPoolManager> logger)
                 "WarmPoolManager: creating warm standby '{NodeName}' for pool '{PoolName}'",
                 nodeName, config.Name);
 
-            // Capture locals for the async task closure
             var capturedName = nodeName;
             var capturedConfig = config;
             var capturedSemaphore = semaphore;
@@ -333,32 +295,27 @@ public sealed class WarmPoolManager(ILogger<WarmPoolManager> logger)
                 try
                 {
                     await ProvisionAndWaitAsync(
-                        capturedConfig, controlPlane, wheelPackageReader, environmentResolver,
-                        warmStandby: true, nodeName: capturedName, ct: CancellationToken.None);
+                        capturedConfig, warmStandby: true, nodeName: capturedName,
+                        ct: CancellationToken.None);
                 }
                 catch (Exception ex)
                 {
                     logger.LogError(ex,
                         "WarmPoolManager: failed to provision warm standby '{NodeName}'",
                         capturedName);
-                    // Release the slot so the pool can try again later.
                     capturedSemaphore?.Release();
                     throw;
                 }
             });
 
-            // Enqueue immediately so the next job can claim this in-flight node.
             queue.Enqueue(new WarmNodeEntry(nodeName, readyTask));
         }
     }
 
-    // ── Internal provisioning ─────────────────────────────────────────────────
+    // -- Internal provisioning -------------------------------------------------
 
     private async Task<string> ProvisionAndWaitAsync(
         JobNodePoolConfig config,
-        IControlPlaneClient controlPlane,
-        IWheelPackageReader wheelPackageReader,
-        IEnvironmentResolver environmentResolver,
         bool warmStandby,
         CancellationToken ct,
         string? nodeName = null)
@@ -372,8 +329,6 @@ public sealed class WarmPoolManager(ILogger<WarmPoolManager> logger)
         var resolved = await environmentResolver.ResolveAsync(
             config.EnvironmentVariableIds, config.SecretIds, ct);
 
-        // Warm standby nodes use NodeIdleTimeout = Zero so the eviction service never removes
-        // them while they are idle (no kernels).  The timeout is restored when the node is claimed.
         var nodeIdleTimeout = warmStandby ? TimeSpan.Zero : config.NodeIdleTimeout;
 
         await controlPlane.CreateNodeAsync(
@@ -387,14 +342,11 @@ public sealed class WarmPoolManager(ILogger<WarmPoolManager> logger)
             resolved.Secrets.Count > 0 ? resolved.Secrets : null,
             ct);
 
-        await PollUntilRunningAsync(nodeName, controlPlane, ct);
+        await PollUntilRunningAsync(nodeName, ct);
         return nodeName;
     }
 
-    private async Task PollUntilRunningAsync(
-        string nodeName,
-        IControlPlaneClient controlPlane,
-        CancellationToken ct)
+    private async Task PollUntilRunningAsync(string nodeName, CancellationToken ct)
     {
         var deadline = DateTime.UtcNow + NodeReadyTimeout;
         while (DateTime.UtcNow < deadline)

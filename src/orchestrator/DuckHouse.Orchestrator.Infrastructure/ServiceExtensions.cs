@@ -24,10 +24,10 @@ public static class ServiceExtensions
         services.AddScoped<IScheduleRepository, ScheduleRepository>();
         services.AddScoped<INodePoolConfigRepository, NodePoolConfigRepository>();
 
-        services.AddScoped<IControlPlaneClient, ControlPlaneClient>();
+        services.AddSingleton<IControlPlaneClient, ControlPlaneClient>();
         services.AddScoped<IWorkspaceReader, WorkspaceReader>();
-        services.AddScoped<IWheelPackageReader, WheelPackageReader>();
-        services.AddScoped<IEnvironmentResolver, EnvironmentResolver>();
+        services.AddSingleton<IWheelPackageReader, WheelPackageReader>();
+        services.AddSingleton<IEnvironmentResolver, EnvironmentResolver>();
         services.AddScoped<ICatalogResolver, CatalogResolver>();
 
         services.Configure<CatalogSettings>(configuration.GetSection("Catalogs"));

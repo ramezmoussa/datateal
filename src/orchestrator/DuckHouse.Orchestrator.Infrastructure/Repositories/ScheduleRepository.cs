@@ -7,19 +7,19 @@ namespace DuckHouse.Orchestrator.Infrastructure.Repositories;
 
 internal class ScheduleRepository(DuckHouseDbContext db) : IScheduleRepository
 {
-    public async Task<IReadOnlyList<JobSchedule>> GetEnabledSchedulesAsync(CancellationToken cancellationToken = default) =>
-        await db.JobSchedules
+    public async Task<IReadOnlyList<JobSchedule>> GetEnabledSchedulesAsync(CancellationToken cancellationToken = default)
+        => await db.JobSchedules
             .Include(s => s.Job)
             .Where(s => s.IsEnabled && s.Job!.IsEnabled)
             .ToListAsync(cancellationToken);
 
-    public async Task<IReadOnlyList<JobSchedule>> GetSchedulesForJobAsync(Guid jobId, CancellationToken cancellationToken = default) =>
-        await db.JobSchedules
+    public async Task<IReadOnlyList<JobSchedule>> GetSchedulesForJobAsync(Guid jobId, CancellationToken cancellationToken = default)
+        => await db.JobSchedules
             .Where(s => s.JobId == jobId)
             .ToListAsync(cancellationToken);
 
-    public async Task<JobSchedule?> GetScheduleAsync(Guid id, CancellationToken cancellationToken = default) =>
-        await db.JobSchedules.FindAsync([id], cancellationToken);
+    public async Task<JobSchedule?> GetScheduleAsync(Guid id, CancellationToken cancellationToken = default)
+        => await db.JobSchedules.FindAsync([id], cancellationToken);
 
     public async Task<JobSchedule> CreateScheduleAsync(JobSchedule schedule, CancellationToken cancellationToken = default)
     {

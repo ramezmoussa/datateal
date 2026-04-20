@@ -2,6 +2,7 @@ using DuckHouse.Data;
 using DuckHouse.Orchestrator.Core.Interfaces;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace DuckHouse.Orchestrator.Infrastructure.Repositories;
 
@@ -10,7 +11,7 @@ namespace DuckHouse.Orchestrator.Infrastructure.Repositories;
 /// database. Secrets are decrypted using the shared Data Protection key ring.
 /// </summary>
 internal class EnvironmentResolver(
-    DuckHouseDbContext db,
+    IServiceScopeFactory scopeFactory,
     IDataProtectionProvider dataProtectionProvider) : IEnvironmentResolver
 {
     private const string DataProtectionPurpose = "DuckHouse.Secrets";
@@ -22,6 +23,9 @@ internal class EnvironmentResolver(
     {
         var variables = new Dictionary<string, string>();
         var secrets = new Dictionary<string, string>();
+
+        await using var scope = scopeFactory.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<DuckHouseDbContext>();
 
         if (environmentVariableIds is { Count: > 0 })
         {

@@ -8,34 +8,30 @@ namespace DuckHouse.Orchestrator.Infrastructure.Repositories;
 internal class WorkspaceReader(DuckHouseDbContext db) : IWorkspaceReader
 {
     public async Task<WorkspaceItemContent?> GetNotebookContentAsync(Guid notebookId, CancellationToken ct)
-    {
-        return await db.WorkspaceItems
+        => await db.WorkspaceItems
             .OfType<Notebook>()
             .Where(n => n.Id == notebookId)
             .Select(n => new WorkspaceItemContent(n.Id, n.Title, n.Content))
             .FirstOrDefaultAsync(ct);
-    }
 
     public async Task<WorkspaceItemContent?> GetQueryContentAsync(Guid queryId, CancellationToken ct)
-    {
-        return await db.WorkspaceItems
+        => await db.WorkspaceItems
             .OfType<Query>()
             .Where(q => q.Id == queryId)
             .Select(q => new WorkspaceItemContent(q.Id, q.Title, q.Content))
             .FirstOrDefaultAsync(ct);
-    }
 
     public async Task<Guid?> ResolveNotebookIdByPathAsync(string path, CancellationToken ct)
-        => await ResolveItemIdByPathAsync<Notebook>(path, ct);
+        => await ResolveItemIdByPathAsync<Notebook>(db, path, ct);
 
     public async Task<Guid?> ResolveQueryIdByPathAsync(string path, CancellationToken ct)
-        => await ResolveItemIdByPathAsync<Query>(path, ct);
+        => await ResolveItemIdByPathAsync<Query>(db, path, ct);
 
     public async Task<string?> ResolveNotebookPathByIdAsync(Guid id, CancellationToken ct)
-        => await ResolveItemPathByIdAsync<Notebook>(id, ct);
+        => await ResolveItemPathByIdAsync<Notebook>(db, id, ct);
 
     public async Task<string?> ResolveQueryPathByIdAsync(Guid id, CancellationToken ct)
-        => await ResolveItemPathByIdAsync<Query>(id, ct);
+        => await ResolveItemPathByIdAsync<Query>(db, id, ct);
 
     public async Task<IReadOnlyList<string>> GetWorkspaceItemCatalogNamesAsync(Guid itemId, CancellationToken ct)
     {
@@ -47,7 +43,7 @@ internal class WorkspaceReader(DuckHouseDbContext db) : IWorkspaceReader
         return catalogNames ?? [];
     }
 
-    private async Task<Guid?> ResolveItemIdByPathAsync<T>(string path, CancellationToken ct)
+    private static async Task<Guid?> ResolveItemIdByPathAsync<T>(DuckHouseDbContext db, string path, CancellationToken ct)
         where T : WorkspaceItem
     {
         var normalized = path.Trim('/');
@@ -75,7 +71,7 @@ internal class WorkspaceReader(DuckHouseDbContext db) : IWorkspaceReader
             .FirstOrDefaultAsync(ct);
     }
 
-    private async Task<string?> ResolveItemPathByIdAsync<T>(Guid id, CancellationToken ct)
+    private static async Task<string?> ResolveItemPathByIdAsync<T>(DuckHouseDbContext db, Guid id, CancellationToken ct)
         where T : WorkspaceItem
     {
         var item = await db.WorkspaceItems
@@ -106,4 +102,3 @@ internal class WorkspaceReader(DuckHouseDbContext db) : IWorkspaceReader
         return "/" + string.Join("/", pathParts);
     }
 }
-

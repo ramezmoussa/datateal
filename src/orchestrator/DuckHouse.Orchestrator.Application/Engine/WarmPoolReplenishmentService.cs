@@ -1,5 +1,4 @@
 using DuckHouse.Orchestrator.Core.Entities;
-using DuckHouse.Orchestrator.Core.Interfaces;
 using DuckHouse.Orchestrator.Core.Repositories;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -42,29 +41,27 @@ public class WarmPoolReplenishmentService(
     {
         try
         {
-            await using var scope = scopeFactory.CreateAsyncScope();
-            var sp = scope.ServiceProvider;
-
-            var nodePoolRepo = sp.GetRequiredService<INodePoolConfigRepository>();
-            var controlPlane = sp.GetRequiredService<IControlPlaneClient>();
-            var wheelReader = sp.GetRequiredService<IWheelPackageReader>();
-            var envResolver = sp.GetRequiredService<IEnvironmentResolver>();
-
-            var allConfigs = await nodePoolRepo.GetAllAsync(ct);
-            var warmPools = allConfigs
-                .OfType<JobNodePoolConfig>()
-                .Where(c => c.WarmNodes > 0 || c.MaxNodes.HasValue)
-                .ToList();
+            // Use a scope only for repository access (INodePoolConfigRepository is scoped).
+            List<JobNodePoolConfig> warmPools;
+            await using (var scope = scopeFactory.CreateAsyncScope())
+            {
+                var nodePoolRepo = scope.ServiceProvider.GetRequiredService<INodePoolConfigRepository>();
+                var allConfigs = await nodePoolRepo.GetAllAsync(ct);
+                warmPools = allConfigs
+                    .OfType<JobNodePoolConfig>()
+                    .Where(c => c.WarmNodes > 0 || c.MaxNodes.HasValue)
+                    .ToList();
+            }
 
             if (warmPools.Count == 0) return;
 
             if (initialise)
-                await warmPoolManager.InitialiseAsync(warmPools, controlPlane, ct);
+                await warmPoolManager.InitialiseAsync(warmPools, ct);
 
             // Replenish each pool (fills any gap caused by eviction or restart).
             var replenishTasks = warmPools
                 .Where(c => c.WarmNodes > 0)
-                .Select(c => warmPoolManager.ReplenishAsync(c, controlPlane, wheelReader, envResolver));
+                .Select(c => warmPoolManager.ReplenishAsync(c));
 
             await Task.WhenAll(replenishTasks);
         }

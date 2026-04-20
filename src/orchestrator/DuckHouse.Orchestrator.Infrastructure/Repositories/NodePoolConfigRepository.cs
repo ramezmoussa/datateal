@@ -7,14 +7,14 @@ namespace DuckHouse.Orchestrator.Infrastructure.Repositories;
 
 internal class NodePoolConfigRepository(DuckHouseDbContext db) : INodePoolConfigRepository
 {
-    public async Task<IReadOnlyList<NodePoolConfig>> GetAllAsync(CancellationToken cancellationToken = default) =>
-        await db.NodePoolConfigs.OrderBy(c => c.Name).ToListAsync(cancellationToken);
+    public async Task<IReadOnlyList<NodePoolConfig>> GetAllAsync(CancellationToken cancellationToken = default)
+        => await db.NodePoolConfigs.OrderBy(c => c.Name).ToListAsync(cancellationToken);
 
-    public async Task<NodePoolConfig?> GetAsync(Guid id, CancellationToken cancellationToken = default) =>
-        await db.NodePoolConfigs.FindAsync([id], cancellationToken);
+    public async Task<NodePoolConfig?> GetAsync(Guid id, CancellationToken cancellationToken = default)
+        => await db.NodePoolConfigs.FindAsync([id], cancellationToken);
 
-    public async Task<NodePoolConfig?> GetByNameAsync(string name, CancellationToken cancellationToken = default) =>
-        await db.NodePoolConfigs.FirstOrDefaultAsync(c => c.Name == name, cancellationToken);
+    public async Task<NodePoolConfig?> GetByNameAsync(string name, CancellationToken cancellationToken = default)
+        => await db.NodePoolConfigs.FirstOrDefaultAsync(c => c.Name == name, cancellationToken);
 
     public async Task<NodePoolConfig> CreateAsync(NodePoolConfig config, CancellationToken cancellationToken = default)
     {
@@ -41,6 +41,13 @@ internal class NodePoolConfigRepository(DuckHouseDbContext db) : INodePoolConfig
         existing.EnvironmentVariableIds = config.EnvironmentVariableIds;
         existing.SecretIds = config.SecretIds;
         existing.UpdatedAt = DateTime.UtcNow;
+
+        if (config is JobNodePoolConfig src && existing is JobNodePoolConfig dst)
+        {
+            dst.WarmNodes = src.WarmNodes;
+            dst.MaxNodes = src.MaxNodes;
+            dst.NodeAcquireTimeout = src.NodeAcquireTimeout;
+        }
 
         await db.SaveChangesAsync(cancellationToken);
         return existing;

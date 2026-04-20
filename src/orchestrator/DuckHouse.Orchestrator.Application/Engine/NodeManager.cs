@@ -124,7 +124,7 @@ public class NodeManager(
             "Claiming warm node for pool '{PoolRef}' (WarmNodes={Warm}, MaxNodes={Max})",
             nodePoolRef, config.WarmNodes, config.MaxNodes?.ToString() ?? "unlimited");
 
-        var nodeName = await warmPoolManager!.ClaimNodeAsync(config, controlPlane, wheelPackageReader, environmentResolver, ct);
+        var nodeName = await warmPoolManager!.ClaimNodeAsync(config, ct);
         _allocations[nodePoolRef] = new NodeAllocation(nodeName, Provisioned: false, WarmPoolId: config.Id);
         logger.LogInformation("Acquired node '{NodeName}' for pool '{PoolRef}'", nodeName, nodePoolRef);
         return nodeName;
@@ -283,7 +283,7 @@ public class NodeManager(
             {
                 var poolConfig = await GetPoolConfigSafeAsync(alloc.WarmPoolId.Value);
                 if (poolConfig is JobNodePoolConfig jobConfig)
-                    await warmPoolManager.ReleaseNodeAsync(alloc.WarmPoolId.Value, alloc.NodeName, jobConfig, controlPlane, wheelPackageReader, environmentResolver);
+                    await warmPoolManager.ReleaseNodeAsync(alloc.WarmPoolId.Value, alloc.NodeName, jobConfig);
                 else
                     await DeleteNodeSafeAsync(alloc.NodeName);
                 continue;

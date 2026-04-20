@@ -8,13 +8,13 @@ namespace DuckHouse.Orchestrator.Infrastructure.Repositories;
 
 internal class JobRunRepository(DuckHouseDbContext db) : IJobRunRepository
 {
-    public async Task<JobRun?> GetJobRunAsync(Guid id, CancellationToken cancellationToken = default) =>
-        await db.JobRuns
+    public async Task<JobRun?> GetJobRunAsync(Guid id, CancellationToken cancellationToken = default)
+        => await db.JobRuns
             .Include(r => r.TaskRuns)
             .FirstOrDefaultAsync(r => r.Id == id, cancellationToken);
 
-    public async Task<IReadOnlyList<JobRun>> GetJobRunsAsync(Guid jobId, int limit = 20, int offset = 0, CancellationToken cancellationToken = default) =>
-        await db.JobRuns
+    public async Task<IReadOnlyList<JobRun>> GetJobRunsAsync(Guid jobId, int limit = 20, int offset = 0, CancellationToken cancellationToken = default)
+        => await db.JobRuns
             .Where(r => r.JobId == jobId)
             .OrderByDescending(r => r.CreatedAt)
             .Skip(offset)
@@ -68,19 +68,19 @@ internal class JobRunRepository(DuckHouseDbContext db) : IJobRunRepository
         await db.SaveChangesAsync(cancellationToken);
     }
 
-    public async Task<IReadOnlyList<JobRun>> GetActiveRunsAsync(CancellationToken cancellationToken = default) =>
-        await db.JobRuns
+    public async Task<IReadOnlyList<JobRun>> GetActiveRunsAsync(CancellationToken cancellationToken = default)
+        => await db.JobRuns
             .Include(r => r.TaskRuns)
             .Where(r => r.Status == JobRunStatus.Pending || r.Status == JobRunStatus.Running)
             .ToListAsync(cancellationToken);
 
-    public async Task<int> GetActiveRunCountAsync(Guid jobId, CancellationToken cancellationToken = default) =>
-        await db.JobRuns
-            .CountAsync(r => r.JobId == jobId && (r.Status == JobRunStatus.Pending || r.Status == JobRunStatus.Running), cancellationToken);
+    public async Task<int> GetActiveRunCountAsync(Guid jobId, CancellationToken cancellationToken = default)
+        => await db.JobRuns.CountAsync(
+            r => r.JobId == jobId && (r.Status == JobRunStatus.Pending || r.Status == JobRunStatus.Running),
+            cancellationToken);
 
-    public async Task<TaskRun?> GetTaskRunAsync(Guid id, CancellationToken cancellationToken = default) =>
-        await db.TaskRuns
-            .FirstOrDefaultAsync(tr => tr.Id == id, cancellationToken);
+    public async Task<TaskRun?> GetTaskRunAsync(Guid id, CancellationToken cancellationToken = default)
+        => await db.TaskRuns.FirstOrDefaultAsync(tr => tr.Id == id, cancellationToken);
 
     public async Task<TaskRun> CreateTaskRunAsync(TaskRun taskRun, CancellationToken cancellationToken = default)
     {
@@ -96,8 +96,8 @@ internal class JobRunRepository(DuckHouseDbContext db) : IJobRunRepository
         await db.SaveChangesAsync(cancellationToken);
     }
 
-    public async Task<int> PurgeRunsOlderThanAsync(DateTime cutoff, CancellationToken cancellationToken = default) =>
-        await db.JobRuns
+    public async Task<int> PurgeRunsOlderThanAsync(DateTime cutoff, CancellationToken cancellationToken = default)
+        => await db.JobRuns
             .Where(r => r.CompletedAt != null && r.CompletedAt < cutoff)
             .ExecuteDeleteAsync(cancellationToken);
 }
