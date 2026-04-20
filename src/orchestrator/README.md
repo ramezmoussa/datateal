@@ -37,31 +37,32 @@ The orchestrator never executes code directly. It translates job tasks into kern
 
 ## Features
 
-| Feature                        | Notes                                                                                                                                                          |
-| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **DAG execution**              | Tasks run in parallel as soon as their dependencies are satisfied                                                                                              |
-| **Dependency conditions**      | `OnSuccess`, `OnFailure`, `OnCompletion`, `OnSkip` per edge                                                                                                    |
-| **Skip propagation**           | Tasks whose dependency condition can never be satisfied are auto-skipped                                                                                       |
-| **Retries**                    | Per-task `MaxRetries` + `RetryInterval`; status cycles `Running → Retrying → Pending`                                                                          |
-| **Task timeout**               | Optional per-task `Timeout` field (passed to kernel execution)                                                                                                 |
-| **Three task types**           | `NotebookTask`, `SqlQueryTask`, `SubJobTask`                                                                                                                   |
-| **Sub-jobs**                   | A task can trigger another job and wait for its completion                                                                                                     |
-| **Scheduled execution**        | Cron-based schedules (5- or 6-field) with timezone support; reloaded from DB every cycle without restart                                                       |
-| **Manual trigger**             | `POST /api/jobs/{id}/trigger` with optional parameter overrides                                                                                                |
-| **Parameterised jobs**         | Named parameters with defaults; resolved into `${{ param_name }}` placeholders in task configs                                                                 |
-| **Notebook parameterisation**  | Injects a parameter cell after a cell tagged `parameters` before execution                                                                                     |
-| **`%run` magic**               | Python cells may use `%run path/to/notebook` to inline another notebook; recursive with cycle detection (depth limit 10)                                       |
-| **SQL wrapping**               | SQL cells and `SqlQueryTask` content are wrapped as `import duckdb; duckdb.sql("""...""")` before kernel execution                                             |
-| **Cell-level output tracking** | Each notebook cell has its own `TaskRunCellOutput` row with status, outputs, timing, and errors                                                                |
-| **Node pool configs**          | Two types: `JobNodePoolConfig` (run-scoped nodes, deleted on run end) and `InteractiveNodePoolConfig` (stable pool node, persists until evicted). Stored in DB and referenced by tasks via `NodePoolRef`. |
-| **Node provisioning**          | `NodeManager` lazily provisions a node per distinct `NodePoolRef` per run. Job pool nodes are created fresh each run and deleted on completion; interactive pool nodes are joined if already running |
-| **Per-task kernels**           | Each notebook/SQL task gets its own kernel, deleted immediately after the task completes                                                                       |
-| **Crash recovery**             | `RecoveryService` re-dispatches any `Running` or `Pending` runs found in the DB on startup                                                                     |
-| **Concurrent run cap**         | Per-job `MaxConcurrentRuns` limit enforced at trigger time                                                                                                     |
-| **Run cancellation**           | `POST /api/runs/{id}/cancel`; propagates a `CancellationToken` through the entire DAG execution                                                                |
-| **Job snapshot**               | The full job definition (tasks, parameters) is snapshotted as JSON at trigger time; in-flight runs are immune to live job edits                                |
-| **Job import / export**        | YAML format supporting tasks, parameters, schedules, and inline node pool definitions                                                                          |
-| **History retention**          | `HistoryRetentionService` purges old run records on a configurable schedule                                                                                    |
+| Feature                        | Notes                                                                                                                                                                                                                                                                                                            |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **DAG execution**              | Tasks run in parallel as soon as their dependencies are satisfied                                                                                                                                                                                                                                                |
+| **Dependency conditions**      | `OnSuccess`, `OnFailure`, `OnCompletion`, `OnSkip` per edge                                                                                                                                                                                                                                                      |
+| **Skip propagation**           | Tasks whose dependency condition can never be satisfied are auto-skipped                                                                                                                                                                                                                                         |
+| **Retries**                    | Per-task `MaxRetries` + `RetryInterval`; status cycles `Running → Retrying → Pending`                                                                                                                                                                                                                            |
+| **Task timeout**               | Optional per-task `Timeout` field (passed to kernel execution)                                                                                                                                                                                                                                                   |
+| **Three task types**           | `NotebookTask`, `SqlQueryTask`, `SubJobTask`                                                                                                                                                                                                                                                                     |
+| **Sub-jobs**                   | A task can trigger another job and wait for its completion                                                                                                                                                                                                                                                       |
+| **Scheduled execution**        | Cron-based schedules (5- or 6-field) with timezone support; reloaded from DB every cycle without restart                                                                                                                                                                                                         |
+| **Manual trigger**             | `POST /api/jobs/{id}/trigger` with optional parameter overrides                                                                                                                                                                                                                                                  |
+| **Parameterised jobs**         | Named parameters with defaults; resolved into `${{ param_name }}` placeholders in task configs                                                                                                                                                                                                                   |
+| **Notebook parameterisation**  | Injects a parameter cell after a cell tagged `parameters` before execution                                                                                                                                                                                                                                       |
+| **`%run` magic**               | Python cells may use `%run path/to/notebook` to inline another notebook; recursive with cycle detection (depth limit 10)                                                                                                                                                                                         |
+| **SQL wrapping**               | SQL cells and `SqlQueryTask` content are wrapped as `import duckdb; duckdb.sql("""...""")` before kernel execution                                                                                                                                                                                               |
+| **Cell-level output tracking** | Each notebook cell has its own `TaskRunCellOutput` row with status, outputs, timing, and errors                                                                                                                                                                                                                  |
+| **Node pool configs**          | Two types: `JobNodePoolConfig` (run-scoped nodes, deleted on run end) and `InteractiveNodePoolConfig` (stable pool node, persists until evicted). Stored in DB and referenced by tasks via `NodePoolRef`.                                                                                                        |
+| **Warm node pools**            | `JobNodePoolConfig` supports a `WarmNodes` standby count and an optional `MaxNodes` cap. Warm standby nodes are pre-provisioned and instantly claimed when a job starts, eliminating cold-start wait time. `MaxNodes` bounds the total live node count (warm + active) across all concurrent runs for that pool. |
+| **Node provisioning**          | `NodeManager` lazily provisions a node per distinct `NodePoolRef` per run, or claims a pre-warmed standby from `WarmPoolManager` when one is available. Job pool nodes are created fresh each run and deleted on completion; interactive pool nodes are joined if already running                                |
+| **Per-task kernels**           | Each notebook/SQL task gets its own kernel, deleted immediately after the task completes                                                                                                                                                                                                                         |
+| **Crash recovery**             | `RecoveryService` re-dispatches any `Running` or `Pending` runs found in the DB on startup                                                                                                                                                                                                                       |
+| **Concurrent run cap**         | Per-job `MaxConcurrentRuns` limit enforced at trigger time                                                                                                                                                                                                                                                       |
+| **Run cancellation**           | `POST /api/runs/{id}/cancel`; propagates a `CancellationToken` through the entire DAG execution                                                                                                                                                                                                                  |
+| **Job snapshot**               | The full job definition (tasks, parameters) is snapshotted as JSON at trigger time; in-flight runs are immune to live job edits                                                                                                                                                                                  |
+| **Job import / export**        | YAML format supporting tasks, parameters, schedules, and inline node pool definitions                                                                                                                                                                                                                            |
+| **History retention**          | `HistoryRetentionService` purges old run records on a configurable schedule                                                                                                                                                                                                                                      |
 
 ---
 
@@ -110,10 +111,10 @@ A named configuration for a compute node. Referenced from tasks via `NodePoolRef
 
 `NodePoolConfig` is **abstract** with TPH discrimination (column `PoolType varchar(32)`). The two concrete subtypes are:
 
-| Subtype | PoolType | Behaviour |
-|---|---|---|
-| `JobNodePoolConfig` | `"Job"` | Run-scoped node; created on demand per run, deleted when the run finishes |
-| `InteractiveNodePoolConfig` | `"Interactive"` | Pool has a stable node name (`i` + 11 GUID hex chars); node is created on demand and persists until deleted by the inactivity eviction service |
+| Subtype                     | PoolType        | Behaviour                                                                                                                                                                                                                                                                                                                                                                            |
+| --------------------------- | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `JobNodePoolConfig`         | `"Job"`         | Run-scoped node; created on demand per run (or claimed from the warm standby pool), deleted when the run finishes. Optional fields: `WarmNodes` (number of pre-warmed standbys to maintain; default `0`), `MaxNodes` (total live node cap across warm + active; `null` = unlimited), `NodeAcquireTimeout` (how long to wait when `MaxNodes` is reached; `null` = wait indefinitely). |
+| `InteractiveNodePoolConfig` | `"Interactive"` | Pool has a stable node name (`i` + 11 GUID hex chars); node is created on demand and persists until deleted by the inactivity eviction service                                                                                                                                                                                                                                       |
 
 ### `JobRun`
 
@@ -196,7 +197,7 @@ while (true):
 - Any task `Cancelled` → `Cancelled`
 - Otherwise → `Failed`
 
-### 4. Node & Kernel Management (`NodeManager`)
+### 4. Node & Kernel Management (`NodeManager`, `WarmPoolManager`)
 
 `NodeManager` is created per run by `RunCoordinator`. It manages the mapping from `NodePoolRef` names to provisioned nodes.
 
@@ -204,7 +205,8 @@ while (true):
 
 1. Returns the cached node name if the pool ref has already been provisioned for this run.
 2. Loads the `NodePoolConfig` by name; branches on the concrete type:
-   - **`JobNodePoolConfig`**: derives node name as `j` + 11 lowercase hex chars from SHA-256 of `(runId, poolRef)`. Creates the node via the control plane and polls until `Running`. Sets `Provisioned = true` (deleted on cleanup).
+   - **`JobNodePoolConfig`** with `WarmNodes > 0`: attempts to claim a pre-warmed standby via `WarmPoolManager.ClaimNodeAsync`. If a warm node is available it is returned immediately and re-provisioned as a run-scoped node (no cold-start wait). If no standby is available (e.g., on first run after startup), falls back to creating a fresh node. After claiming or creating, `WarmPoolManager.ScheduleReplenishment` queues replacement of the consumed standby.
+   - **`JobNodePoolConfig`** with `WarmNodes == 0`: derives node name as `j` + 11 lowercase hex chars from SHA-256 of `(runId, poolRef)`. Creates the node via the control plane and polls until `Running`. If `MaxNodes` is set, the semaphore in `WarmPoolManager` is acquired first (blocking until a slot is free or `NodeAcquireTimeout` elapses).
    - **`InteractiveNodePoolConfig`**: derives node name via `pool.GetNodeName()` (`i` + 11 GUID hex chars). If the node is already `Running`, returns it immediately. Otherwise creates it (handling 409 race) and polls until `Running`. Sets `Provisioned = false` (not deleted on cleanup — eviction handles teardown).
 
 **`CreateKernelAsync(nodePoolRef)`** — called by `TaskExecutor` per task:
@@ -214,7 +216,34 @@ while (true):
 
 **`CleanupKernelAsync`** — called by `TaskExecutor` in the `finally` block of each task, regardless of success or failure.
 
-**`CleanupAllAsync`** — called by `RunCoordinator` in its `finally` block; deletes every node where `Provisioned = true` (job pool nodes). Interactive pool nodes (`Provisioned = false`) are left running; the inactivity eviction service handles their teardown.
+**`CleanupAllAsync`** — called by `RunCoordinator` in its `finally` block:
+
+- Job pool nodes with `Provisioned = true` are deleted via the control plane; their semaphore slot in `WarmPoolManager` is released.
+- Interactive pool nodes (`Provisioned = false`) are left running.
+
+---
+
+### `WarmPoolManager` (singleton)
+
+`WarmPoolManager` is a **singleton** responsible for the lifecycle of warm standby nodes across all concurrent runs. It maintains:
+
+- A `ConcurrentQueue<string>` of available warm node names per pool ID.
+- A `SemaphoreSlim(MaxNodes, MaxNodes)` per pool (when `MaxNodes` is configured) that limits the total live node count (warm + active jobs combined).
+
+**Key operations:**
+
+| Method                          | Description                                                                                                                                                                                                                                                                                                                                   |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `InitialiseAsync(configs)`      | Called on startup by `WarmPoolReplenishmentService`. Queries the control plane for already-running nodes whose names start with the pool's warm-node prefix (`w` + 7 GUID hex chars) and enqueues them as pre-existing standbys.                                                                                                              |
+| `ClaimNodeAsync(pool, ct)`      | Dequeues one warm standby node name if available. Returns `null` when the queue is empty (caller falls back to cold provisioning). Does **not** acquire a semaphore slot (the slot was already held when the warm node was created).                                                                                                          |
+| `ReleaseSlotAsync(poolId)`      | Releases one `MaxNodes` semaphore slot when a node (warm or job-scoped) is deleted.                                                                                                                                                                                                                                                           |
+| `AdjustPoolAsync(pool)`         | Called when a pool's `WarmNodes` or `MaxNodes` is changed in the UI. Evicts excess warm standbys down to the new `WarmNodes` count; rebuilds the `MaxNodes` semaphore to reflect the updated cap.                                                                                                                                             |
+| `ReplenishAsync(pool)`          | Ensures the warm standby queue is filled up to `WarmNodes`. Acquires a semaphore slot (if `MaxNodes` applies), creates a node named `w` + 7-char pool GUID prefix + 4 random hex chars, and enqueues it. Warm nodes are created with `NodeIdleTimeout = TimeSpan.Zero` so the control plane's inactivity eviction service never deletes them. |
+| `ScheduleReplenishment(poolId)` | Queues an async replenishment task after a warm node is claimed, so a fresh standby is available for the next job.                                                                                                                                                                                                                            |
+
+**Warm node naming**: `w` + first 7 hex chars of the pool GUID + 4 random hex = 12 characters total. The 8-character prefix (`w` + 7 chars) uniquely identifies which pool a warm node belongs to, allowing `InitialiseAsync` to rediscover existing standbys after a restart.
+
+**Eviction protection**: warm standbys are created with `NodeIdleTimeout = TimeSpan.Zero`. The control plane's `InactivityEvictionService` treats `Zero` as "never evict". When a warm node is claimed by a job, `NodeManager` calls `UpdateNodeEvictionConfigAsync` to restore the pool's normal idle timeout so the node can be evicted at the end of the job (or when the run's `CleanupAllAsync` deletes it explicitly).
 
 ### 5. Task Execution (`TaskExecutor`)
 
@@ -250,6 +279,10 @@ while (true):
 4. Returns normally on `Succeeded`, throws `InvalidOperationException` on `Failed`, throws `OperationCanceledException` on `Cancelled`.
 
 ### 6. Background Services
+
+#### `WarmPoolReplenishmentService`
+
+Runs as a `BackgroundService`. On startup it calls `WarmPoolManager.InitialiseAsync` to rediscover any warm standby nodes already running from a previous process instance. Then, every 60 seconds, it loads all `JobNodePoolConfig` records with `WarmNodes > 0` and calls `WarmPoolManager.ReplenishAsync` for each — ensuring the warm standby queues stay filled even if nodes are unexpectedly lost.
 
 #### `SchedulerService`
 
