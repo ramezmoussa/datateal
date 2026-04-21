@@ -1,10 +1,26 @@
 @inject NavigationManager Navigation
+@inject IJobService JobService
+@using DuckHouse.Ui.Shared.Orchestration
 
-<Menu Mode="MenuMode.Inline"
+<Menu Mode="MenuMode.Vertical"
       Theme="MenuTheme.Dark"
       SelectedKeys="@_selectedKeys"
       Style="border-right: none;">
     <div class="logo" />
+    <SubMenu Key="new" TitleTemplate="@_newTitle">
+        <MenuItem Key="new-notebook" OnClick="@(() => Navigation.NavigateTo("/notebook"))">
+            <Icon Type="@IconType.Outline.FileText" />
+            <span>Notebook</span>
+        </MenuItem>
+        <MenuItem Key="new-query" OnClick="@(() => Navigation.NavigateTo("/query"))">
+            <Icon Type="@IconType.Outline.Code" />
+            <span>SQL query</span>
+        </MenuItem>
+        <MenuItem Key="new-job" OnClick="StartCreateJob">
+            <Icon Type="@IconType.Outline.Partition" />
+            <span>Job</span>
+        </MenuItem>
+    </SubMenu>
     <MenuItem Key="home" OnClick="@(() => Navigation.NavigateTo("/"))">
         <Icon Type="@IconType.Outline.Home" />
         <span>Home</span>
@@ -43,6 +59,27 @@
     </MenuItem>
 </Menu>
 
+<Modal Title="New job"
+       Visible="_showCreateJobModal"
+       OnOk="ConfirmCreateJobAsync"
+       OnCancel="@(() => _showCreateJobModal = false)"
+       OkButtonProps="@(new ButtonProps { Disabled = string.IsNullOrWhiteSpace(_newJobName), Loading = _creatingJob })">
+    <div style="display: flex; flex-direction: column; gap: 16px;">
+        <div>
+            <label style="display: block; margin-bottom: 4px; font-weight: 500;">Name</label>
+            <Input @bind-Value="_newJobName" Placeholder="My Job" />
+        </div>
+        <div>
+            <label style="display: block; margin-bottom: 4px; font-weight: 500;">Description</label>
+            <TextArea @bind-Value="_newJobDescription" Placeholder="Optional description" Rows="3" />
+        </div>
+        @if (_createJobError is not null)
+        {
+            <Alert Type="@AlertType.Error" Message="@_createJobError" ShowIcon="true" />
+        }
+    </div>
+</Modal>
+
 <style>
     .logo {
         height: 32px;
@@ -53,13 +90,49 @@
 
 @code {
     private string[] _selectedKeys = [];
-    private bool _collapsed = false;
 
-    private void ToggleCollapsed()
+    private readonly RenderFragment _newTitle =
+        @<span>
+            <Icon Type="@IconType.Outline.Plus" />
+            <span>New</span>
+        </span>;
+
+    // New job modal state
+    private bool _showCreateJobModal;
+    private string _newJobName = "";
+    private string? _newJobDescription;
+    private bool _creatingJob;
+    private string? _createJobError;
+
+    private void StartCreateJob()
     {
-        _collapsed = !_collapsed;
+        _newJobName = "";
+        _newJobDescription = null;
+        _createJobError = null;
+        _showCreateJobModal = true;
     }
 
+    private async Task ConfirmCreateJobAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_newJobName)) return;
+        _creatingJob = true;
+        _createJobError = null;
+        try
+        {
+            var job = await JobService.CreateJobAsync(
+                new CreateJobRequest(_newJobName.Trim(), _newJobDescription?.Trim(), null, 1));
+            _showCreateJobModal = false;
+            Navigation.NavigateTo($"/jobs/{job.Id}");
+        }
+        catch (Exception ex)
+        {
+            _createJobError = $"Failed to create job: {ex.Message}";
+        }
+        finally
+        {
+            _creatingJob = false;
+        }
+    }
 
     protected override void OnInitialized() => UpdateSelectedKey();
 
