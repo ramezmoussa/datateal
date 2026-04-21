@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Text.Json.Serialization;
+using Quartz;
 
 namespace DuckHouse.Orchestrator.Core.Entities;
 
@@ -16,8 +17,29 @@ public class JobSchedule
     public Dictionary<string, string>? Parameters { get; set; }
 
     /// <summary>
-    /// Not persisted to the database. Populated from the Quartz scheduler at query time.
+    /// Computed from the cron expression and timezone. Not persisted to the database.
+    /// Returns null if the schedule is disabled or the expression is invalid.
     /// </summary>
     [NotMapped]
-    public DateTime? NextFireTime { get; set; }
+    public DateTime? NextFireTime
+    {
+        get
+        {
+            if (!IsEnabled) return null;
+            try
+            {
+                var cron = new CronExpression(CronExpression)
+                {
+                    TimeZone = !string.IsNullOrWhiteSpace(TimeZone)
+                        ? TimeZoneInfo.FindSystemTimeZoneById(TimeZone)
+                        : TimeZoneInfo.Local
+                };
+                return cron.GetNextValidTimeAfter(DateTimeOffset.UtcNow)?.UtcDateTime;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+    }
 }

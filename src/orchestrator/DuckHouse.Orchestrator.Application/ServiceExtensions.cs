@@ -15,7 +15,7 @@ public static class ServiceExtensions
             services.AddMediator<ScanEntryPoint>();
 
             // Quartz scheduler
-            services.AddQuartz(q => q.UseDefaultThreadPool(tp => tp.MaxConcurrency = 10));
+            services.AddQuartz(q => q.UseDefaultThreadPool(tp => tp.MaxConcurrency = 100));
             services.AddQuartzHostedService(opt => opt.WaitForJobsToComplete = true);
             services.AddTransient<ScheduledJobExecutor>();
             services.AddSingleton<SchedulesManager>();

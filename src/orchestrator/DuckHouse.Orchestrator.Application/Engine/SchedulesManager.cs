@@ -156,16 +156,6 @@ public class SchedulesManager(
         }
     }
 
-    /// <summary>
-    /// Returns the next UTC fire time for a given schedule, or null if no trigger is registered.
-    /// </summary>
-    public async Task<DateTime?> GetNextFireTimeAsync(Guid scheduleId, CancellationToken cancellationToken = default)
-    {
-        var triggerKey = new TriggerKey(scheduleId.ToString());
-        var trigger = await _scheduler.GetTrigger(triggerKey, cancellationToken);
-        return trigger?.GetNextFireTimeUtc()?.UtcDateTime;
-    }
-
     private async Task CreateAndAddScheduleAsync(JobSchedule schedule, CancellationToken cancellationToken)
     {
         var jobKey = new JobKey(schedule.Id.ToString(), schedule.JobId.ToString());
