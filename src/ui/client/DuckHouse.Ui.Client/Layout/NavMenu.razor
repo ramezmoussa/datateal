@@ -2,11 +2,19 @@
 @inject IJobService JobService
 @using DuckHouse.Ui.Shared.Orchestration
 
-<Menu Mode="MenuMode.Vertical"
+<Menu @ref="_menu"
+      Mode="MenuMode.Vertical"
       Theme="MenuTheme.Dark"
       SelectedKeys="@_selectedKeys"
       Style="border-right: none;">
-    <div class="logo" />
+    <div class="navmenu-brand" style="height: 32px; margin: 16px; display: flex; align-items: center;">
+        <span style="font-size: 22px; font-weight: 600; color: #ddd;">
+            @if (_menu?.InlineCollapsed is null or false)
+            {
+                <text>DuckHouse</text>
+            }
+        </span>
+    </div>
     <SubMenu Key="new" TitleTemplate="@_newTitle">
         <MenuItem Key="new-notebook" OnClick="@(() => Navigation.NavigateTo("/notebook"))">
             <Icon Type="@IconType.Outline.FileText" />
@@ -76,15 +84,8 @@
     </div>
 </Modal>
 
-<style>
-    .logo {
-        height: 32px;
-        background: rgba(255, 255, 255, 0.2);
-        margin: 16px;
-    }
-</style>
-
 @code {
+    private Menu? _menu;
     private string[] _selectedKeys = [];
 
     private readonly RenderFragment _newTitle =
