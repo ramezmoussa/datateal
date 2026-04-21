@@ -1,8 +1,11 @@
 @page "/environment"
 
 @using DuckHouse.Ui.Shared.Environment
+@using DuckHouse.Ui.Shared.Packages
 @using DuckHouse.Ui.Client.Validation
 @inject IEnvironmentService EnvironmentService
+@inject IWheelPackageService WheelPackageService
+@inject NavigationManager Navigation
 
 <PageTitle>Environment — DuckHouse</PageTitle>
 
@@ -108,6 +111,80 @@
             </Table>
         </Spin>
     </TabPane>
+
+    <TabPane Key="packages" Tab="Packages">
+        <Flex Justify="FlexJustify.SpaceBetween" Align="FlexAlign.Center" Style="margin-bottom: 12px;">
+            <span></span>
+            <Space>
+                <SpaceItem>
+                    <Button OnClick="LoadPackagesAsync"
+                            Disabled="_loadingPackages"
+                            Icon="@IconType.Outline.Reload">
+                        Refresh
+                    </Button>
+                </SpaceItem>
+                <SpaceItem>
+                    <Upload Action="@_uploadUrl"
+                            Name="file"
+                            Accept=".whl"
+                            ShowUploadList="false"
+                            BeforeUpload="ValidatePackageFile"
+                            OnSingleCompleted="OnPackageUploadCompleted">
+                        <Button Type="ButtonType.Primary"
+                                Icon="@IconType.Outline.Upload"
+                                Loading="_uploading">
+                            Upload .whl
+                        </Button>
+                    </Upload>
+                </SpaceItem>
+            </Space>
+        </Flex>
+        @if (_packagesError is not null)
+        {
+            <Alert Type="AlertType.Error" Message="@_packagesError" Closable ShowIcon="true"
+                   OnClose="@(() => _packagesError = null)" Style="margin-bottom: 16px;" />
+        }
+        @if (_loadingPackages)
+        {
+            <Flex Justify="@("center")" Style="padding: 40px 0;">
+                <Spin />
+            </Flex>
+        }
+        else if (_packages.Count == 0)
+        {
+            <p><Text Type="TextElementType.Secondary">No packages yet. Upload a .whl file to get started.</Text></p>
+        }
+        else
+        {
+            <Table TItem="WheelPackageDto" DataSource="@_packages" Bordered Size="@TableSize.Small" PageSize="int.MaxValue" PaginationPosition="none">
+                <PropertyColumn Property="p => p.Name" Title="Name">
+                    <span style="font-weight: 600;">@context.Name</span>
+                </PropertyColumn>
+                <PropertyColumn Property="p => p.FileName" Title="Filename">
+                    <Text Type="TextElementType.Secondary" Style="font-size: 0.875rem;">@context.FileName</Text>
+                </PropertyColumn>
+                <PropertyColumn Property="p => p.Size" Title="Size">
+                    <Text Type="TextElementType.Secondary" Style="font-size: 0.875rem;">@FormatPackageSize(context.Size)</Text>
+                </PropertyColumn>
+                <PropertyColumn Property="p => p.UploadedAt" Title="Uploaded">
+                    <Text Type="TextElementType.Secondary" Style="font-size: 0.875rem;">@context.UploadedAt.ToString("yyyy-MM-dd HH:mm")</Text>
+                </PropertyColumn>
+                <ActionColumn Title="Actions">
+                    <Popconfirm Title="@($"Delete package '{context.Name}'?")"
+                                OkText="Delete"
+                                CancelText="Cancel"
+                                OkType="ButtonType.Primary"
+                                OkButtonProps="new ButtonProps { Danger = true }"
+                                OnConfirm="@(() => DeletePackageAsync(context.Id))">
+                        <Button Size="ButtonSize.Small" Danger
+                                Icon="@IconType.Outline.Delete">
+                            Delete
+                        </Button>
+                    </Popconfirm>
+                </ActionColumn>
+            </Table>
+        }
+    </TabPane>
 </Tabs>
 
 @* Variable modal *@
@@ -177,6 +254,14 @@
     private bool _loadingSecrets = true;
     private string? _error;
 
+    // Packages state
+    private List<WheelPackageDto> _packages = [];
+    private bool _loadingPackages = true;
+    private bool _uploading;
+    private string? _packagesError;
+
+    private string _uploadUrl => Navigation.BaseUri + "api/packages";
+
     // Variable modal state
     private bool _showVarModal;
     private EnvironmentVariableDto? _editVarTarget;
@@ -193,7 +278,7 @@
 
     protected override async Task OnInitializedAsync()
     {
-        await Task.WhenAll(LoadVariablesAsync(), LoadSecretsAsync());
+        await Task.WhenAll(LoadVariablesAsync(), LoadSecretsAsync(), LoadPackagesAsync());
     }
 
     private async Task LoadVariablesAsync()
@@ -318,4 +403,81 @@
         }
         catch (Exception ex) { _error = $"Failed to delete secret: {ex.Message}"; }
     }
+
+    // ── Packages ─────────────────────────────────────────────────────────
+
+    private async Task LoadPackagesAsync()
+    {
+        _loadingPackages = true;
+        _packagesError = null;
+        try
+        {
+            _packages = [.. await WheelPackageService.GetPackagesAsync()];
+        }
+        catch (Exception ex)
+        {
+            _packagesError = $"Failed to load packages: {ex.Message}";
+        }
+        finally
+        {
+            _loadingPackages = false;
+        }
+    }
+
+    private bool ValidatePackageFile(UploadFileItem file)
+    {
+        _packagesError = null;
+        if (!file.FileName.EndsWith(".whl", StringComparison.OrdinalIgnoreCase))
+        {
+            _packagesError = "Only .whl files are accepted.";
+            StateHasChanged();
+            return false;
+        }
+        if (file.Size > 5 * 1024 * 1024)
+        {
+            _packagesError = "File exceeds the 5 MB limit.";
+            StateHasChanged();
+            return false;
+        }
+        _uploading = true;
+        StateHasChanged();
+        return true;
+    }
+
+    private async Task OnPackageUploadCompleted(UploadInfo info)
+    {
+        _uploading = false;
+        if (info.File.State == UploadState.Success)
+        {
+            await LoadPackagesAsync();
+        }
+        else
+        {
+            _packagesError = string.IsNullOrWhiteSpace(info.File.Response)
+                ? "Upload failed."
+                : info.File.Response;
+        }
+    }
+
+    private async Task DeletePackageAsync(Guid id)
+    {
+        _packagesError = null;
+        try
+        {
+            await WheelPackageService.DeletePackageAsync(id);
+            _packages.RemoveAll(p => p.Id == id);
+        }
+        catch (Exception ex)
+        {
+            _packagesError = $"Delete failed: {ex.Message}";
+        }
+    }
+
+    private static string FormatPackageSize(long bytes) =>
+        bytes switch
+        {
+            < 1024 => $"{bytes} B",
+            < 1024 * 1024 => $"{bytes / 1024.0:F1} KB",
+            _ => $"{bytes / 1024.0 / 1024.0:F1} MB"
+        };
 }

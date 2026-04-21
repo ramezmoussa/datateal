@@ -49,10 +49,6 @@
         <Icon Type="@IconType.Outline.Tool" />
         <span>Environment</span>
     </MenuItem>
-    <MenuItem Key="packages" OnClick="@(() => Navigation.NavigateTo("/packages"))">
-        <Icon Type="@IconType.Outline.CodeSandbox" />
-        <span>Packages</span>
-    </MenuItem>
     <MenuItem Key="settings" OnClick="@(() => Navigation.NavigateTo("/settings"))">
         <Icon Type="@IconType.Outline.Setting" />
         <span>Settings</span>
@@ -153,7 +149,6 @@
             _ when path.StartsWith("/node-pools") => ["node-pools"],
             _ when path.StartsWith("/environment") => ["environment"],
             _ when path.StartsWith("/catalogs") => ["catalogs"],
-            _ when path.StartsWith("/packages") => ["packages"],
             _ when path.StartsWith("/settings") => ["settings"],
             _ => []
         };
