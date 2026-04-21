@@ -1,6 +1,7 @@
 @using DuckHouse.Ui.Client.Models
 @using DuckHouse.Ui.Client.Validation
 @using DuckHouse.Ui.Shared.Orchestration
+@using DuckHouse.Core.Orchestration
 @inject INodePoolService NodePoolService
 @inject IJobService JobService
 
@@ -20,10 +21,10 @@
                 </div>
                 <div>
                     <label style="display: block; margin-bottom: 4px; font-weight: 500;">Task type</label>
-                    <Select TItem="string" TItemValue="string" @bind-Value="_taskType" Style="width: 100%;" OnSelectedItemChanged="@((string _) => OnTaskTypeChanged())">
-                        <SelectOption TItem="string" TItemValue="string" Value="@("Notebook")" Label="Notebook" />
-                        <SelectOption TItem="string" TItemValue="string" Value="@("SqlQuery")" Label="SQL Query" />
-                        <SelectOption TItem="string" TItemValue="string" Value="@("SubJob")" Label="Sub-Job" />
+                    <Select TItem="TaskType" TItemValue="TaskType" @bind-Value="_taskType" Style="width: 100%;" OnSelectedItemChanged="@((TaskType _) => OnTaskTypeChanged())">
+                        <SelectOption TItem="TaskType" TItemValue="TaskType" Value="TaskType.Notebook" Label="Notebook" />
+                        <SelectOption TItem="TaskType" TItemValue="TaskType" Value="TaskType.SqlQuery" Label="SQL Query" />
+                        <SelectOption TItem="TaskType" TItemValue="TaskType" Value="TaskType.SubJob" Label="Sub-Job" />
                     </Select>
                 </div>
             </div>
@@ -33,7 +34,7 @@
         <div>
             <h4 style="margin: 0 0 12px;">Type settings</h4>
             <div style="display: flex; flex-direction: column; gap: 12px;">
-                @if (_taskType == "Notebook")
+                @if (_taskType == TaskType.Notebook)
                 {
                     <div>
                         <label style="display: block; margin-bottom: 4px; font-weight: 500;">Notebook <span style="color: #ff4d4f;">*</span></label>
@@ -68,7 +69,7 @@
                         }
                     </div>
                 }
-                else if (_taskType == "SqlQuery")
+                else if (_taskType == TaskType.SqlQuery)
                 {
                     <div>
                         <label style="display: block; margin-bottom: 4px; font-weight: 500;">Query <span style="color: #ff4d4f;">*</span></label>
@@ -103,7 +104,7 @@
                         }
                     </div>
                 }
-                else if (_taskType == "SubJob")
+                else if (_taskType == TaskType.SubJob)
                 {
                     <div>
                         <label style="display: block; margin-bottom: 4px; font-weight: 500;">Job <span style="color: #ff4d4f;">*</span></label>
@@ -164,7 +165,7 @@
             @foreach (var (param, index) in _parameters.Select((p, i) => (p, i)))
             {
                 var idx = index;
-                var keyErr = _taskType == "Notebook" ? ValidationHelper.ValidatePythonIdentifier(param.Key) : null;
+                var keyErr = _taskType == TaskType.Notebook ? ValidationHelper.ValidatePythonIdentifier(param.Key) : null;
                 <div style="margin-bottom: 8px;">
                     <div style="display: flex; gap: 8px; align-items: flex-start;">
                         <div style="flex: 1;">
@@ -236,7 +237,7 @@
 
     // Form fields
     private string _name = "";
-    private string _taskType = "Notebook";
+    private TaskType _taskType = TaskType.Notebook;
     private int _maxRetries;
     private string _retryInterval = "00:00:30";
     private string? _timeout;
@@ -294,7 +295,7 @@
             {
                 _isEdit = false;
                 _name = "";
-                _taskType = "Notebook";
+                _taskType = TaskType.Notebook;
                 _maxRetries = 0;
                 _retryInterval = "00:00:30";
                 _timeout = null;
@@ -320,13 +321,13 @@
     private bool HasValidationErrors()
     {
         if (string.IsNullOrWhiteSpace(_name)) return true;
-        if (_taskType == "Notebook" && _notebookId is null) return true;
-        if (_taskType == "SqlQuery" && _queryId is null) return true;
-        if (_taskType == "SubJob" && _subJobId is null) return true;
-        if ((_taskType == "Notebook" || _taskType == "SqlQuery") && _nodePoolRef is null) return true;
+        if (_taskType == TaskType.Notebook && _notebookId is null) return true;
+        if (_taskType == TaskType.SqlQuery && _queryId is null) return true;
+        if (_taskType == TaskType.SubJob && _subJobId is null) return true;
+        if ((_taskType == TaskType.Notebook || _taskType == TaskType.SqlQuery) && _nodePoolRef is null) return true;
         if (ValidationHelper.ValidateTimeSpan(_retryInterval, required: true) is not null) return true;
         if (ValidationHelper.ValidateTimeSpan(_timeout, required: false) is not null) return true;
-        if (_taskType == "Notebook" && _parameters.Any(p => ValidationHelper.ValidatePythonIdentifier(p.Key) is not null)) return true;
+        if (_taskType == TaskType.Notebook && _parameters.Any(p => ValidationHelper.ValidatePythonIdentifier(p.Key) is not null)) return true;
         return false;
     }
 

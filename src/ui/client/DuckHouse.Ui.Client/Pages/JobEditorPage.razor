@@ -2,6 +2,7 @@
 
 @using DuckHouse.Ui.Shared.Orchestration
 @using DuckHouse.Ui.Client.Validation
+@using DuckHouse.Core.Orchestration
 @inject IJobService JobService
 @inject IRecentItemsService RecentItemsService
 @inject NavigationManager Navigation
@@ -492,11 +493,11 @@
         // Type-specific validation
         foreach (var t in _editTasks)
         {
-            if (t.TaskType == "Notebook" && t.NotebookId is null)
+            if (t.TaskType == TaskType.Notebook && t.NotebookId is null)
                 return $"Task '{t.Name}': a notebook must be selected.";
-            if (t.TaskType == "SqlQuery" && t.QueryId is null)
+            if (t.TaskType == TaskType.SqlQuery && t.QueryId is null)
                 return $"Task '{t.Name}': a query must be selected.";
-            if (t.TaskType == "SubJob" && t.SubJobId is null)
+            if (t.TaskType == TaskType.SubJob && t.SubJobId is null)
                 return $"Task '{t.Name}': a sub-job must be selected.";
         }
 
@@ -786,11 +787,11 @@
         }
     }
 
-    private static string GetTaskTypeColor(string taskType) => taskType.ToLowerInvariant() switch
+    private static string GetTaskTypeColor(TaskType taskType) => taskType switch
     {
-        "notebook" => "blue",
-        "sqlquery" or "sql" => "purple",
-        "subjob" => "orange",
+        TaskType.Notebook => "blue",
+        TaskType.SqlQuery => "purple",
+        TaskType.SubJob => "orange",
         _ => "default",
     };
 

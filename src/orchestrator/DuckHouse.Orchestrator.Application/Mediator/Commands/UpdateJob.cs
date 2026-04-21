@@ -1,4 +1,5 @@
 using DuckHouse.Core.Mediator;
+using DuckHouse.Core.Orchestration;
 using DuckHouse.Orchestrator.Application.Validation;
 using DuckHouse.Orchestrator.Core.Entities;
 using DuckHouse.Orchestrator.Core.Enums;
@@ -18,7 +19,7 @@ public record UpdateJobRequest(
 
 public record UpdateJobTaskRequest(
     string Name,
-    string TaskType,
+    TaskType TaskType,
     int MaxRetries,
     TimeSpan RetryInterval,
     TimeSpan? Timeout,
@@ -92,9 +93,9 @@ internal class UpdateJobHandler(IJobRepository jobRepository) : IRequestHandler<
 
             foreach (var t in request.Tasks)
             {
-                JobTask task = t.TaskType.ToLowerInvariant() switch
+                JobTask task = t.TaskType switch
                 {
-                    "notebook" => new NotebookTask
+                    TaskType.Notebook => new NotebookTask
                     {
                         JobId = existing.Id,
                         Name = t.Name,
@@ -105,7 +106,7 @@ internal class UpdateJobHandler(IJobRepository jobRepository) : IRequestHandler<
                         NodePoolRef = t.NodePoolRef ?? throw new InvalidOperationException("NodePoolRef is required for notebook tasks."),
                         Parameters = t.Parameters,
                     },
-                    "sqlquery" or "sql" => new SqlQueryTask
+                    TaskType.SqlQuery => new SqlQueryTask
                     {
                         JobId = existing.Id,
                         Name = t.Name,
@@ -116,7 +117,7 @@ internal class UpdateJobHandler(IJobRepository jobRepository) : IRequestHandler<
                         NodePoolRef = t.NodePoolRef ?? throw new InvalidOperationException("NodePoolRef is required for SQL query tasks."),
                         Parameters = t.Parameters,
                     },
-                    "subjob" => new SubJobTask
+                    TaskType.SubJob => new SubJobTask
                     {
                         JobId = existing.Id,
                         Name = t.Name,

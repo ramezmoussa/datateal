@@ -1,4 +1,5 @@
 using DuckHouse.Core.Mediator;
+using DuckHouse.Core.Orchestration;
 using DuckHouse.Orchestrator.Application.Validation;
 using DuckHouse.Orchestrator.Core.Entities;
 using DuckHouse.Orchestrator.Core.Enums;
@@ -16,7 +17,7 @@ public record CreateJobRequest(
 
 public record CreateJobTaskRequest(
     string Name,
-    string TaskType,
+    TaskType TaskType,
     int MaxRetries,
     TimeSpan RetryInterval,
     TimeSpan? Timeout,
@@ -77,9 +78,9 @@ internal class CreateJobHandler(IJobRepository jobRepository) : IRequestHandler<
 
         foreach (var t in request.Tasks ?? [])
         {
-            JobTask task = t.TaskType.ToLowerInvariant() switch
+            JobTask task = t.TaskType switch
             {
-                "notebook" => new NotebookTask
+                TaskType.Notebook => new NotebookTask
                 {
                     Id = Guid.NewGuid(),
                     JobId = job.Id,
@@ -91,7 +92,7 @@ internal class CreateJobHandler(IJobRepository jobRepository) : IRequestHandler<
                     NodePoolRef = t.NodePoolRef ?? throw new InvalidOperationException("NodePoolRef is required for notebook tasks."),
                     Parameters = t.Parameters,
                 },
-                "sqlquery" or "sql" => new SqlQueryTask
+                TaskType.SqlQuery => new SqlQueryTask
                 {
                     Id = Guid.NewGuid(),
                     JobId = job.Id,
@@ -103,7 +104,7 @@ internal class CreateJobHandler(IJobRepository jobRepository) : IRequestHandler<
                     NodePoolRef = t.NodePoolRef ?? throw new InvalidOperationException("NodePoolRef is required for SQL query tasks."),
                     Parameters = t.Parameters,
                 },
-                "subjob" => new SubJobTask
+                TaskType.SubJob => new SubJobTask
                 {
                     Id = Guid.NewGuid(),
                     JobId = job.Id,

@@ -2,6 +2,7 @@ using System.Text.Json;
 using DuckHouse.Core.Catalogs;
 using DuckHouse.Core.Environment;
 using DuckHouse.Core.Nodes;
+using DuckHouse.Core.Orchestration;
 using DuckHouse.Core.RuntimePackages;
 using DuckHouse.Core.Workspace;
 using DuckHouse.Orchestrator.Core.Entities;
@@ -192,11 +193,11 @@ public class DuckHouseDbContext(DbContextOptions<DuckHouseDbContext> options)
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Name).HasMaxLength(256).IsRequired();
             entity.HasIndex(e => new { e.JobId, e.Name }).IsUnique();
-            entity.HasDiscriminator<string>("TaskType")
-                .HasValue<NotebookTask>("Notebook")
-                .HasValue<SqlQueryTask>("SqlQuery")
-                .HasValue<SubJobTask>("SubJob");
-            entity.Property("TaskType").HasMaxLength(32).IsRequired();
+            entity.HasDiscriminator(e => e.TaskType)
+                .HasValue<NotebookTask>(TaskType.Notebook)
+                .HasValue<SqlQueryTask>(TaskType.SqlQuery)
+                .HasValue<SubJobTask>(TaskType.SubJob);
+            entity.Property(e => e.TaskType).HasConversion<string>().HasMaxLength(32).IsRequired();
             entity.HasMany(e => e.Dependencies).WithOne(d => d.Task).HasForeignKey(d => d.TaskId).OnDelete(DeleteBehavior.Cascade);
         });
 
@@ -275,11 +276,11 @@ public class DuckHouseDbContext(DbContextOptions<DuckHouseDbContext> options)
             entity.Property(e => e.Status).HasConversion<string>().HasMaxLength(32);
             entity.Property(e => e.TaskName).HasMaxLength(256).IsRequired();
             entity.Property(e => e.Parameters).HasColumnType("jsonb").HasConversion(DictJsonConverter);
-            entity.HasDiscriminator<string>("TaskType")
-                .HasValue<NotebookTaskRun>("Notebook")
-                .HasValue<SqlQueryTaskRun>("SqlQuery")
-                .HasValue<SubJobTaskRun>("SubJob");
-            entity.Property("TaskType").HasMaxLength(32).IsRequired();
+            entity.HasDiscriminator(e => e.TaskType)
+                .HasValue<NotebookTaskRun>(TaskType.Notebook)
+                .HasValue<SqlQueryTaskRun>(TaskType.SqlQuery)
+                .HasValue<SubJobTaskRun>(TaskType.SubJob);
+            entity.Property(e => e.TaskType).HasConversion<string>().HasMaxLength(32).IsRequired();
             entity.HasOne(e => e.Task).WithMany().HasForeignKey(e => e.TaskId).OnDelete(DeleteBehavior.SetNull);
         });
     }

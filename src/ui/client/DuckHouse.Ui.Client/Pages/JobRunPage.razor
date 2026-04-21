@@ -1,6 +1,7 @@
 @page "/runs/{Id:guid}"
 
 @using DuckHouse.Ui.Shared.Orchestration
+@using DuckHouse.Core.Orchestration
 @inject IJobService JobService
 @inject NavigationManager Navigation
 
@@ -121,14 +122,14 @@
                     }
                 </PropertyColumn>
                 <ActionColumn Title="">
-                    @if (context.TaskType.Equals("Notebook", StringComparison.OrdinalIgnoreCase))
+                    @if (context.TaskType == TaskType.Notebook)
                     {
                         <Button Size="@ButtonSize.Small"
                                 OnClick="@(() => Navigation.NavigateTo($"/runs/{Id}/tasks/{context.Id}/notebook"))">
                             <Icon Type="@IconType.Outline.FileText" /> Notebook
                         </Button>
                     }
-                    else if (context.TaskType.Equals("SqlQuery", StringComparison.OrdinalIgnoreCase))
+                    else if (context.TaskType == TaskType.SqlQuery)
                     {
                         <Button Size="@ButtonSize.Small"
                                 OnClick="@(() => Navigation.NavigateTo($"/runs/{Id}/tasks/{context.Id}/query"))">
@@ -214,11 +215,11 @@
             }
         </div>;
 
-    private static string GetTaskTypeColor(string taskType) => taskType.ToLowerInvariant() switch
+    private static string GetTaskTypeColor(TaskType taskType) => taskType switch
     {
-        "notebook" => "blue",
-        "sqlquery" or "sql" => "purple",
-        "subjob" => "orange",
+        TaskType.Notebook => "blue",
+        TaskType.SqlQuery => "purple",
+        TaskType.SubJob => "orange",
         _ => "default",
     };
 

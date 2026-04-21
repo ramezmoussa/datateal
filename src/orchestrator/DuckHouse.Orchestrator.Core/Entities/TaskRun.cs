@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using DuckHouse.Core.Orchestration;
 using DuckHouse.Orchestrator.Core.Enums;
 
 namespace DuckHouse.Orchestrator.Core.Entities;
@@ -17,6 +18,9 @@ public abstract class TaskRun
     public Guid? TaskId { get; set; }
     [JsonIgnore]
     public JobTask? Task { get; set; }
+
+    [JsonIgnore]
+    public TaskType TaskType { get; protected set; }
 
     public string TaskName { get; set; } = string.Empty;
     public Dictionary<string, string>? Parameters { get; set; }

@@ -1,9 +1,11 @@
+using DuckHouse.Core.Orchestration;
+
 namespace DuckHouse.Ui.Shared.Orchestration;
 
 public record TaskDto(
     Guid Id,
     string Name,
-    string TaskType,
+    TaskType TaskType,
     int MaxRetries,
     TimeSpan RetryInterval,
     TimeSpan? Timeout,

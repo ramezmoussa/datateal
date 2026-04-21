@@ -1,3 +1,5 @@
+using DuckHouse.Core.Orchestration;
+
 namespace DuckHouse.Ui.Shared.Orchestration;
 
 public record UpdateJobRequest(
@@ -11,7 +13,7 @@ public record UpdateJobRequest(
 
 public record UpdateTaskRequest(
     string Name,
-    string TaskType,
+    TaskType TaskType,
     int MaxRetries,
     TimeSpan RetryInterval,
     TimeSpan? Timeout,

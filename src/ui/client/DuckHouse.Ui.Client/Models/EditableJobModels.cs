@@ -1,9 +1,11 @@
+using DuckHouse.Core.Orchestration;
+
 namespace DuckHouse.Ui.Client.Models;
 
 public class EditableTask
 {
     public string Name { get; set; } = "";
-    public string TaskType { get; set; } = "Notebook";
+    public TaskType TaskType { get; set; } = TaskType.Notebook;
     public int MaxRetries { get; set; }
     public string RetryInterval { get; set; } = "00:00:30";
     public string? Timeout { get; set; }

@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using DuckHouse.Core.Orchestration;
 
 namespace DuckHouse.Orchestrator.Core.Entities;
 
@@ -15,6 +16,9 @@ public abstract class JobTask
     public Guid JobId { get; set; }
     [JsonIgnore]
     public Job? Job { get; set; }
+
+    [JsonIgnore]
+    public TaskType TaskType { get; protected set; }
 
     public required string Name { get; set; }
     public int MaxRetries { get; set; }
