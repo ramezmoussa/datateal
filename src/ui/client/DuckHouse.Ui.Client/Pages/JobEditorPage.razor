@@ -264,7 +264,7 @@
                Visible="_showScheduleModal"
                OnOk="ConfirmSchedule"
                OnCancel="() => _showScheduleModal = false"
-               OkButtonProps="@(new ButtonProps { Disabled = string.IsNullOrWhiteSpace(_newCron) || ValidationHelper.ValidateCronExpression(_newCron) is not null })">
+               OkButtonProps="@(new ButtonProps { Disabled = string.IsNullOrWhiteSpace(_newCron) || ValidationHelper.ValidateCronExpression(_newCron) is not null || GetMissingRequiredScheduleParams().Count > 0 })">
             <div style="display: flex; flex-direction: column; gap: 16px;">
                 <div>
                     <label style="display: block; margin-bottom: 4px; font-weight: 500;">Cron Expression</label>
@@ -310,6 +310,15 @@
                     <Button Size="@ButtonSize.Small" OnClick="() => _newScheduleParameters.Add(new())">
                         <Icon Type="@IconType.Outline.Plus" /> Add override
                     </Button>
+                    @{
+                        var missingRequired = GetMissingRequiredScheduleParams();
+                    }
+                    @if (missingRequired.Count > 0)
+                    {
+                        <div style="color: #ff4d4f; font-size: 12px; margin-top: 8px;">
+                            Required parameter(s) with no default value must be overridden: <strong>@string.Join(", ", missingRequired)</strong>
+                        </div>
+                    }
                 </div>
             </div>
         </Modal>
@@ -648,7 +657,11 @@
         _editingScheduleId = null;
         _newCron = "";
         _newTimeZone = "";
-        _newScheduleParameters = [];
+        // Pre-populate required parameters that have no default so the user sees what must be filled in.
+        _newScheduleParameters = _job!.Parameters
+            .Where(p => p.IsRequired && p.DefaultValue is null)
+            .Select(p => new EditableTaskParameter { Key = p.Name, Value = "" })
+            .ToList();
         _showScheduleModal = true;
     }
 
@@ -675,6 +688,22 @@
         {
             _error = $"Failed to load time zones: {ex.Message}";
         }
+    }
+
+    /// <summary>
+    /// Returns the names of required job parameters that have no default value
+    /// and are not yet overridden in the schedule form.
+    /// </summary>
+    private List<string> GetMissingRequiredScheduleParams()
+    {
+        if (_job is null) return [];
+        return _job.Parameters
+            .Where(p => p.IsRequired && p.DefaultValue is null)
+            .Where(p => !_newScheduleParameters.Any(sp =>
+                string.Equals(sp.Key?.Trim(), p.Name, StringComparison.OrdinalIgnoreCase)
+                && !string.IsNullOrWhiteSpace(sp.Value)))
+            .Select(p => p.Name)
+            .ToList();
     }
 
     private async Task ConfirmSchedule()

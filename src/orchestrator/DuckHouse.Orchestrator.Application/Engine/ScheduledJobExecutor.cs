@@ -41,13 +41,20 @@ public class ScheduledJobExecutor(
                 return;
             }
 
+            var schedule = job.Schedules.FirstOrDefault(s => s.Id == scheduleId);
+            if (schedule is null)
+            {
+                logger.LogWarning("Scheduled fire skipped: schedule {ScheduleId} not found on job {JobId}", scheduleId, jobId);
+                return;
+            }
+
             logger.LogInformation(
                 "Schedule {ScheduleId} firing for job '{JobName}' ({JobId})",
                 scheduleId, job.Name, jobId);
 
             // TriggerJobRequest handler handles both DB persistence and dispatch via RunDispatcher.
             var run = await mediator.SendAsync(
-                new TriggerJobRequest(jobId, null, JobRunTrigger.Scheduled),
+                new TriggerJobRequest(jobId, schedule.Parameters, JobRunTrigger.Scheduled),
                 context.CancellationToken);
 
             logger.LogInformation(
