@@ -13,6 +13,9 @@ public class Job
     public List<JobTask> Tasks { get; set; } = [];
     public List<JobSchedule> Schedules { get; set; } = [];
 
+    public int TaskCount => Tasks.Count;
+    public int ScheduleCount => Schedules.Count;
+
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 }

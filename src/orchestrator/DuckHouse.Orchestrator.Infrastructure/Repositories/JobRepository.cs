@@ -10,6 +10,7 @@ internal class JobRepository(DuckHouseDbContext db) : IJobRepository
     public async Task<IReadOnlyList<Job>> GetJobsAsync(CancellationToken cancellationToken = default) =>
         await db.Jobs
             .Include(j => j.Parameters)
+            .Include(j => j.Tasks)
             .Include(j => j.Schedules)
             .OrderBy(j => j.Name)
             .ToListAsync(cancellationToken);
