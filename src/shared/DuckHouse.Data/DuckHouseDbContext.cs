@@ -122,10 +122,10 @@ public class DuckHouseDbContext(DbContextOptions<DuckHouseDbContext> options)
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Name).HasMaxLength(128).IsRequired();
             entity.HasIndex(e => e.Name).IsUnique();
-            entity.HasDiscriminator<string>("CatalogType")
-                .HasValue<ManagedCatalog>("Managed")
-                .HasValue<UnmanagedCatalog>("Unmanaged");
-            entity.Property("CatalogType").HasMaxLength(32).IsRequired();
+            entity.HasDiscriminator(e => e.CatalogType)
+                .HasValue<ManagedCatalog>(CatalogType.Managed)
+                .HasValue<UnmanagedCatalog>(CatalogType.Unmanaged);
+            entity.Property(e => e.CatalogType).HasConversion<string>().HasMaxLength(32).IsRequired();
         });
 
         modelBuilder.Entity<UnmanagedCatalog>(entity =>

@@ -5,4 +5,7 @@ namespace DuckHouse.Core.Catalogs;
 /// are derived entirely from server-side <see cref="CatalogSettings"/> at runtime.
 /// Only the catalog <see cref="Catalog.Name"/> is stored.
 /// </summary>
-public sealed class ManagedCatalog : Catalog;
+public sealed class ManagedCatalog : Catalog
+{
+    public ManagedCatalog() => CatalogType = CatalogType.Managed;
+}

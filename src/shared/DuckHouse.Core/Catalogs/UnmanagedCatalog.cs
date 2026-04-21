@@ -7,6 +7,9 @@ namespace DuckHouse.Core.Catalogs;
 /// </summary>
 public sealed class UnmanagedCatalog : Catalog
 {
+    public UnmanagedCatalog() => CatalogType = CatalogType.Unmanaged;
+
+
     /// <summary>
     /// Final data path for the DuckLake instance (local path or az:// / abfss:// URI).
     /// </summary>

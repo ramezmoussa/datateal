@@ -8,6 +8,8 @@ public abstract class Catalog
 {
     public Guid Id { get; set; }
 
+    public CatalogType CatalogType { get; protected set; }
+
     /// <summary>
     /// Must be a valid DuckDB identifier and PostgreSQL database name.
     /// Unique across all catalogs.
