@@ -17,7 +17,16 @@
                     {
                         var col = Data.Columns[i];
                         var cell = i < row.Count ? row[i] : null;
-                        <td style="font-family: monospace; @(IsNumeric(col) ? "text-align: right;" : "")">@FormatCell(cell)</td>
+                        <td style="font-family: monospace; @(IsNumeric(col) ? "text-align: right;" : "")">
+                            @if (cell is null)
+                            {
+                                <AntDesign.Text Code="true">null</AntDesign.Text>
+                            }
+                            else
+                            {
+                                @FormatCell(cell)
+                            }
+                        </td>
                     }
                 </tr>
             </Virtualize>
