@@ -18,6 +18,7 @@
     [Parameter] public EventCallback OnEditorReady { get; set; }
     [Parameter] public EventCallback<string> OnSelectionChanged { get; set; }
     [Parameter] public string? Class { get; set; }
+    [Parameter] public bool AlwaysConsumeMouseWheel { get; set; } = true;
 
     [Inject] private IJSRuntime JS { get; set; } = default!;
     private IJSInProcessRuntime? JSSync => JS as IJSInProcessRuntime;
@@ -50,6 +51,7 @@
             AutomaticLayout = true,
             Minimap = new EditorMinimapOptions { Enabled = false },
             ScrollBeyondLastLine = false,
+            Scrollbar = new EditorScrollbarOptions { AlwaysConsumeMouseWheel = AlwaysConsumeMouseWheel },
             WordWrap = "on",
             GlyphMargin = false,
             OverviewRulerLanes = 0,

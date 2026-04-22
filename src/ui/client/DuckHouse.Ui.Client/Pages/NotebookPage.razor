@@ -244,6 +244,7 @@
                             OnMoveUp="@(() => MoveCell(index, -1))"
                             OnMoveDown="@(() => MoveCell(index, 1))"
                             OnCellChanged="@(() => _notebook.IsDirty = true)"
+                            AlwaysConsumeMouseWheel="false"
                             OnToggleParameters="@(() => ToggleParameterCell(cell))" />
             <AddCellBar OnAddPython="() => AddCell(index + 1, NotebookCellType.Code, NotebookCellLanguage.Python)"
                         OnAddSql="() => AddCell(index + 1, NotebookCellType.Code, NotebookCellLanguage.Sql)"

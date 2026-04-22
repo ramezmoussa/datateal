@@ -16,6 +16,7 @@
           ReadOnly="@ReadOnly"
           OnExecute="OnExecute"
           OnEditorReady="OnEditorReadyAsync"
+          AlwaysConsumeMouseWheel="@AlwaysConsumeMouseWheel"
           Class="@Class" />
 
 @code {
@@ -37,6 +38,7 @@
     /// notebook titles, and query titles in the resolved folder.
     /// </summary>
     [Parameter] public Func<string, Task<IReadOnlyList<RunMagicCompletionItem>>>? ProvideRunMagicCompletions { get; set; }
+    [Parameter] public bool AlwaysConsumeMouseWheel { get; set; } = true;
 
     private static readonly Regex RunLinePrefix = new(@"^\s*%run\s+(.*)", RegexOptions.Compiled);
 

@@ -216,6 +216,7 @@
                             PriorContext="PriorContext"
                             ProvideRunMagicCompletions="ProvideRunMagicCompletions"
                             OnExecute="OnExecute"
+                            AlwaysConsumeMouseWheel="@AlwaysConsumeMouseWheel"
                             Class="editor-cell" />
         }
         else
@@ -225,6 +226,7 @@
                       Language="@(Cell.Language == NotebookCellLanguage.Sql ? "sql" : "python")"
                       ReadOnly="@Cell.IsExecuting"
                       OnExecute="OnExecute"
+                      AlwaysConsumeMouseWheel="@AlwaysConsumeMouseWheel"
                       Class="editor-cell" />
         }
     }
@@ -235,6 +237,7 @@
             <CodeCell Value="@Cell.Source"
                       ValueChanged="@(async v => { Cell.Source = v; await OnCellChanged.InvokeAsync(); })"
                       Language="markdown"
+                      AlwaysConsumeMouseWheel="@AlwaysConsumeMouseWheel"
                       Class="editor-cell" />
         }
         else
@@ -344,6 +347,7 @@
     [Parameter] public EventCallback OnMoveDown { get; set; }
     [Parameter] public EventCallback OnCellChanged { get; set; }
     [Parameter] public EventCallback OnToggleParameters { get; set; }
+    [Parameter] public bool AlwaysConsumeMouseWheel { get; set; } = true;
 
     private bool HasKernel => !string.IsNullOrEmpty(NodeName) && !string.IsNullOrEmpty(KernelId);
 
