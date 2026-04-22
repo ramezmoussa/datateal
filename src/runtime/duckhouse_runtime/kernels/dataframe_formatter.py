@@ -50,7 +50,7 @@ def _format_df(df) -> dict:
 
     # Convert to Python-native types so the IPython JSON encoder can handle them
     rows = [
-        [None if (v != v) else v.item() if hasattr(v, "item") else v for v in row]
+        [None if pd.isna(v) else v.item() if hasattr(v, "item") else v for v in row]
         for row in display_df.itertuples(index=False, name=None)
     ]
 
