@@ -56,11 +56,6 @@
 
             @* File toolbar *@
             <Space Size="SpaceSize.Small" Style="flex-wrap: wrap;">
-                <SpaceItem>
-                    <Button OnClick="@(() => Navigation.NavigateTo("/workspace"))" Icon="@IconType.Outline.FolderOpen">
-                        Browse workspace
-                    </Button>
-                </SpaceItem>
                 @if (_workspaceQueryId.HasValue)
                 {
                     <SpaceItem>

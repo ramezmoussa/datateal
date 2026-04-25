@@ -57,11 +57,6 @@
             @* File toolbar *@
             <Space Size="SpaceSize.Small" Style="flex-wrap: wrap;">
                 <SpaceItem>
-                    <Button OnClick="@(() => Navigation.NavigateTo("/workspace"))" Icon="@IconType.Outline.FolderOpen">
-                        Browse workspace
-                    </Button>
-                </SpaceItem>
-                <SpaceItem>
                     <Button OnClick="OpenFileDialogAsync" Icon="@IconType.Outline.Upload">
                         Open from file
                     </Button>
