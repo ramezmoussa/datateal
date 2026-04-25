@@ -212,7 +212,6 @@
                             ValueChanged="@(async v => { Cell.Source = v; await OnCellChanged.InvokeAsync(); })"
                             NodeName="@(NodeName ?? "")"
                             KernelId="@(KernelId ?? "")"
-                            ReadOnly="@Cell.IsExecuting"
                             PriorContext="PriorContext"
                             ProvideRunMagicCompletions="ProvideRunMagicCompletions"
                             OnExecute="OnExecute"
@@ -224,7 +223,6 @@
             <CodeCell Value="@Cell.Source"
                       ValueChanged="@(async v => { Cell.Source = v; await OnCellChanged.InvokeAsync(); })"
                       Language="@(Cell.Language == NotebookCellLanguage.Sql ? "sql" : "python")"
-                      ReadOnly="@Cell.IsExecuting"
                       OnExecute="OnExecute"
                       AlwaysConsumeMouseWheel="@AlwaysConsumeMouseWheel"
                       Class="editor-cell" />
