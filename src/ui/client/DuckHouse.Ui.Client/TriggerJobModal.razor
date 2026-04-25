@@ -35,7 +35,9 @@
                                     <div style="font-size: 12px; color: #888; margin-bottom: 4px;">@param.Description</div>
                                 }
                                 <Input @bind-Value="_paramValues[param.Name]"
-                                       Placeholder="@(param.DefaultValue ?? "")" />
+                                       Placeholder="@(param.DefaultValue ?? "")"
+                                       OnInput="@(e => _paramValues[param.Name] = e.Value?.ToString() ?? "")"
+                                       OnPressEnter="@(_ => HandleConfirm())" />
                             </div>
                         }
                     </div>

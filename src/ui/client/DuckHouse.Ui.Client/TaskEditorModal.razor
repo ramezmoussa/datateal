@@ -18,209 +18,215 @@
                 <div>
                     <label style="display: block; margin-bottom: 4px; font-weight: 500;">Name</label>
                     <Input @bind-Value="_name" Placeholder="task-name"
-                           Status="@(IsDuplicateName() ? "error" : "")" />
+                           Status="@(IsDuplicateName() ? "error" : "")"
+                           OnInput="@(e => _name = e.Value?.ToString() ?? "")"
+                           OnPressEnter="@(async _ => await HandleSave())" />
                     @if (IsDuplicateName())
                     {
                         <div style="color: #ff4d4f; font-size: 12px; margin-top: 2px;">A task with this name already exists.</div>
                     }
                 </div>
-                <div>
-                    <label style="display: block; margin-bottom: 4px; font-weight: 500;">Task type</label>
-                    <Select TItem="TaskType" TItemValue="TaskType" @bind-Value="_taskType" Style="width: 100%;" OnSelectedItemChanged="@((TaskType _) => OnTaskTypeChanged())">
-                        <SelectOption TItem="TaskType" TItemValue="TaskType" Value="TaskType.Notebook" Label="Notebook" />
-                        <SelectOption TItem="TaskType" TItemValue="TaskType" Value="TaskType.SqlQuery" Label="SQL Query" />
-                        <SelectOption TItem="TaskType" TItemValue="TaskType" Value="TaskType.SubJob" Label="Sub-Job" />
-                    </Select>
-                </div>
-            </div>
-        </div>
-
-        @* Section 2: Type-Specific Settings *@
-        <div>
-            <h4 style="margin: 0 0 12px;">Type settings</h4>
-            <div style="display: flex; flex-direction: column; gap: 12px;">
-                @if (_taskType == TaskType.Notebook)
-                {
                     <div>
-                        <label style="display: block; margin-bottom: 4px; font-weight: 500;">Notebook <span style="color: #ff4d4f;">*</span></label>
-                        <WorkspaceItemPicker ItemType="Notebook"
-                                             @bind-SelectedId="_notebookId" />
-                        @if (_notebookId is null)
-                        {
-                            <div style="color: #ff4d4f; font-size: 12px; margin-top: 2px;">A notebook must be selected.</div>
-                        }
-                    </div>
-                    <div>
-                        <label style="display: block; margin-bottom: 4px; font-weight: 500;">Node pool <span style="color: #ff4d4f;">*</span></label>
-                        <Select TItem="NodePoolOption"
-                                TItemValue="string"
-                                DataSource="_nodePoolOptions"
-                                @bind-Value="_nodePoolRef"
-                                LabelName="@nameof(NodePoolOption.Label)"
-                                ValueName="@nameof(NodePoolOption.Value)"
-                                Style="width: 100%;"
-                                Placeholder="Select node pool">
-                            <ItemTemplate>
-                                @{ var pool = (NodePoolOption)(object)context!; }
-                                <div style="line-height: 1.4;">
-                                    <div>@pool.Label</div>
-                                    <div style="font-size: 11px; color: #888; margin-top: 1px;">@pool.PoolType · @pool.VmSize</div>
-                                </div>
-                            </ItemTemplate>
+                        <label style="display: block; margin-bottom: 4px; font-weight: 500;">Task type</label>
+                        <Select TItem="TaskType" TItemValue="TaskType" @bind-Value="_taskType" Style="width: 100%;" OnSelectedItemChanged="@((TaskType _) => OnTaskTypeChanged())">
+                            <SelectOption TItem="TaskType" TItemValue="TaskType" Value="TaskType.Notebook" Label="Notebook" />
+                            <SelectOption TItem="TaskType" TItemValue="TaskType" Value="TaskType.SqlQuery" Label="SQL Query" />
+                            <SelectOption TItem="TaskType" TItemValue="TaskType" Value="TaskType.SubJob" Label="Sub-Job" />
                         </Select>
-                        @if (_nodePoolRef is null)
-                        {
-                            <div style="color: #ff4d4f; font-size: 12px; margin-top: 2px;">A node pool must be selected.</div>
-                        }
                     </div>
-                }
-                else if (_taskType == TaskType.SqlQuery)
-                {
-                    <div>
-                        <label style="display: block; margin-bottom: 4px; font-weight: 500;">Query <span style="color: #ff4d4f;">*</span></label>
-                        <WorkspaceItemPicker ItemType="Query"
-                                             @bind-SelectedId="_queryId" />
-                        @if (_queryId is null)
-                        {
-                            <div style="color: #ff4d4f; font-size: 12px; margin-top: 2px;">A query must be selected.</div>
-                        }
-                    </div>
-                    <div>
-                        <label style="display: block; margin-bottom: 4px; font-weight: 500;">Node pool <span style="color: #ff4d4f;">*</span></label>
-                        <Select TItem="NodePoolOption"
-                                TItemValue="string"
-                                DataSource="_nodePoolOptions"
-                                @bind-Value="_nodePoolRef"
-                                LabelName="@nameof(NodePoolOption.Label)"
-                                ValueName="@nameof(NodePoolOption.Value)"
-                                Style="width: 100%;"
-                                Placeholder="Select node pool">
-                            <ItemTemplate>
-                                @{ var pool = (NodePoolOption)(object)context!; }
-                                <div style="line-height: 1.4;">
-                                    <div>@pool.Label</div>
-                                    <div style="font-size: 11px; color: #888; margin-top: 1px;">@pool.PoolType · @pool.VmSize</div>
-                                </div>
-                            </ItemTemplate>
-                        </Select>
-                        @if (_nodePoolRef is null)
-                        {
-                            <div style="color: #ff4d4f; font-size: 12px; margin-top: 2px;">A node pool must be selected.</div>
-                        }
-                    </div>
-                }
-                else if (_taskType == TaskType.SubJob)
-                {
-                    <div>
-                        <label style="display: block; margin-bottom: 4px; font-weight: 500;">Job <span style="color: #ff4d4f;">*</span></label>
-                        <Select TItem="JobOption"
-                                TItemValue="Guid?"
-                                DataSource="_jobOptions"
-                                @bind-Value="_subJobId"
-                                LabelName="@nameof(JobOption.Label)"
-                                ValueName="@nameof(JobOption.Value)"
-                                EnableSearch
-                                AllowClear
-                                Style="width: 100%;"
-                                Placeholder="Select job" />
-                        @if (_subJobId is null)
-                        {
-                            <div style="color: #ff4d4f; font-size: 12px; margin-top: 2px;">A sub-job must be selected.</div>
-                        }
-                    </div>
-                }
-            </div>
-        </div>
-
-        @* Section 3: Execution Settings *@
-        <div>
-            <h4 style="margin: 0 0 12px;">Execution settings</h4>
-            <div style="display: flex; flex-direction: column; gap: 12px;">
-                <div>
-                    <label style="display: block; margin-bottom: 4px; font-weight: 500;">Max retries</label>
-                    <AntDesign.InputNumber @bind-Value="_maxRetries" Min="0" Style="width: 100%;" />
-                </div>
-                <div>
-                    <label style="display: block; margin-bottom: 4px; font-weight: 500;">Retry interval</label>
-                    <Input @bind-Value="_retryInterval" Placeholder="00:00:30"
-                           Status="@(ValidationHelper.ValidateTimeSpan(_retryInterval, required: true) is not null ? "error" : "")" />
-                    @if (ValidationHelper.ValidateTimeSpan(_retryInterval, required: true) is { } retryErr)
-                    {
-                        <div style="color: #ff4d4f; font-size: 12px; margin-top: 2px;">@retryErr</div>
-                    }
-                </div>
-                <div>
-                    <label style="display: block; margin-bottom: 4px; font-weight: 500;">Timeout</label>
-                    <Input @bind-Value="_timeout" Placeholder="01:00:00 (optional)"
-                           Status="@(ValidationHelper.ValidateTimeSpan(_timeout, required: false) is not null ? "error" : "")" />
-                    @if (ValidationHelper.ValidateTimeSpan(_timeout, required: false) is { } timeoutErr)
-                    {
-                        <div style="color: #ff4d4f; font-size: 12px; margin-top: 2px;">@timeoutErr</div>
-                    }
                 </div>
             </div>
-        </div>
 
-        @* Section 4: Parameters *@
-        <div>
-            <h4 style="margin: 0 0 4px;">Parameters</h4>
-            <p style="font-size: 12px; color: #888; margin: 0 0 12px;">
-                Use <code>$&#123;&#123; param_name &#125;&#125;</code> in a value to inherit from a job parameter at execution time.
-            </p>
-            @foreach (var (param, index) in _parameters.Select((p, i) => (p, i)))
-            {
-                var idx = index;
-                var keyErr = _taskType == TaskType.Notebook ? ValidationHelper.ValidatePythonIdentifier(param.Key) : null;
-                <div style="margin-bottom: 8px;">
-                    <div style="display: flex; gap: 8px; align-items: flex-start;">
-                        <div style="flex: 1;">
-                            <Input @bind-Value="param.Key" Placeholder="Key"
-                                   Status="@(keyErr is not null ? "error" : "")" />
-                            @if (keyErr is not null)
+            @* Section 2: Type-Specific Settings *@
+            <div>
+                <h4 style="margin: 0 0 12px;">Type settings</h4>
+                <div style="display: flex; flex-direction: column; gap: 12px;">
+                    @if (_taskType == TaskType.Notebook)
+                    {
+                        <div>
+                            <label style="display: block; margin-bottom: 4px; font-weight: 500;">Notebook <span style="color: #ff4d4f;">*</span></label>
+                            <WorkspaceItemPicker ItemType="Notebook"
+                                                 @bind-SelectedId="_notebookId" />
+                            @if (_notebookId is null)
                             {
-                                <div style="color: #ff4d4f; font-size: 12px; margin-top: 2px;">@keyErr</div>
+                                <div style="color: #ff4d4f; font-size: 12px; margin-top: 2px;">A notebook must be selected.</div>
                             }
                         </div>
-                        <Input @bind-Value="param.Value" Placeholder="Value" Style="flex: 1;" />
-                        <Button Danger Size="@ButtonSize.Small" OnClick="() => _parameters.RemoveAt(idx)">
+                        <div>
+                            <label style="display: block; margin-bottom: 4px; font-weight: 500;">Node pool <span style="color: #ff4d4f;">*</span></label>
+                            <Select TItem="NodePoolOption"
+                                    TItemValue="string"
+                                    DataSource="_nodePoolOptions"
+                                    @bind-Value="_nodePoolRef"
+                                    LabelName="@nameof(NodePoolOption.Label)"
+                                    ValueName="@nameof(NodePoolOption.Value)"
+                                    Style="width: 100%;"
+                                    Placeholder="Select node pool">
+                                <ItemTemplate Context="poolCtx">
+                                    @{ var pool = (NodePoolOption)(object)poolCtx!; }
+                                    <div style="line-height: 1.4;">
+                                        <div>@pool.Label</div>
+                                        <div style="font-size: 11px; color: #888; margin-top: 1px;">@pool.PoolType · @pool.VmSize</div>
+                                    </div>
+                                </ItemTemplate>
+                            </Select>
+                            @if (_nodePoolRef is null)
+                            {
+                                <div style="color: #ff4d4f; font-size: 12px; margin-top: 2px;">A node pool must be selected.</div>
+                            }
+                        </div>
+                    }
+                    else if (_taskType == TaskType.SqlQuery)
+                    {
+                        <div>
+                            <label style="display: block; margin-bottom: 4px; font-weight: 500;">Query <span style="color: #ff4d4f;">*</span></label>
+                            <WorkspaceItemPicker ItemType="Query"
+                                                 @bind-SelectedId="_queryId" />
+                            @if (_queryId is null)
+                            {
+                                <div style="color: #ff4d4f; font-size: 12px; margin-top: 2px;">A query must be selected.</div>
+                            }
+                        </div>
+                        <div>
+                            <label style="display: block; margin-bottom: 4px; font-weight: 500;">Node pool <span style="color: #ff4d4f;">*</span></label>
+                            <Select TItem="NodePoolOption"
+                                    TItemValue="string"
+                                    DataSource="_nodePoolOptions"
+                                    @bind-Value="_nodePoolRef"
+                                    LabelName="@nameof(NodePoolOption.Label)"
+                                    ValueName="@nameof(NodePoolOption.Value)"
+                                    Style="width: 100%;"
+                                    Placeholder="Select node pool">
+                                <ItemTemplate Context="poolCtx2">
+                                    @{ var pool = (NodePoolOption)(object)poolCtx2!; }
+                                    <div style="line-height: 1.4;">
+                                        <div>@pool.Label</div>
+                                        <div style="font-size: 11px; color: #888; margin-top: 1px;">@pool.PoolType · @pool.VmSize</div>
+                                    </div>
+                                </ItemTemplate>
+                            </Select>
+                            @if (_nodePoolRef is null)
+                            {
+                                <div style="color: #ff4d4f; font-size: 12px; margin-top: 2px;">A node pool must be selected.</div>
+                            }
+                        </div>
+                    }
+                    else if (_taskType == TaskType.SubJob)
+                    {
+                        <div>
+                            <label style="display: block; margin-bottom: 4px; font-weight: 500;">Job <span style="color: #ff4d4f;">*</span></label>
+                            <Select TItem="JobOption"
+                                    TItemValue="Guid?"
+                                    DataSource="_jobOptions"
+                                    @bind-Value="_subJobId"
+                                    LabelName="@nameof(JobOption.Label)"
+                                    ValueName="@nameof(JobOption.Value)"
+                                    EnableSearch
+                                    AllowClear
+                                    Style="width: 100%;"
+                                    Placeholder="Select job" />
+                            @if (_subJobId is null)
+                            {
+                                <div style="color: #ff4d4f; font-size: 12px; margin-top: 2px;">A sub-job must be selected.</div>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+
+            @* Section 3: Execution Settings *@
+            <div>
+                <h4 style="margin: 0 0 12px;">Execution settings</h4>
+                <div style="display: flex; flex-direction: column; gap: 12px;">
+                    <div>
+                        <label style="display: block; margin-bottom: 4px; font-weight: 500;">Max retries</label>
+                        <AntDesign.InputNumber @bind-Value="_maxRetries" Min="0" Style="width: 100%;" />
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 4px; font-weight: 500;">Retry interval</label>
+                        <Input @bind-Value="_retryInterval" Placeholder="00:00:30"
+                               Status="@(ValidationHelper.ValidateTimeSpan(_retryInterval, required: true) is not null ? "error" : "")"
+                               OnInput="@(e => _retryInterval = e.Value?.ToString() ?? "")"
+                               OnPressEnter="@(async _ => await HandleSave())" />
+                        @if (ValidationHelper.ValidateTimeSpan(_retryInterval, required: true) is { } retryErr)
+                        {
+                            <div style="color: #ff4d4f; font-size: 12px; margin-top: 2px;">@retryErr</div>
+                        }
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 4px; font-weight: 500;">Timeout</label>
+                        <Input @bind-Value="_timeout" Placeholder="01:00:00 (optional)"
+                               Status="@(ValidationHelper.ValidateTimeSpan(_timeout, required: false) is not null ? "error" : "")"
+                               OnInput="@(e => _timeout = string.IsNullOrEmpty(e.Value?.ToString()) ? null : e.Value.ToString())"
+                               OnPressEnter="@(async _ => await HandleSave())" />
+                        @if (ValidationHelper.ValidateTimeSpan(_timeout, required: false) is { } timeoutErr)
+                        {
+                            <div style="color: #ff4d4f; font-size: 12px; margin-top: 2px;">@timeoutErr</div>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            @* Section 4: Parameters *@
+            <div>
+                <h4 style="margin: 0 0 4px;">Parameters</h4>
+                <p style="font-size: 12px; color: #888; margin: 0 0 12px;">
+                    Use <code>$&#123;&#123; param_name &#125;&#125;</code> in a value to inherit from a job parameter at execution time.
+                </p>
+                @foreach (var (param, index) in _parameters.Select((p, i) => (p, i)))
+                {
+                    var idx = index;
+                    var keyErr = _taskType == TaskType.Notebook ? ValidationHelper.ValidatePythonIdentifier(param.Key) : null;
+                    <div style="margin-bottom: 8px;">
+                        <div style="display: flex; gap: 8px; align-items: flex-start;">
+                            <div style="flex: 1;">
+                                <Input @bind-Value="param.Key" Placeholder="Key"
+                                       Status="@(keyErr is not null ? "error" : "")" />
+                                @if (keyErr is not null)
+                                {
+                                    <div style="color: #ff4d4f; font-size: 12px; margin-top: 2px;">@keyErr</div>
+                                }
+                            </div>
+                            <Input @bind-Value="param.Value" Placeholder="Value" Style="flex: 1;" />
+                            <Button Danger Size="@ButtonSize.Small" OnClick="() => _parameters.RemoveAt(idx)">
+                                <Icon Type="@IconType.Outline.Delete" />
+                            </Button>
+                        </div>
+                    </div>
+                }
+                <Button Size="@ButtonSize.Small" OnClick="() => _parameters.Add(new EditableTaskParameter())">
+                    <Icon Type="@IconType.Outline.Plus" /> Add parameter
+                </Button>
+            </div>
+
+            @* Section 5: Dependencies *@
+            <div>
+                <h4 style="margin: 0 0 12px;">Dependencies</h4>
+                @foreach (var (dep, index) in _dependencies.Select((d, i) => (d, i)))
+                {
+                    var idx = index;
+                    <div style="display: flex; gap: 8px; margin-bottom: 8px; align-items: center;">
+                        <Select TItem="string" TItemValue="string"
+                                DataSource="@OtherTaskNames"
+                                @bind-Value="dep.TaskName"
+                                Style="flex: 1;"
+                                Placeholder="Depends on..." />
+                        <Select TItem="string" TItemValue="string" @bind-Value="dep.Condition" Style="width: 140px;">
+                            <SelectOption TItem="string" TItemValue="string" Value="@("OnSuccess")" Label="On Success" />
+                            <SelectOption TItem="string" TItemValue="string" Value="@("OnFailure")" Label="On Failure" />
+                            <SelectOption TItem="string" TItemValue="string" Value="@("OnCompletion")" Label="On Completion" />
+                            <SelectOption TItem="string" TItemValue="string" Value="@("OnSkip")" Label="On Skip" />
+                        </Select>
+                        <Button Danger Size="@ButtonSize.Small" OnClick="() => _dependencies.RemoveAt(idx)">
                             <Icon Type="@IconType.Outline.Delete" />
                         </Button>
                     </div>
-                </div>
-            }
-            <Button Size="@ButtonSize.Small" OnClick="() => _parameters.Add(new EditableTaskParameter())">
-                <Icon Type="@IconType.Outline.Plus" /> Add parameter
-            </Button>
+                }
+                <Button Size="@ButtonSize.Small" OnClick="() => _dependencies.Add(new EditableDependency())">
+                    <Icon Type="@IconType.Outline.Plus" /> Add dependency
+                </Button>
+            </div>
         </div>
-
-        @* Section 5: Dependencies *@
-        <div>
-            <h4 style="margin: 0 0 12px;">Dependencies</h4>
-            @foreach (var (dep, index) in _dependencies.Select((d, i) => (d, i)))
-            {
-                var idx = index;
-                <div style="display: flex; gap: 8px; margin-bottom: 8px; align-items: center;">
-                    <Select TItem="string" TItemValue="string"
-                            DataSource="@OtherTaskNames"
-                            @bind-Value="dep.TaskName"
-                            Style="flex: 1;"
-                            Placeholder="Depends on..." />
-                    <Select TItem="string" TItemValue="string" @bind-Value="dep.Condition" Style="width: 140px;">
-                        <SelectOption TItem="string" TItemValue="string" Value="@("OnSuccess")" Label="On Success" />
-                        <SelectOption TItem="string" TItemValue="string" Value="@("OnFailure")" Label="On Failure" />
-                        <SelectOption TItem="string" TItemValue="string" Value="@("OnCompletion")" Label="On Completion" />
-                        <SelectOption TItem="string" TItemValue="string" Value="@("OnSkip")" Label="On Skip" />
-                    </Select>
-                    <Button Danger Size="@ButtonSize.Small" OnClick="() => _dependencies.RemoveAt(idx)">
-                        <Icon Type="@IconType.Outline.Delete" />
-                    </Button>
-                </div>
-            }
-            <Button Size="@ButtonSize.Small" OnClick="() => _dependencies.Add(new EditableDependency())">
-                <Icon Type="@IconType.Outline.Plus" /> Add dependency
-            </Button>
-        </div>
-    </div>
 
     @* Footer *@
     <div class="drawer-footer">

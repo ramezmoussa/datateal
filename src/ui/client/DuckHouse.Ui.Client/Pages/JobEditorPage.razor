@@ -3,6 +3,7 @@
 @using DuckHouse.Ui.Shared.Orchestration
 @using DuckHouse.Ui.Client.Validation
 @using DuckHouse.Core.Orchestration
+@using System.ComponentModel.DataAnnotations
 @inject IJobService JobService
 @inject IRecentItemsService RecentItemsService
 @inject NavigationManager Navigation
@@ -276,65 +277,63 @@
                OnClose="() => _showScheduleModal = false"
                BodyStyle="display: flex; flex-direction: column; padding: 0; overflow: hidden;">
             <div style="flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 16px;">
-                <div>
-                    <label style="display: block; margin-bottom: 4px; font-weight: 500;">Cron Expression</label>
-                    <Input @bind-Value="_newCron"
-                           OnInput="@(e => _newCron = e.Value?.ToString() ?? "")"
-                           Placeholder="0 0 6 * * ?"
-                           Status="@(ValidationHelper.ValidateCronExpression(_newCron) is not null ? "error" : "")" />
-                    @if (ValidationHelper.ValidateCronExpression(_newCron) is { } cronErr)
+                <Form Model="@_scheduleForm" Layout="FormLayout.Vertical" ValidateOnChange="true">
+                    <FormItem Label="Cron Expression" Rules="@_cronRules">
+                        <Input @bind-Value="context.Cron"
+                               OnInput="@(e => _scheduleForm.Cron = e.Value?.ToString() ?? "")"
+                               OnPressEnter="@(async _ => await ConfirmSchedule())"
+                               Placeholder="0 0 6 * * ?" />
+                    </FormItem>
+                    @if (ValidationHelper.ValidateCronExpression(_scheduleForm.Cron) is null && !string.IsNullOrWhiteSpace(_scheduleForm.Cron))
                     {
-                        <div style="color: #ff4d4f; font-size: 12px; margin-top: 4px;">@cronErr</div>
+                        <div style="color: #888; font-size: 12px; margin-top: -8px;">@ValidationHelper.GetCronDescription(_scheduleForm.Cron)</div>
                     }
-                    else if (!string.IsNullOrWhiteSpace(_newCron))
-                    {
-                        <div style="color: #888; font-size: 12px; margin-top: 4px;">@ValidationHelper.GetCronDescription(_newCron)</div>
-                    }
-                </div>
-                <div>
-                    <label style="display: block; margin-bottom: 4px; font-weight: 500;">Time Zone</label>
-                    <Select TItem="TimeZoneDto"
-                            TItemValue="string"
-                            DataSource="_timeZones"
-                            @bind-Value="_newTimeZone"
-                            LabelName="@nameof(TimeZoneDto.DisplayName)"
-                            ValueName="@nameof(TimeZoneDto.Id)"
-                            Placeholder="UTC"
-                            AllowClear
-                            ShowSearch
-                            Style="width: 100%;" />
-                </div>
-                <div>
-                    <label style="display: block; margin-bottom: 8px; font-weight: 500;">Parameter Overrides</label>
-                    @foreach (var (param, index) in _newScheduleParameters.Select((p, i) => (p, i)))
-                    {
-                        var idx = index;
-                        <div style="display: flex; gap: 8px; margin-bottom: 8px; align-items: center;">
-                            <Input @bind-Value="param.Key" Placeholder="Key" Style="flex: 1;" />
-                            <Input @bind-Value="param.Value" Placeholder="Value" Style="flex: 1;" />
-                            <Button Danger Size="@ButtonSize.Small" OnClick="() => _newScheduleParameters.RemoveAt(idx)">
-                                <Icon Type="@IconType.Outline.Delete" />
-                            </Button>
-                        </div>
-                    }
-                    <Button Size="@ButtonSize.Small" OnClick="() => _newScheduleParameters.Add(new())">
-                        <Icon Type="@IconType.Outline.Plus" /> Add override
-                    </Button>
-                    @{
-                        var missingRequired = GetMissingRequiredScheduleParams();
-                    }
-                    @if (missingRequired.Count > 0)
-                    {
-                        <div style="color: #ff4d4f; font-size: 12px; margin-top: 8px;">
-                            Required parameter(s) with no default value must be overridden: <strong>@string.Join(", ", missingRequired)</strong>
-                        </div>
-                    }
-                </div>
+                    <FormItem Label="Time Zone">
+                        <Select TItem="TimeZoneDto"
+                                TItemValue="string"
+                                DataSource="_timeZones"
+                                @bind-Value="context.TimeZone"
+                                LabelName="@nameof(TimeZoneDto.DisplayName)"
+                                ValueName="@nameof(TimeZoneDto.Id)"
+                                Placeholder="UTC"
+                                AllowClear
+                                ShowSearch
+                                Style="width: 100%;" />
+                    </FormItem>
+                    <div>
+                        <label style="display: block; margin-bottom: 8px; font-weight: 500;">Parameter Overrides</label>
+                        @foreach (var (param, index) in _scheduleForm.Parameters.Select((p, i) => (p, i)))
+                        {
+                            var idx = index;
+                            <div style="display: flex; gap: 8px; margin-bottom: 8px; align-items: center;">
+                                <Input @bind-Value="param.Key" Placeholder="Key" Style="flex: 1;"
+                                       OnInput="@(e => param.Key = e.Value?.ToString() ?? "")" />
+                                <Input @bind-Value="param.Value" Placeholder="Value" Style="flex: 1;"
+                                       OnInput="@(e => param.Value = e.Value?.ToString() ?? "")" />
+                                <Button Danger Size="@ButtonSize.Small" OnClick="() => _scheduleForm.Parameters.RemoveAt(idx)">
+                                    <Icon Type="@IconType.Outline.Delete" />
+                                </Button>
+                            </div>
+                        }
+                        <Button Size="@ButtonSize.Small" OnClick="() => _scheduleForm.Parameters.Add(new())">
+                            <Icon Type="@IconType.Outline.Plus" /> Add override
+                        </Button>
+                        @{
+                            var missingRequired = GetMissingRequiredScheduleParams();
+                        }
+                        @if (missingRequired.Count > 0)
+                        {
+                            <div style="color: #ff4d4f; font-size: 12px; margin-top: 8px;">
+                                Required parameter(s) with no default value must be overridden: <strong>@string.Join(", ", missingRequired)</strong>
+                            </div>
+                        }
+                    </div>
+                </Form>
             </div>
             <div class="drawer-footer">
                 <Button OnClick="() => _showScheduleModal = false">Cancel</Button>
                 <Button Type="@ButtonType.Primary" OnClick="ConfirmSchedule"
-                        Disabled="@(string.IsNullOrWhiteSpace(_newCron) || ValidationHelper.ValidateCronExpression(_newCron) is not null || GetMissingRequiredScheduleParams().Count > 0)">Save</Button>
+                        Disabled="@(string.IsNullOrWhiteSpace(_scheduleForm.Cron) || ValidationHelper.ValidateCronExpression(_scheduleForm.Cron) is not null || GetMissingRequiredScheduleParams().Count > 0)">Save</Button>
             </div>
         </Drawer>
 
@@ -397,10 +396,16 @@
     // Schedule modal state
     private bool _showScheduleModal;
     private Guid? _editingScheduleId;
-    private string _newCron = "";
-    private string _newTimeZone = "";
-    private List<EditableTaskParameter> _newScheduleParameters = [];
+    private ScheduleFormModel _scheduleForm = new();
     private List<TimeZoneDto> _timeZones = [];
+
+    private static readonly FormValidationRule[] _cronRules =
+    [
+        new() { Required = true, Message = "Cron expression is required." },
+        new() { Validator = ctx =>
+            ValidationHelper.ValidateCronExpression(ctx.Value?.ToString()) is { } err
+                ? new ValidationResult(err, [ctx.FieldName]) : null }
+    ];
 
     // Trigger modal state
     private bool _showTriggerModal;
@@ -774,13 +779,13 @@
     {
         await LoadTimeZonesAsync();
         _editingScheduleId = null;
-        _newCron = "";
-        _newTimeZone = "";
-        // Pre-populate required parameters that have no default so the user sees what must be filled in.
-        _newScheduleParameters = _editParams
-            .Where(p => p.IsRequired && p.DefaultValue is null)
-            .Select(p => new EditableTaskParameter { Key = p.Name, Value = "" })
-            .ToList();
+        _scheduleForm = new ScheduleFormModel
+        {
+            Parameters = _editParams
+                .Where(p => p.IsRequired && p.DefaultValue is null)
+                .Select(p => new EditableTaskParameter { Key = p.Name, Value = "" })
+                .ToList()
+        };
         _showScheduleModal = true;
     }
 
@@ -788,11 +793,14 @@
     {
         await LoadTimeZonesAsync();
         _editingScheduleId = schedule.Id;
-        _newCron = schedule.CronExpression;
-        _newTimeZone = schedule.TimeZone ?? "";
-        _newScheduleParameters = schedule.Parameters is { Count: > 0 }
-            ? schedule.Parameters.Select(kv => new EditableTaskParameter { Key = kv.Key, Value = kv.Value }).ToList()
-            : [];
+        _scheduleForm = new ScheduleFormModel
+        {
+            Cron = schedule.CronExpression,
+            TimeZone = schedule.TimeZone,
+            Parameters = schedule.Parameters is { Count: > 0 }
+                ? schedule.Parameters.Select(kv => new EditableTaskParameter { Key = kv.Key, Value = kv.Value }).ToList()
+                : [],
+        };
         _showScheduleModal = true;
     }
 
@@ -809,15 +817,11 @@
         }
     }
 
-    /// <summary>
-    /// Returns the names of required job parameters that have no default value
-    /// and are not yet overridden in the schedule form.
-    /// </summary>
     private List<string> GetMissingRequiredScheduleParams()
     {
         return _editParams
             .Where(p => p.IsRequired && p.DefaultValue is null)
-            .Where(p => !_newScheduleParameters.Any(sp =>
+            .Where(p => !_scheduleForm.Parameters.Any(sp =>
                 string.Equals(sp.Key?.Trim(), p.Name, StringComparison.OrdinalIgnoreCase)
                 && !string.IsNullOrWhiteSpace(sp.Value)))
             .Select(p => p.Name)
@@ -826,25 +830,25 @@
 
     private async Task ConfirmSchedule()
     {
-        if (string.IsNullOrWhiteSpace(_newCron)) return;
+        if (string.IsNullOrWhiteSpace(_scheduleForm.Cron)) return;
         try
         {
-            var parameters = _newScheduleParameters.Count > 0
-                ? _newScheduleParameters
+            var parameters = _scheduleForm.Parameters.Count > 0
+                ? _scheduleForm.Parameters
                     .Where(p => !string.IsNullOrWhiteSpace(p.Key))
                     .ToDictionary(p => p.Key, p => p.Value)
                 : null;
-            var tz = string.IsNullOrWhiteSpace(_newTimeZone) ? null : _newTimeZone.Trim();
+            var tz = string.IsNullOrWhiteSpace(_scheduleForm.TimeZone) ? null : _scheduleForm.TimeZone.Trim();
 
             if (_editingScheduleId.HasValue)
             {
                 await JobService.UpdateScheduleAsync(Id, _editingScheduleId.Value,
-                    new UpdateScheduleRequest(_newCron.Trim(), true, tz, parameters?.Count > 0 ? parameters : null));
+                    new UpdateScheduleRequest(_scheduleForm.Cron.Trim(), true, tz, parameters?.Count > 0 ? parameters : null));
             }
             else
             {
                 await JobService.CreateScheduleAsync(Id,
-                    new CreateScheduleRequest(_newCron.Trim(), true, tz, parameters?.Count > 0 ? parameters : null));
+                    new CreateScheduleRequest(_scheduleForm.Cron.Trim(), true, tz, parameters?.Count > 0 ? parameters : null));
             }
             _showScheduleModal = false;
             await RefreshJobAsync();

@@ -2,6 +2,7 @@
 
 @using DuckHouse.Ui.Shared.Workspace
 @using DuckHouse.Core.Workspace
+@using System.ComponentModel.DataAnnotations
 @inject IWorkspaceService WorkspaceService
 @inject IRecentItemsService RecentItemsService
 @inject NavigationManager Navigation
@@ -242,19 +243,18 @@ else
        OnClose="CancelRenameFolder"
        BodyStyle="display: flex; flex-direction: column; padding: 0; overflow: hidden;">
     <div style="flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 16px;">
-        <div>
-            <label style="display: block; margin-bottom: 4px; font-weight: 500;">Name</label>
-            <Input @bind-Value="_renameFolderName" Placeholder="Folder name" />
-            @if (_renameFolderName.Contains('/'))
-            {
-                <span style="font-size: 0.75rem; color: #ff4d4f; margin-top: 4px; display: block;">Folder name cannot contain '/'.</span>
-            }
-        </div>
+        <Form Model="@_renameFolderForm" Layout="FormLayout.Vertical" ValidateOnChange="true">
+            <FormItem Label="Name" Rules="@_renameRules">
+                <Input @bind-Value="context.Name" Placeholder="Folder name"
+                       OnInput="@(e => _renameFolderForm.Name = e.Value?.ToString() ?? "")"
+                       OnPressEnter="@(async _ => await ConfirmRenameFolderAsync())" />
+            </FormItem>
+        </Form>
     </div>
     <div class="drawer-footer">
         <Button OnClick="CancelRenameFolder">Cancel</Button>
         <Button Type="@ButtonType.Primary" OnClick="ConfirmRenameFolderAsync"
-                Disabled="@(string.IsNullOrWhiteSpace(_renameFolderName) || _renameFolderName.Contains('/'))">Rename</Button>
+                Disabled="@(string.IsNullOrWhiteSpace(_renameFolderForm.Name) || _renameFolderForm.Name.Contains('/'))">Rename</Button>
     </div>
 </Drawer>
 
@@ -264,19 +264,18 @@ else
        OnClose="CancelRenameItem"
        BodyStyle="display: flex; flex-direction: column; padding: 0; overflow: hidden;">
     <div style="flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 16px;">
-        <div>
-            <label style="display: block; margin-bottom: 4px; font-weight: 500;">Title</label>
-            <Input @bind-Value="_renameItemName" Placeholder="Title" />
-            @if (_renameItemName.Contains('/'))
-            {
-                <span style="font-size: 0.75rem; color: #ff4d4f; margin-top: 4px; display: block;">Title cannot contain '/'.</span>
-            }
-        </div>
+        <Form Model="@_renameItemForm" Layout="FormLayout.Vertical" ValidateOnChange="true">
+            <FormItem Label="Title" Rules="@_renameRules">
+                <Input @bind-Value="context.Title" Placeholder="Title"
+                       OnInput="@(e => _renameItemForm.Title = e.Value?.ToString() ?? "")"
+                       OnPressEnter="@(async _ => await ConfirmRenameItemAsync())" />
+            </FormItem>
+        </Form>
     </div>
     <div class="drawer-footer">
         <Button OnClick="CancelRenameItem">Cancel</Button>
         <Button Type="@ButtonType.Primary" OnClick="ConfirmRenameItemAsync"
-                Disabled="@(string.IsNullOrWhiteSpace(_renameItemName) || _renameItemName.Contains('/'))">Rename</Button>
+                Disabled="@(string.IsNullOrWhiteSpace(_renameItemForm.Title) || _renameItemForm.Title.Contains('/'))">Rename</Button>
     </div>
 </Drawer>
 
@@ -323,11 +322,19 @@ else
 
     // Rename folder
     private FolderSummary? _renameFolderTarget;
-    private string _renameFolderName = "";
+    private RenameFolderFormModel _renameFolderForm = new();
 
     // Rename item (notebook or query)
     private WorkspaceItemSummary? _renameItemTarget;
-    private string _renameItemName = "";
+    private RenameItemFormModel _renameItemForm = new();
+
+    private static readonly FormValidationRule[] _renameRules =
+    [
+        new() { Required = true, Message = "This field is required." },
+        new() { Validator = ctx =>
+            (ctx.Value?.ToString() ?? "").Contains('/')
+                ? new ValidationResult("Cannot contain '/'.", [ctx.FieldName]) : null }
+    ];
 
     // Move folder
     private FolderSummary? _moveFolderTarget;
@@ -430,13 +437,13 @@ else
     private void StartRenameFolder(FolderSummary folder)
     {
         _renameFolderTarget = folder;
-        _renameFolderName = folder.Name;
+        _renameFolderForm = new RenameFolderFormModel { Name = folder.Name };
     }
 
     private async Task ConfirmRenameFolderAsync()
     {
         if (_renameFolderTarget is null) return;
-        var name = _renameFolderName.Trim();
+        var name = _renameFolderForm.Name.Trim();
         if (string.IsNullOrEmpty(name)) { CancelRenameFolder(); return; }
         try
         {
@@ -472,13 +479,13 @@ else
     private void StartRenameItem(WorkspaceItemSummary item)
     {
         _renameItemTarget = item;
-        _renameItemName = item.Title;
+        _renameItemForm = new RenameItemFormModel { Title = item.Title };
     }
 
     private async Task ConfirmRenameItemAsync()
     {
         if (_renameItemTarget is null) return;
-        var title = _renameItemName.Trim();
+        var title = _renameItemForm.Title.Trim();
         if (string.IsNullOrEmpty(title)) { CancelRenameItem(); return; }
         try
         {

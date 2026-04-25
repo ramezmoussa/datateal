@@ -196,18 +196,22 @@
         OnClose="() => _showCreateModal = false"
         BodyStyle="display: flex; flex-direction: column; padding: 0; overflow: hidden;">
     <div style="flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 16px;">
-        <div>
-            <label style="display: block; margin-bottom: 4px; font-weight: 500;">Name</label>
-            <Input @bind-Value="_newJobName" Placeholder="My Job" />
-        </div>
-        <div>
-            <label style="display: block; margin-bottom: 4px; font-weight: 500;">Description</label>
-            <TextArea @bind-Value="_newJobDescription" Placeholder="Optional description" Rows="3" />
-        </div>
+        <Form Model="@_createForm" Layout="FormLayout.Vertical" ValidateOnChange="true">
+            <FormItem Label="Name" Rules="@_jobNameRules">
+                <Input @bind-Value="context.Name" Placeholder="My Job"
+                       OnInput="@(e => _createForm.Name = e.Value?.ToString() ?? "")"
+                       OnPressEnter="@(_ => ConfirmCreate())" />
+            </FormItem>
+            <FormItem Label="Description">
+                <TextArea @bind-Value="context.Description" Placeholder="Optional description" Rows="3"
+                          OnInput="@(e => _createForm.Description = e.Value?.ToString())" />
+            </FormItem>
+        </Form>
     </div>
     <div class="drawer-footer">
         <Button OnClick="() => _showCreateModal = false">Cancel</Button>
-        <Button Type="@ButtonType.Primary" OnClick="ConfirmCreate" Disabled="@(string.IsNullOrWhiteSpace(_newJobName))">Create</Button>
+        <Button Type="@ButtonType.Primary" OnClick="ConfirmCreate"
+                Disabled="@(string.IsNullOrWhiteSpace(_createForm.Name))">Create</Button>
     </div>
 </Drawer>
 
@@ -218,7 +222,8 @@
     <div style="flex: 1; overflow-y: auto; padding: 24px;">
         <label style="display: block; margin-bottom: 4px; font-weight: 500;">YAML Definition</label>
         <TextArea @bind-Value="_importYaml" Placeholder="Paste YAML here..." Rows="20"
-                  Style="font-family: monospace; font-size: 13px;" />
+                  Style="font-family: monospace; font-size: 13px;"
+                  OnInput="@(e => _importYaml = e.Value?.ToString() ?? "")" />
     </div>
     <div class="drawer-footer">
         <Button OnClick="() => _showImportModal = false">Cancel</Button>
@@ -246,8 +251,12 @@
     private string _activeTab = "jobs";
 
     private bool _showCreateModal;
-    private string _newJobName = "";
-    private string? _newJobDescription;
+    private CreateJobFormModel _createForm = new();
+
+    private static readonly FormValidationRule[] _jobNameRules =
+    [
+        new() { Required = true, Message = "Name is required." }
+    ];
 
     // Import modal state
     private bool _showImportModal;
@@ -330,8 +339,7 @@
 
     private void StartCreate()
     {
-        _newJobName = "";
-        _newJobDescription = null;
+        _createForm = new CreateJobFormModel();
         _showCreateModal = true;
     }
 
@@ -371,11 +379,11 @@
 
     private async Task ConfirmCreate()
     {
-        if (string.IsNullOrWhiteSpace(_newJobName)) return;
+        if (string.IsNullOrWhiteSpace(_createForm.Name)) return;
         try
         {
             var job = await JobService.CreateJobAsync(
-                new CreateJobRequest(_newJobName.Trim(), _newJobDescription?.Trim(), null, 1));
+                new CreateJobRequest(_createForm.Name.Trim(), _createForm.Description?.Trim(), null, 1));
             _showCreateModal = false;
             Navigation.NavigateTo($"/jobs/{job.Id}");
         }

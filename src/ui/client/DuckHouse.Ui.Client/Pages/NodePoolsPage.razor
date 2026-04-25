@@ -6,6 +6,7 @@
 @using DuckHouse.Core.Nodes
 @using DuckHouse.Ui.Client.Validation
 @using DuckHouse.Ui.Shared.Packages
+@using System.ComponentModel.DataAnnotations
 @inject INodePoolService NodePoolService
 @inject IInteractivePoolService InteractivePoolService
 @inject INodeService NodeService
@@ -243,106 +244,98 @@
         OnClose="() => _showDrawer = false"
         BodyStyle="display: flex; flex-direction: column; padding: 0; overflow: hidden;">
     <div style="flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 16px;">
-        <div>
-            <label style="display: block; margin-bottom: 4px; font-weight: 500;">Name</label>
-            <Input @bind-Value="_formName" Placeholder="Analytics Node Pool"
-                    Status="@(ValidationHelper.ValidateNodePoolName(_formName) is not null ? "error" : "")" />
-            @if (ValidationHelper.ValidateNodePoolName(_formName) is { } poolNameErr)
-            {
-                <div style="color: #ff4d4f; font-size: 12px; margin-top: 2px;">@poolNameErr</div>
+        <Form Model="@_form" Layout="FormLayout.Vertical" ValidateOnChange="true">
+            <FormItem Label="Name" Rules="@_nodePoolNameRules">
+                <Input @bind-Value="context.Name" Placeholder="Analytics Node Pool"
+                       OnInput="@(e => _form.Name = e.Value?.ToString() ?? "")"
+                       OnPressEnter="@(async _ => await ConfirmSave())" />
+            </FormItem>
+            <FormItem Label="VM Size" Rules="@_requiredRule">
+                <Input @bind-Value="context.VmSize" Placeholder="Standard_D4as_v5"
+                       OnInput="@(e => _form.VmSize = e.Value?.ToString() ?? "")"
+                       OnPressEnter="@(async _ => await ConfirmSave())" />
+            </FormItem>
+            <FormItem Label="Kernel idle timeout (minutes)">
+                <AntDesign.InputNumber @bind-Value="context.KernelIdleMin" Min="0" />
+            </FormItem>
+            <FormItem Label="Node idle timeout (minutes)">
+                <AntDesign.InputNumber @bind-Value="context.NodeIdleMin" Min="0" Placeholder="Default" />
+                <div style="color: #888; font-size: 12px; margin-top: 4px;">
+                    Leave blank to use the control plane default. Set to <strong>0</strong> to disable automatic node eviction for this pool.
+                    Warm standby nodes are always eviction-protected while waiting; this timeout applies once a node is claimed by a job.
+                </div>
+            </FormItem>
+            <FormItem Label="Kernel requirements (pip)">
+                <TextArea @bind-Value="context.KernelReqs" Rows="3" Placeholder="@("scipy>=1.14\nscikit-learn>=1.6")"
+                          OnInput="@(e => _form.KernelReqs = e.Value?.ToString())" />
+            </FormItem>
+            @{
+                var isJobPool = _editTarget?.PoolType == NodePoolType.Job || (_editTarget is null && _activeTab == "job");
             }
-        </div>
-        <div>
-            <label style="display: block; margin-bottom: 4px; font-weight: 500;">VM Size</label>
-            <Input @bind-Value="_formVmSize" Placeholder="Standard_D4as_v5" />
-        </div>
-        <div>
-            <label style="display: block; margin-bottom: 4px; font-weight: 500;">Kernel idle timeout (minutes)</label>
-            <AntDesign.InputNumber @bind-Value="_formKernelIdleMin" Min="0" />
-        </div>
-        <div>
-            <label style="display: block; margin-bottom: 4px; font-weight: 500;">Node idle timeout (minutes)</label>
-            <AntDesign.InputNumber @bind-Value="_formNodeIdleMin" Min="0" Placeholder="Default" />
-            <div style="color: #888; font-size: 12px; margin-top: 4px;">
-                Leave blank to use the control plane default. Set to <strong>0</strong> to disable automatic node eviction for this pool.
-                Warm standby nodes are always eviction-protected while waiting; this timeout applies once a node is claimed by a job.
-            </div>
-        </div>
-        <div>
-            <label style="display: block; margin-bottom: 4px; font-weight: 500;">Kernel requirements (pip)</label>
-            <TextArea @bind-Value="_formKernelReqs" Rows="3" Placeholder="@("scipy>=1.14\nscikit-learn>=1.6")" />
-        </div>
-        @{
-            var isJobPool = _editTarget?.PoolType == NodePoolType.Job || (_editTarget is null && _activeTab == "job");        }
-        @if (isJobPool)
-        {
-            <div>
-                <label style="display: block; margin-bottom: 4px; font-weight: 500;">Warm nodes</label>
-                <AntDesign.InputNumber @bind-Value="_formWarmNodes" Min="0" Style="width: 100%;" />
-                <div style="color: #888; font-size: 12px; margin-top: 4px;">
-                    Number of standby nodes to keep running and ready for immediate use.
-                    Set to <strong>0</strong> to provision nodes on demand (default).
-                    Warm nodes count toward the <em>Max nodes</em> limit.
-                    Standby nodes are eviction-protected; the node idle timeout takes effect once a standby is claimed by a job.
-                </div>
-            </div>
-            <div>
-                <label style="display: block; margin-bottom: 4px; font-weight: 500;">Max nodes</label>
-                <AntDesign.InputNumber @bind-Value="_formMaxNodes" Min="1" Placeholder="Unlimited" Style="width: 100%;" />
-                <div style="color: #888; font-size: 12px; margin-top: 4px;">
-                    Maximum total nodes running simultaneously (warm standby + in use).
-                    Leave blank for no limit. Jobs queue for a node when this limit is reached.
-                </div>
-            </div>
-            <div>
-                <label style="display: block; margin-bottom: 4px; font-weight: 500;">Node acquire timeout (minutes)</label>
-                <AntDesign.InputNumber @bind-Value="_formNodeAcquireTimeoutMin" Min="1" Placeholder="Wait indefinitely" Style="width: 100%;" />
-                <div style="color: #888; font-size: 12px; margin-top: 4px;">
-                    How long a job task waits for an available node when <em>Max nodes</em> is reached.
-                    Leave blank to wait indefinitely (bounded only by job cancellation).
-                </div>
-            </div>
-        }
-        <div>
-            <label style="display: block; margin-bottom: 4px; font-weight: 500;">Wheel packages</label>
-            <Select Mode="SelectMode.Multiple"
-                    TItem="WheelPackageDto"
-                    TItemValue="Guid"
-                    DataSource="_availablePackages"
-                    LabelName="@nameof(WheelPackageDto.Name)"
-                    ValueName="@nameof(WheelPackageDto.Id)"
-                    @bind-Values="_formWheelPackageIds"
-                    Placeholder="Select packages to install"
-                    Style="width: 100%;" />
-        </div>
-        <div>
-            <label style="display: block; margin-bottom: 4px; font-weight: 500;">Environment variables</label>
-            <Select Mode="SelectMode.Multiple"
-                    TItem="EnvironmentVariableDto"
-                    TItemValue="Guid"
-                    DataSource="_availableEnvVars"
-                    LabelName="@nameof(EnvironmentVariableDto.Key)"
-                    ValueName="@nameof(EnvironmentVariableDto.Id)"
-                    @bind-Values="_formEnvVarIds"
-                    Placeholder="Select environment variables"
-                    Style="width: 100%;" />
-        </div>
-        <div>
-            <label style="display: block; margin-bottom: 4px; font-weight: 500;">Secrets</label>
-            <Select Mode="SelectMode.Multiple"
-                    TItem="SecretDto"
-                    TItemValue="Guid"
-                    DataSource="_availableSecrets"
-                    LabelName="@nameof(SecretDto.Key)"
-                    ValueName="@nameof(SecretDto.Id)"
-                    @bind-Values="_formSecretIds"
-                    Placeholder="Select secrets"
-                    Style="width: 100%;" />
-        </div>
-        <div>
-            <label style="display: block; margin-bottom: 4px; font-weight: 500;">Description</label>
-            <TextArea @bind-Value="_formDescription" Rows="2" />
-        </div>
+            @if (isJobPool)
+            {
+                <FormItem Label="Warm nodes">
+                    <AntDesign.InputNumber @bind-Value="context.WarmNodes" Min="0" Style="width: 100%;" />
+                    <div style="color: #888; font-size: 12px; margin-top: 4px;">
+                        Number of standby nodes to keep running and ready for immediate use.
+                        Set to <strong>0</strong> to provision nodes on demand (default).
+                        Warm nodes count toward the <em>Max nodes</em> limit.
+                        Standby nodes are eviction-protected; the node idle timeout takes effect once a standby is claimed by a job.
+                    </div>
+                </FormItem>
+                <FormItem Label="Max nodes">
+                    <AntDesign.InputNumber @bind-Value="context.MaxNodes" Min="1" Placeholder="Unlimited" Style="width: 100%;" />
+                    <div style="color: #888; font-size: 12px; margin-top: 4px;">
+                        Maximum total nodes running simultaneously (warm standby + in use).
+                        Leave blank for no limit. Jobs queue for a node when this limit is reached.
+                    </div>
+                </FormItem>
+                <FormItem Label="Node acquire timeout (minutes)">
+                    <AntDesign.InputNumber @bind-Value="context.NodeAcquireTimeoutMin" Min="1" Placeholder="Wait indefinitely" Style="width: 100%;" />
+                    <div style="color: #888; font-size: 12px; margin-top: 4px;">
+                        How long a job task waits for an available node when <em>Max nodes</em> is reached.
+                        Leave blank to wait indefinitely (bounded only by job cancellation).
+                    </div>
+                </FormItem>
+            }
+            <FormItem Label="Wheel packages">
+                <Select Mode="SelectMode.Multiple"
+                        TItem="WheelPackageDto"
+                        TItemValue="Guid"
+                        DataSource="_availablePackages"
+                        LabelName="@nameof(WheelPackageDto.Name)"
+                        ValueName="@nameof(WheelPackageDto.Id)"
+                        @bind-Values="context.WheelPackageIds"
+                        Placeholder="Select packages to install"
+                        Style="width: 100%;" />
+            </FormItem>
+            <FormItem Label="Environment variables">
+                <Select Mode="SelectMode.Multiple"
+                        TItem="EnvironmentVariableDto"
+                        TItemValue="Guid"
+                        DataSource="_availableEnvVars"
+                        LabelName="@nameof(EnvironmentVariableDto.Key)"
+                        ValueName="@nameof(EnvironmentVariableDto.Id)"
+                        @bind-Values="context.EnvVarIds"
+                        Placeholder="Select environment variables"
+                        Style="width: 100%;" />
+            </FormItem>
+            <FormItem Label="Secrets">
+                <Select Mode="SelectMode.Multiple"
+                        TItem="SecretDto"
+                        TItemValue="Guid"
+                        DataSource="_availableSecrets"
+                        LabelName="@nameof(SecretDto.Key)"
+                        ValueName="@nameof(SecretDto.Id)"
+                        @bind-Values="context.SecretIds"
+                        Placeholder="Select secrets"
+                        Style="width: 100%;" />
+            </FormItem>
+            <FormItem Label="Description">
+                <TextArea @bind-Value="context.Description" Rows="2"
+                          OnInput="@(e => _form.Description = e.Value?.ToString())" />
+            </FormItem>
+        </Form>
     </div>
     <div class="drawer-footer">
         @if (_formValidationError is not null)
@@ -351,7 +344,7 @@
         }
         <Button OnClick="() => _showDrawer = false">Cancel</Button>
         <Button Type="@ButtonType.Primary" OnClick="ConfirmSave" Loading="_saving"
-                Disabled="@(string.IsNullOrWhiteSpace(_formName) || string.IsNullOrWhiteSpace(_formVmSize) || ValidationHelper.ValidateNodePoolName(_formName) is not null)">
+                Disabled="@(string.IsNullOrWhiteSpace(_form.Name) || string.IsNullOrWhiteSpace(_form.VmSize) || ValidationHelper.ValidateNodePoolName(_form.Name) is not null)">
             Save
         </Button>
     </div>
@@ -374,18 +367,19 @@
     private bool _saving;
     private string? _formValidationError;
     private NodePoolConfigDto? _editTarget;
-    private string _formName = "";
-    private string _formVmSize = "";
-    private int _formKernelIdleMin;
-    private int? _formNodeIdleMin;
-    private string? _formKernelReqs;
-    private string? _formDescription;
-    private int _formWarmNodes;
-    private int? _formMaxNodes;
-    private int? _formNodeAcquireTimeoutMin;
-    private IEnumerable<Guid> _formWheelPackageIds = [];
-    private IEnumerable<Guid> _formEnvVarIds = [];
-    private IEnumerable<Guid> _formSecretIds = [];
+    private NodePoolFormModel _form = new();
+
+    private static readonly FormValidationRule[] _nodePoolNameRules =
+    [
+        new() { Required = true, Message = "Name is required." },
+        new() { Validator = ctx =>
+            ValidationHelper.ValidateNodePoolName(ctx.Value?.ToString()) is { } err
+                ? new ValidationResult(err, [ctx.FieldName]) : null }
+    ];
+    private static readonly FormValidationRule[] _requiredRule =
+    [
+        new() { Required = true, Message = "This field is required." }
+    ];
 
     private List<WheelPackageDto> _availablePackages = [];
     private List<EnvironmentVariableDto> _availableEnvVars = [];
@@ -438,18 +432,7 @@
     private void StartCreate()
     {
         _editTarget = null;
-        _formName = "";
-        _formVmSize = "";
-        _formKernelIdleMin = 0;
-        _formNodeIdleMin = null;
-        _formKernelReqs = null;
-        _formDescription = null;
-        _formWarmNodes = 0;
-        _formMaxNodes = null;
-        _formNodeAcquireTimeoutMin = null;
-        _formWheelPackageIds = [];
-        _formEnvVarIds = [];
-        _formSecretIds = [];
+        _form = new NodePoolFormModel();
         _formValidationError = null;
         _showDrawer = true;
     }
@@ -457,46 +440,48 @@
     private void StartEdit(NodePoolConfigDto pool)
     {
         _editTarget = pool;
-        _formName = pool.Name;
-        _formVmSize = pool.VmSize;
-        _formKernelIdleMin = (int)(pool.KernelIdleTimeout?.TotalMinutes ?? 0);
-        _formNodeIdleMin = pool.NodeIdleTimeout.HasValue ? (int)pool.NodeIdleTimeout.Value.TotalMinutes : (int?)null;
-        _formKernelReqs = pool.KernelRequirements;
-        _formDescription = pool.Description;
-        _formWarmNodes = pool.WarmNodes;
-        _formMaxNodes = pool.MaxNodes;
-        _formNodeAcquireTimeoutMin = pool.NodeAcquireTimeout.HasValue ? (int)pool.NodeAcquireTimeout.Value.TotalMinutes : (int?)null;
-        _formWheelPackageIds = pool.WheelPackageIds ?? [];
-        _formEnvVarIds = pool.EnvironmentVariableIds ?? [];
-        _formSecretIds = pool.SecretIds ?? [];
+        _form = new NodePoolFormModel
+        {
+            Name = pool.Name,
+            VmSize = pool.VmSize,
+            KernelIdleMin = (int)(pool.KernelIdleTimeout?.TotalMinutes ?? 0),
+            NodeIdleMin = pool.NodeIdleTimeout.HasValue ? (int)pool.NodeIdleTimeout.Value.TotalMinutes : (int?)null,
+            KernelReqs = pool.KernelRequirements,
+            Description = pool.Description,
+            WarmNodes = pool.WarmNodes,
+            MaxNodes = pool.MaxNodes,
+            NodeAcquireTimeoutMin = pool.NodeAcquireTimeout.HasValue ? (int)pool.NodeAcquireTimeout.Value.TotalMinutes : (int?)null,
+            WheelPackageIds = pool.WheelPackageIds ?? [],
+            EnvVarIds = pool.EnvironmentVariableIds ?? [],
+            SecretIds = pool.SecretIds ?? [],
+        };
         _formValidationError = null;
         _showDrawer = true;
     }
 
     private async Task ConfirmSave()
     {
-        if (string.IsNullOrWhiteSpace(_formName) || string.IsNullOrWhiteSpace(_formVmSize)) return;
+        if (string.IsNullOrWhiteSpace(_form.Name) || string.IsNullOrWhiteSpace(_form.VmSize)) return;
 
         var isJobPool = _editTarget?.PoolType == NodePoolType.Job || (_editTarget is null && _activeTab == "job");
         if (isJobPool)
         {
-            if (_formMaxNodes.HasValue && _formMaxNodes.Value < 1)
+            if (_form.MaxNodes.HasValue && _form.MaxNodes.Value < 1)
             {
                 _formValidationError = "Max nodes must be 1 or greater.";
                 return;
             }
-            if (_formMaxNodes.HasValue && _formMaxNodes.Value < _formWarmNodes)
+            if (_form.MaxNodes.HasValue && _form.MaxNodes.Value < _form.WarmNodes)
             {
-                _formValidationError = $"Max nodes ({_formMaxNodes.Value}) must be greater than or equal to Warm nodes ({_formWarmNodes}).";
+                _formValidationError = $"Max nodes ({_form.MaxNodes.Value}) must be greater than or equal to Warm nodes ({_form.WarmNodes}).";
                 return;
             }
         }
         _formValidationError = null;
 
-        var kernelTimeout = _formKernelIdleMin > 0 ? TimeSpan.FromMinutes(_formKernelIdleMin) : (TimeSpan?)null;
-        // null → use global default; 0 → never evict; > 0 → specific timeout
-        var nodeTimeout = _formNodeIdleMin.HasValue ? TimeSpan.FromMinutes(_formNodeIdleMin.Value) : (TimeSpan?)null;
-        var acquireTimeout = _formNodeAcquireTimeoutMin.HasValue ? TimeSpan.FromMinutes(_formNodeAcquireTimeoutMin.Value) : (TimeSpan?)null;
+        var kernelTimeout = _form.KernelIdleMin > 0 ? TimeSpan.FromMinutes(_form.KernelIdleMin) : (TimeSpan?)null;
+        var nodeTimeout = _form.NodeIdleMin.HasValue ? TimeSpan.FromMinutes(_form.NodeIdleMin.Value) : (TimeSpan?)null;
+        var acquireTimeout = _form.NodeAcquireTimeoutMin.HasValue ? TimeSpan.FromMinutes(_form.NodeAcquireTimeoutMin.Value) : (TimeSpan?)null;
 
         _saving = true;
         try
@@ -505,22 +490,22 @@
             {
                 var poolType = _activeTab == "interactive" ? NodePoolType.Interactive : NodePoolType.Job;
                 await NodePoolService.CreateNodePoolAsync(new CreateNodePoolRequest(
-                    _formName.Trim(), poolType, _formVmSize.Trim(), kernelTimeout, nodeTimeout,
-                    _formKernelReqs?.Trim(), _formDescription?.Trim(),
-                    _formWheelPackageIds.Any() ? [.. _formWheelPackageIds] : null,
-                    _formEnvVarIds.Any() ? [.. _formEnvVarIds] : null,
-                    _formSecretIds.Any() ? [.. _formSecretIds] : null,
-                    _formWarmNodes, _formMaxNodes, acquireTimeout));
+                    _form.Name.Trim(), poolType, _form.VmSize.Trim(), kernelTimeout, nodeTimeout,
+                    _form.KernelReqs?.Trim(), _form.Description?.Trim(),
+                    _form.WheelPackageIds.Any() ? [.. _form.WheelPackageIds] : null,
+                    _form.EnvVarIds.Any() ? [.. _form.EnvVarIds] : null,
+                    _form.SecretIds.Any() ? [.. _form.SecretIds] : null,
+                    _form.WarmNodes, _form.MaxNodes, acquireTimeout));
             }
             else
             {
                 await NodePoolService.UpdateNodePoolAsync(_editTarget.Id, new UpdateNodePoolRequest(
-                    _formName.Trim(), _formVmSize.Trim(), kernelTimeout, nodeTimeout,
-                    _formKernelReqs?.Trim(), _formDescription?.Trim(),
-                    _formWheelPackageIds.Any() ? [.. _formWheelPackageIds] : null,
-                    _formEnvVarIds.Any() ? [.. _formEnvVarIds] : null,
-                    _formSecretIds.Any() ? [.. _formSecretIds] : null,
-                    _formWarmNodes, _formMaxNodes, acquireTimeout));
+                    _form.Name.Trim(), _form.VmSize.Trim(), kernelTimeout, nodeTimeout,
+                    _form.KernelReqs?.Trim(), _form.Description?.Trim(),
+                    _form.WheelPackageIds.Any() ? [.. _form.WheelPackageIds] : null,
+                    _form.EnvVarIds.Any() ? [.. _form.EnvVarIds] : null,
+                    _form.SecretIds.Any() ? [.. _form.SecretIds] : null,
+                    _form.WarmNodes, _form.MaxNodes, acquireTimeout));
             }
             _showDrawer = false;
             await LoadAsync();

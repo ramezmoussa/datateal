@@ -3,6 +3,7 @@
 @using DuckHouse.Ui.Shared.Environment
 @using DuckHouse.Ui.Shared.Packages
 @using DuckHouse.Ui.Client.Validation
+@using System.ComponentModel.DataAnnotations
 @inject IEnvironmentService EnvironmentService
 @inject IWheelPackageService WheelPackageService
 @inject NavigationManager Navigation
@@ -193,28 +194,27 @@
         OnClose="() => _showVarModal = false"
         BodyStyle="display: flex; flex-direction: column; padding: 0; overflow: hidden;">
     <div style="flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 16px;">
-        <div>
-            <label style="display: block; margin-bottom: 4px; font-weight: 500;">Key</label>
-            <Input @bind-Value="_formVarKey" Placeholder="MY_VARIABLE"
-                    Status="@(ValidationHelper.ValidateEnvVarKey(_formVarKey) is not null ? "error" : "")" />
-            @if (ValidationHelper.ValidateEnvVarKey(_formVarKey) is { } keyErr)
-            {
-                <div style="color: #ff4d4f; font-size: 12px; margin-top: 2px;">@keyErr</div>
-            }
-        </div>
-        <div>
-            <label style="display: block; margin-bottom: 4px; font-weight: 500;">Value</label>
-            <Input @bind-Value="_formVarValue" Placeholder="https://example.com" />
-        </div>
-        <div>
-            <label style="display: block; margin-bottom: 4px; font-weight: 500;">Description</label>
-            <TextArea @bind-Value="_formVarDescription" Rows="2" />
-        </div>
+        <Form Model="@_varForm" Layout="FormLayout.Vertical" ValidateOnChange="true">
+            <FormItem Label="Key" Rules="@_varKeyRules">
+                <Input @bind-Value="context.Key" Placeholder="MY_VARIABLE"
+                       OnInput="@(e => _varForm.Key = e.Value?.ToString() ?? "")"
+                       OnPressEnter="@(async _ => await ConfirmSaveVariable())" />
+            </FormItem>
+            <FormItem Label="Value" Rules="@_requiredRule">
+                <Input @bind-Value="context.Value" Placeholder="https://example.com"
+                       OnInput="@(e => _varForm.Value = e.Value?.ToString() ?? "")"
+                       OnPressEnter="@(async _ => await ConfirmSaveVariable())" />
+            </FormItem>
+            <FormItem Label="Description">
+                <TextArea @bind-Value="context.Description" Rows="2"
+                          OnInput="@(e => _varForm.Description = e.Value?.ToString())" />
+            </FormItem>
+        </Form>
     </div>
     <div class="drawer-footer">
         <Button OnClick="() => _showVarModal = false">Cancel</Button>
         <Button Type="@ButtonType.Primary" OnClick="ConfirmSaveVariable"
-                Disabled="@(string.IsNullOrWhiteSpace(_formVarKey) || string.IsNullOrWhiteSpace(_formVarValue) || ValidationHelper.ValidateEnvVarKey(_formVarKey) is not null)">Save</Button>
+                Disabled="@(string.IsNullOrWhiteSpace(_varForm.Key) || string.IsNullOrWhiteSpace(_varForm.Value) || ValidationHelper.ValidateEnvVarKey(_varForm.Key) is not null)">Save</Button>
     </div>
 </Drawer>
 
@@ -224,34 +224,29 @@
         OnClose="() => _showSecretModal = false"
         BodyStyle="display: flex; flex-direction: column; padding: 0; overflow: hidden;">
     <div style="flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 16px;">
-        <div>
-            <label style="display: block; margin-bottom: 4px; font-weight: 500;">Key</label>
-            <Input @bind-Value="_formSecretKey" Placeholder="API_TOKEN"
-                    Status="@(ValidationHelper.ValidateEnvVarKey(_formSecretKey) is not null ? "error" : "")" />
-            @if (ValidationHelper.ValidateEnvVarKey(_formSecretKey) is { } secretKeyErr)
-            {
-                <div style="color: #ff4d4f; font-size: 12px; margin-top: 2px;">@secretKeyErr</div>
-            }
-        </div>
-        <div>
-            <label style="display: block; margin-bottom: 4px; font-weight: 500;">
-                Value
-                @if (_editSecretTarget is not null)
-                {
-                    <span style="font-weight: normal; color: #8c8c8c; margin-left: 4px;">(leave blank to keep current)</span>
-                }
-            </label>
-            <InputPassword @bind-Value="_formSecretValue" Placeholder="@(_editSecretTarget is not null ? "••••••••" : "Enter secret value")" />
-        </div>
-        <div>
-            <label style="display: block; margin-bottom: 4px; font-weight: 500;">Description</label>
-            <TextArea @bind-Value="_formSecretDescription" Rows="2" />
-        </div>
+        <Form Model="@_secretForm" Layout="FormLayout.Vertical" ValidateOnChange="true">
+            <FormItem Label="Key" Rules="@_secretKeyRules">
+                <Input @bind-Value="context.Key" Placeholder="API_TOKEN"
+                       OnInput="@(e => _secretForm.Key = e.Value?.ToString() ?? "")"
+                       OnPressEnter="@(async _ => await ConfirmSaveSecret())" />
+            </FormItem>
+            <FormItem Label="@(_editSecretTarget is not null ? "Value (leave blank to keep current)" : "Value")"
+                      Rules="@(_editSecretTarget is null ? _requiredRule : Array.Empty<FormValidationRule>())">
+                <InputPassword @bind-Value="context.Value"
+                               Placeholder="@(_editSecretTarget is not null ? "••••••••" : "Enter secret value")"
+                               OnInput="@(e => _secretForm.Value = e.Value?.ToString() ?? "")"
+                               OnPressEnter="@(async _ => await ConfirmSaveSecret())" />
+            </FormItem>
+            <FormItem Label="Description">
+                <TextArea @bind-Value="context.Description" Rows="2"
+                          OnInput="@(e => _secretForm.Description = e.Value?.ToString())" />
+            </FormItem>
+        </Form>
     </div>
     <div class="drawer-footer">
         <Button OnClick="() => _showSecretModal = false">Cancel</Button>
         <Button Type="@ButtonType.Primary" OnClick="ConfirmSaveSecret"
-                Disabled="@(string.IsNullOrWhiteSpace(_formSecretKey) || (_editSecretTarget is null && string.IsNullOrWhiteSpace(_formSecretValue)) || ValidationHelper.ValidateEnvVarKey(_formSecretKey) is not null)">Save</Button>
+                Disabled="@(string.IsNullOrWhiteSpace(_secretForm.Key) || (_editSecretTarget is null && string.IsNullOrWhiteSpace(_secretForm.Value)) || ValidationHelper.ValidateEnvVarKey(_secretForm.Key) is not null)">Save</Button>
     </div>
 </Drawer>
 
@@ -273,16 +268,33 @@
     // Variable modal state
     private bool _showVarModal;
     private EnvironmentVariableDto? _editVarTarget;
-    private string _formVarKey = "";
-    private string _formVarValue = "";
-    private string? _formVarDescription;
+    private VariableFormModel _varForm = new();
 
     // Secret modal state
     private bool _showSecretModal;
     private SecretDto? _editSecretTarget;
-    private string _formSecretKey = "";
-    private string _formSecretValue = "";
-    private string? _formSecretDescription;
+    private SecretFormModel _secretForm = new();
+
+    private static readonly FormValidationRule[] _requiredRule =
+    [
+        new() { Required = true, Message = "This field is required." }
+    ];
+
+    private static readonly FormValidationRule[] _varKeyRules =
+    [
+        new() { Required = true, Message = "Key is required." },
+        new() { Validator = ctx =>
+            ValidationHelper.ValidateEnvVarKey(ctx.Value?.ToString()) is { } err
+                ? new ValidationResult(err, [ctx.FieldName]) : null }
+    ];
+
+    private static readonly FormValidationRule[] _secretKeyRules =
+    [
+        new() { Required = true, Message = "Key is required." },
+        new() { Validator = ctx =>
+            ValidationHelper.ValidateEnvVarKey(ctx.Value?.ToString()) is { } err
+                ? new ValidationResult(err, [ctx.FieldName]) : null }
+    ];
 
     protected override async Task OnInitializedAsync()
     {
@@ -310,36 +322,32 @@
     private void StartCreateVariable()
     {
         _editVarTarget = null;
-        _formVarKey = "";
-        _formVarValue = "";
-        _formVarDescription = null;
+        _varForm = new VariableFormModel();
         _showVarModal = true;
     }
 
     private void StartEditVariable(EnvironmentVariableDto variable)
     {
         _editVarTarget = variable;
-        _formVarKey = variable.Key;
-        _formVarValue = variable.Value;
-        _formVarDescription = variable.Description;
+        _varForm = new VariableFormModel { Key = variable.Key, Value = variable.Value, Description = variable.Description };
         _showVarModal = true;
     }
 
     private async Task ConfirmSaveVariable()
     {
-        if (string.IsNullOrWhiteSpace(_formVarKey) || string.IsNullOrWhiteSpace(_formVarValue)) return;
+        if (string.IsNullOrWhiteSpace(_varForm.Key) || string.IsNullOrWhiteSpace(_varForm.Value)) return;
 
         try
         {
             if (_editVarTarget is null)
             {
                 await EnvironmentService.CreateVariableAsync(new CreateEnvironmentVariableRequest(
-                    _formVarKey.Trim(), _formVarValue.Trim(), _formVarDescription?.Trim()));
+                    _varForm.Key.Trim(), _varForm.Value.Trim(), _varForm.Description?.Trim()));
             }
             else
             {
                 await EnvironmentService.UpdateVariableAsync(_editVarTarget.Id, new UpdateEnvironmentVariableRequest(
-                    _formVarKey.Trim(), _formVarValue.Trim(), _formVarDescription?.Trim()));
+                    _varForm.Key.Trim(), _varForm.Value.Trim(), _varForm.Description?.Trim()));
             }
             _showVarModal = false;
             await LoadVariablesAsync();
@@ -362,39 +370,35 @@
     private void StartCreateSecret()
     {
         _editSecretTarget = null;
-        _formSecretKey = "";
-        _formSecretValue = "";
-        _formSecretDescription = null;
+        _secretForm = new SecretFormModel();
         _showSecretModal = true;
     }
 
     private void StartEditSecret(SecretDto secret)
     {
         _editSecretTarget = secret;
-        _formSecretKey = secret.Key;
-        _formSecretValue = "";
-        _formSecretDescription = secret.Description;
+        _secretForm = new SecretFormModel { Key = secret.Key, Description = secret.Description };
         _showSecretModal = true;
     }
 
     private async Task ConfirmSaveSecret()
     {
-        if (string.IsNullOrWhiteSpace(_formSecretKey)) return;
-        if (_editSecretTarget is null && string.IsNullOrWhiteSpace(_formSecretValue)) return;
+        if (string.IsNullOrWhiteSpace(_secretForm.Key)) return;
+        if (_editSecretTarget is null && string.IsNullOrWhiteSpace(_secretForm.Value)) return;
 
         try
         {
             if (_editSecretTarget is null)
             {
                 await EnvironmentService.CreateSecretAsync(new CreateSecretRequest(
-                    _formSecretKey.Trim(), _formSecretValue, _formSecretDescription?.Trim()));
+                    _secretForm.Key.Trim(), _secretForm.Value, _secretForm.Description?.Trim()));
             }
             else
             {
                 await EnvironmentService.UpdateSecretAsync(_editSecretTarget.Id, new UpdateSecretRequest(
-                    _formSecretKey.Trim(),
-                    string.IsNullOrWhiteSpace(_formSecretValue) ? null : _formSecretValue,
-                    _formSecretDescription?.Trim()));
+                    _secretForm.Key.Trim(),
+                    string.IsNullOrWhiteSpace(_secretForm.Value) ? null : _secretForm.Value,
+                    _secretForm.Description?.Trim()));
             }
             _showSecretModal = false;
             await LoadSecretsAsync();
