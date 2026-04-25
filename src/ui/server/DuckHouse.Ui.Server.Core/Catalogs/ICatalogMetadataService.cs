@@ -26,11 +26,13 @@ public record CatalogTableResult(
     string Name,
     string Type,
     IReadOnlyList<CatalogColumnResult> Columns,
-    string? Comment = null);
+    string? Comment);
 
 public record CatalogColumnResult(
     string Name,
     string DataType,
     bool IsNullable,
     int OrdinalPosition,
-    string? Comment = null);
+    string? Comment,
+    int? PartitionKeyIndex,
+    string? PartitionTransform);

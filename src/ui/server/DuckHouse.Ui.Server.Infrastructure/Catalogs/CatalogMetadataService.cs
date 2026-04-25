@@ -37,17 +37,13 @@ internal class CatalogMetadataService : ICatalogMetadataService
         var views = await QueryViewsAsync(conn, snapshotId.Value, cancellationToken);
         var columns = await QueryColumnsAsync(conn, snapshotId.Value, cancellationToken);
 
-        // Query comments — graceful fallback if tag tables are unavailable
-        Dictionary<long, string> tableComments = [];
-        Dictionary<long, string> viewComments = [];
-        Dictionary<(long tableId, long columnId), string> columnComments = [];
-        try
-        {
-            tableComments = await QueryObjectCommentsAsync(conn, snapshotId.Value, tables.Select(t => t.TableId), cancellationToken);
-            viewComments = await QueryObjectCommentsAsync(conn, snapshotId.Value, views.Select(v => v.ViewId), cancellationToken);
-            columnComments = await QueryColumnCommentsAsync(conn, snapshotId.Value, cancellationToken);
-        }
-        catch { /* tag tables may not exist in older DuckLake installations */ }
+        // Query comments
+        var tableComments = await QueryObjectCommentsAsync(conn, snapshotId.Value, tables.Select(t => t.TableId), cancellationToken);
+        var viewComments = await QueryObjectCommentsAsync(conn, snapshotId.Value, views.Select(v => v.ViewId), cancellationToken);
+        var columnComments = await QueryColumnCommentsAsync(conn, snapshotId.Value, cancellationToken);
+
+        // Query partition columns
+        var partitionColumns = await QueryPartitionColumnsAsync(conn, snapshotId.Value, cancellationToken);
 
         var columnsByTableId = columns
             .GroupBy(c => c.TableId)
@@ -55,9 +51,15 @@ internal class CatalogMetadataService : ICatalogMetadataService
                 g => g.Key,
                 g => (IReadOnlyList<CatalogColumnResult>)g
                     .OrderBy(c => c.ColumnOrder)
-                    .Select(c => new CatalogColumnResult(
-                        c.ColumnName, c.ColumnType, c.NullsAllowed, (int)c.ColumnOrder,
-                        columnComments.GetValueOrDefault((c.TableId, c.ColumnId))))
+                    .Select(c =>
+                    {
+                        var (KeyIndex, Transform) = partitionColumns.GetValueOrDefault((c.TableId, c.ColumnId));
+                        return new CatalogColumnResult(
+                            c.ColumnName, c.ColumnType, c.NullsAllowed, (int)c.ColumnOrder,
+                            columnComments.GetValueOrDefault((c.TableId, c.ColumnId)),
+                            partitionColumns.ContainsKey((c.TableId, c.ColumnId)) ? KeyIndex : null,
+                            partitionColumns.ContainsKey((c.TableId, c.ColumnId)) ? Transform : null);
+                    })
                     .ToList());
 
         var schemaResults = schemas
@@ -242,5 +244,24 @@ internal class CatalogMetadataService : ICatalogMetadataService
         while (await reader.ReadAsync(ct))
             comments[(reader.GetInt64(0), reader.GetInt64(1))] = reader.GetString(2);
         return comments;
+    }
+
+    private static async Task<Dictionary<(long tableId, long columnId), (int KeyIndex, string Transform)>> QueryPartitionColumnsAsync(
+        NpgsqlConnection conn, long snapshotId, CancellationToken ct)
+    {
+        var result = new Dictionary<(long, long), (int, string)>();
+        const string sql = """
+            SELECT pc.table_id, pc.column_id, pc.partition_key_index, pc.transform
+            FROM ducklake_partition_column pc
+                JOIN ducklake_partition_info pi ON pc.partition_id = pi.partition_id
+            WHERE @snapshotId >= pi.begin_snapshot
+              AND (@snapshotId < pi.end_snapshot OR pi.end_snapshot IS NULL)
+            """;
+        await using var cmd = new NpgsqlCommand(sql, conn);
+        cmd.Parameters.AddWithValue("snapshotId", snapshotId);
+        await using var reader = await cmd.ExecuteReaderAsync(ct);
+        while (await reader.ReadAsync(ct))
+            result[(reader.GetInt64(0), reader.GetInt64(1))] = ((int)reader.GetInt64(2), reader.GetString(3));
+        return result;
     }
 }

@@ -70,6 +70,19 @@ else
                             <Icon Type="@IconType.Outline.Check" Style="color: #52c41a;" />
                         }
                     </PropertyColumn>
+                    <PropertyColumn Property="c => c.PartitionKeyIndex" Title="Partition" Width="100px">
+                        @if (context.PartitionKeyIndex is { } idx)
+                        {
+                            var label = (idx + 1).ToString();
+                            var transform = context.PartitionTransform;
+                            var showTransform = !string.IsNullOrEmpty(transform) && transform != "identity";
+                            <Tooltip Title="@(showTransform ? $"Partition key #{idx + 1} · transform: {transform}" : $"Partition key #{idx + 1}")">
+                                <Tag Style="cursor: default;">
+                                    #@label@(showTransform ? $" · {transform}" : "")
+                                </Tag>
+                            </Tooltip>
+                        }
+                    </PropertyColumn>
                     <PropertyColumn Property="c => c.Comment" Title="Comment">
                         @(context.Comment ?? "")
                     </PropertyColumn>

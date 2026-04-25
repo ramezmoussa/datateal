@@ -11,11 +11,13 @@ public record TableDto(
     string Name,
     string Type,
     IReadOnlyList<ColumnDto> Columns,
-    string? Comment = null);
+    string? Comment);
 
 public record ColumnDto(
     string Name,
     string DataType,
     bool IsNullable,
     int OrdinalPosition,
-    string? Comment = null);
+    string? Comment,
+    int? PartitionKeyIndex,
+    string? PartitionTransform);
