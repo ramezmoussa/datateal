@@ -6,8 +6,11 @@
 @inject IJobService JobService
 @inject IRecentItemsService RecentItemsService
 @inject NavigationManager Navigation
+@inject IJSRuntime JS
 
 <PageTitle>@(_job?.Name ?? "Job Editor") — DuckHouse</PageTitle>
+<NavigationLock ConfirmExternalNavigation="@_isDirty"
+                OnBeforeInternalNavigation="ConfirmInternalNavigationAsync" />
 
 @if (!string.IsNullOrEmpty(_error))
 {
@@ -811,4 +814,12 @@
                 <div><strong>@kv.Key</strong> = @kv.Value</div>
             }
         </div>;
+
+    private async Task ConfirmInternalNavigationAsync(LocationChangingContext ctx)
+    {
+        if (!_isDirty) return;
+        var confirmed = await JS.InvokeAsync<bool>("confirm", "You have unsaved changes. Are you sure you want to leave?");
+        if (!confirmed)
+            ctx.PreventNavigation();
+    }
 }

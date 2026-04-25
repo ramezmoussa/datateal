@@ -20,6 +20,8 @@
 @inject IJSRuntime JS
 
 <PageTitle>Query — DuckHouse</PageTitle>
+<NavigationLock ConfirmExternalNavigation="@_isDirty"
+                OnBeforeInternalNavigation="ConfirmInternalNavigationAsync" />
 
 <div class="cp-layout">
     <CatalogSidePanel AllCatalogs="@_allCatalogs"
@@ -815,6 +817,14 @@
     {
         _topHeightPx = Math.Max(80, (int)height);
         StateHasChanged();
+    }
+
+    private async Task ConfirmInternalNavigationAsync(LocationChangingContext ctx)
+    {
+        if (!_isDirty) return;
+        var confirmed = await JS.InvokeAsync<bool>("confirm", "You have unsaved changes. Are you sure you want to leave?");
+        if (!confirmed)
+            ctx.PreventNavigation();
     }
 
     public async ValueTask DisposeAsync()

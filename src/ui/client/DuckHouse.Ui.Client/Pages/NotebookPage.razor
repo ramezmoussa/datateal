@@ -20,6 +20,8 @@
 @implements IAsyncDisposable
 
 <PageTitle>Notebook — DuckHouse</PageTitle>
+<NavigationLock ConfirmExternalNavigation="@_notebook.IsDirty"
+                OnBeforeInternalNavigation="ConfirmInternalNavigationAsync" />
 
 @* Negate the right side padding set in MainLayout.razor to have the scrollbar be flush with the edge. *@
 <div class="cp-layout" style="margin-right: -24px;">
@@ -881,6 +883,14 @@
     {
         _notebook.IsDirty = true;
         return _catalog.OnSelectionChangedAsync(selectedItems);
+    }
+
+    private async Task ConfirmInternalNavigationAsync(LocationChangingContext ctx)
+    {
+        if (!_notebook.IsDirty) return;
+        var confirmed = await JS.InvokeAsync<bool>("confirm", "You have unsaved changes. Are you sure you want to leave?");
+        if (!confirmed)
+            ctx.PreventNavigation();
     }
 
     public async ValueTask DisposeAsync()

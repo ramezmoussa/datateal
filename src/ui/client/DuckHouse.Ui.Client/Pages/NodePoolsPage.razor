@@ -11,8 +11,11 @@
 @inject INodeService NodeService
 @inject IWheelPackageService WheelPackageService
 @inject IEnvironmentService EnvironmentService
+@inject IJSRuntime JS
 
 <PageTitle>Node Pools — DuckHouse</PageTitle>
+<NavigationLock ConfirmExternalNavigation="@_showDrawer"
+                OnBeforeInternalNavigation="ConfirmInternalNavigationAsync" />
 
 <Flex Justify="FlexJustify.FlexStart" Align="FlexAlign.Center" Style="margin-bottom: 24px;" Gap="FlexGap.Small">
     <Space Align="SpaceAlign.End" Size="SpaceSize.Middle">
@@ -596,4 +599,12 @@
         NodeState.Failure => "error",
         _ => "warning"
     };
+
+    private async Task ConfirmInternalNavigationAsync(LocationChangingContext ctx)
+    {
+        if (!_showDrawer) return;
+        var confirmed = await JS.InvokeAsync<bool>("confirm", "You have unsaved changes. Are you sure you want to leave?");
+        if (!confirmed)
+            ctx.PreventNavigation();
+    }
 }
