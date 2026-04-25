@@ -130,92 +130,95 @@
                 </ActionColumn>
             </Table>
         </Spin>
-
-        <Modal Title="@(_editTarget is null ? "New catalog" : "Edit catalog")"
-                Visible="_showModal"
-                OnOk="ConfirmSave"
-                OnCancel="() => _showModal = false"
-                OkButtonProps="@(new ButtonProps { Disabled = !IsFormValid() })">
-            <div style="display: flex; flex-direction: column; gap: 16px;">
-                <div>
-                    <label style="display: block; margin-bottom: 4px; font-weight: 500;">Name</label>
-                    <Input @bind-Value="_formName" Placeholder="my_catalog"
-                            Status="@(ValidationHelper.ValidateCatalogName(_formName) is not null ? "error" : "")" />
-                    @if (ValidationHelper.ValidateCatalogName(_formName) is { } nameErr)
-                    {
-                        <div style="color: #ff4d4f; font-size: 12px; margin-top: 2px;">@nameErr</div>
-                    }
-                </div>
-
-                @if (_editTarget is null)
-                {
-                    <div>
-                        <label style="display: block; margin-bottom: 4px; font-weight: 500;">Type</label>
-                        <RadioGroup @bind-Value="_formIsManaged">
-                            <Radio Value="true">Managed</Radio>
-                            <Radio Value="false">Unmanaged</Radio>
-                        </RadioGroup>
-                    </div>
-
-                    @if (_formIsManaged)
-                    {
-                        <div>
-                            <Checkbox @bind-Value="_formAllowExistingDatabase">
-                                Allow existing PostgreSQL database
-                            </Checkbox>
-                            <div style="color: #8c8c8c; font-size: 12px; margin-top: 2px;">
-                                When checked, the catalog will be registered even if a PostgreSQL database with this name already exists. Useful when migrating an environment.
-                            </div>
-                        </div>
-                    }
-                }
-
-                @if (!_formIsManaged)
-                {
-                    <div>
-                        <label style="display: block; margin-bottom: 4px; font-weight: 500;">Data path</label>
-                        <Input @bind-Value="_formDataPath" Placeholder="/data/ducklake/my_catalog or abfss://..." />
-                    </div>
-                    <div>
-                        <label style="display: block; margin-bottom: 4px; font-weight: 500;">
-                            Storage connection string
-                            <span style="font-weight: normal; color: #8c8c8c; margin-left: 4px;">(Azure only)</span>
-                        </label>
-                        <InputPassword @bind-Value="_formStorageConnectionString"
-                            Placeholder="@(_editTarget is UnmanagedCatalogDto u1 && u1.HasStorageConnectionString ? "••••••••" : "DefaultEndpointsProtocol=https;...")" />
-                    </div>
-                    <div>
-                        <label style="display: block; margin-bottom: 4px; font-weight: 500;">Catalog host</label>
-                        <Input @bind-Value="_formCatalogHost" Placeholder="localhost" />
-                    </div>
-                    <div>
-                        <label style="display: block; margin-bottom: 4px; font-weight: 500;">Catalog port</label>
-                        <AntDesign.InputNumber @bind-Value="_formCatalogPort" Min="1" Max="65535" Style="width: 100%;" />
-                    </div>
-                    <div>
-                        <label style="display: block; margin-bottom: 4px; font-weight: 500;">Catalog database</label>
-                        <Input @bind-Value="_formCatalogDatabase" Placeholder="my_catalog" />
-                    </div>
-                    <div>
-                        <label style="display: block; margin-bottom: 4px; font-weight: 500;">Catalog user</label>
-                        <Input @bind-Value="_formCatalogUser" Placeholder="postgres" />
-                    </div>
-                    <div>
-                        <label style="display: block; margin-bottom: 4px; font-weight: 500;">
-                            Catalog password
-                            @if (_editTarget is not null)
-                            {
-                                <span style="font-weight: normal; color: #8c8c8c; margin-left: 4px;">(leave blank to keep current)</span>
-                            }
-                        </label>
-                        <InputPassword @bind-Value="_formCatalogPassword"
-                            Placeholder="@(_editTarget is UnmanagedCatalogDto u2 && u2.HasCatalogPassword ? "••••••••" : "Enter password")" />
-                    </div>
-                }
-            </div>
-        </Modal>
     </TabPane>
 </Tabs>
+
+<Drawer Closable="true" @bind-Visible="_showModal" Placement="DrawerPlacement.Right"
+        Width="520" Title="@(_editTarget is null ? "New catalog" : "Edit catalog")"
+        OnClose="() => _showModal = false"
+        BodyStyle="display: flex; flex-direction: column; padding: 0; overflow: hidden;">
+    <div style="flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+        <div>
+            <label style="display: block; margin-bottom: 4px; font-weight: 500;">Name</label>
+            <Input @bind-Value="_formName" Placeholder="my_catalog"
+                    Status="@(ValidationHelper.ValidateCatalogName(_formName) is not null ? "error" : "")" />
+            @if (ValidationHelper.ValidateCatalogName(_formName) is { } nameErr)
+            {
+                <div style="color: #ff4d4f; font-size: 12px; margin-top: 2px;">@nameErr</div>
+            }
+        </div>
+
+        @if (_editTarget is null)
+        {
+            <div>
+                <label style="display: block; margin-bottom: 4px; font-weight: 500;">Type</label>
+                <RadioGroup @bind-Value="_formIsManaged">
+                    <Radio Value="true">Managed</Radio>
+                    <Radio Value="false">Unmanaged</Radio>
+                </RadioGroup>
+            </div>
+
+            @if (_formIsManaged)
+            {
+                <div>
+                    <Checkbox @bind-Value="_formAllowExistingDatabase">
+                        Allow existing PostgreSQL database
+                    </Checkbox>
+                    <div style="color: #8c8c8c; font-size: 12px; margin-top: 2px;">
+                        When checked, the catalog will be registered even if a PostgreSQL database with this name already exists. Useful when migrating an environment.
+                    </div>
+                </div>
+            }
+        }
+
+        @if (!_formIsManaged)
+        {
+            <div>
+                <label style="display: block; margin-bottom: 4px; font-weight: 500;">Data path</label>
+                <Input @bind-Value="_formDataPath" Placeholder="/data/ducklake/my_catalog or abfss://..." />
+            </div>
+            <div>
+                <label style="display: block; margin-bottom: 4px; font-weight: 500;">
+                    Storage connection string
+                    <span style="font-weight: normal; color: #8c8c8c; margin-left: 4px;">(Azure only)</span>
+                </label>
+                <InputPassword @bind-Value="_formStorageConnectionString"
+                    Placeholder="@(_editTarget is UnmanagedCatalogDto u1 && u1.HasStorageConnectionString ? "••••••••" : "DefaultEndpointsProtocol=https;...")" />
+            </div>
+            <div>
+                <label style="display: block; margin-bottom: 4px; font-weight: 500;">Catalog host</label>
+                <Input @bind-Value="_formCatalogHost" Placeholder="localhost" />
+            </div>
+            <div>
+                <label style="display: block; margin-bottom: 4px; font-weight: 500;">Catalog port</label>
+                <AntDesign.InputNumber @bind-Value="_formCatalogPort" Min="1" Max="65535" Style="width: 100%;" />
+            </div>
+            <div>
+                <label style="display: block; margin-bottom: 4px; font-weight: 500;">Catalog database</label>
+                <Input @bind-Value="_formCatalogDatabase" Placeholder="my_catalog" />
+            </div>
+            <div>
+                <label style="display: block; margin-bottom: 4px; font-weight: 500;">Catalog user</label>
+                <Input @bind-Value="_formCatalogUser" Placeholder="postgres" />
+            </div>
+            <div>
+                <label style="display: block; margin-bottom: 4px; font-weight: 500;">
+                    Catalog password
+                    @if (_editTarget is not null)
+                    {
+                        <span style="font-weight: normal; color: #8c8c8c; margin-left: 4px;">(leave blank to keep current)</span>
+                    }
+                </label>
+                <InputPassword @bind-Value="_formCatalogPassword"
+                    Placeholder="@(_editTarget is UnmanagedCatalogDto u2 && u2.HasCatalogPassword ? "••••••••" : "Enter password")" />
+            </div>
+        }
+    </div>
+    <div class="drawer-footer">
+        <Button OnClick="() => _showModal = false">Cancel</Button>
+        <Button Type="@ButtonType.Primary" OnClick="ConfirmSave" Disabled="@(!IsFormValid())">Save</Button>
+    </div>
+</Drawer>
 
 @code {
     // ── Tab state ─────────────────────────────────────────────────────

@@ -5,11 +5,11 @@
 @inject INodePoolService NodePoolService
 @inject IJobService JobService
 
-<Drawer Title="@(_isEdit ? "Edit task" : "Add task")"
-        Visible="Visible"
+<Drawer Closable="true" Visible="Visible" Placement="DrawerPlacement.Right"
+        Width="520" Title="@(_isEdit ? "Edit task" : "Add task")"
         OnClose="HandleCancel"
-        Width="520">
-    <div style="display: flex; flex-direction: column; gap: 24px; padding-bottom: 60px;">
+        BodyStyle="display: flex; flex-direction: column; padding: 0; overflow: hidden;">
+    <div style="flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 24px;">
 
         @* Section 1: Basic Settings *@
         <div>
@@ -223,7 +223,7 @@
     </div>
 
     @* Footer *@
-    <div style="position: absolute; bottom: 0; left: 0; right: 0; padding: 10px 16px; border-top: 1px solid #d9d9d9; background: #fff; display: flex; justify-content: flex-end; gap: 8px;">
+    <div class="drawer-footer">
         <Button OnClick="HandleCancel">Cancel</Button>
         <Button Type="@ButtonType.Primary" OnClick="HandleSave" Disabled="@HasValidationErrors()">Save</Button>
     </div>

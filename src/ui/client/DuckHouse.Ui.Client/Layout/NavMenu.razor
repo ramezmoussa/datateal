@@ -63,15 +63,14 @@
     </MenuItem>
 </Menu>
 
-<Modal Title="New job"
-       Visible="_showCreateJobModal"
-       OnOk="ConfirmCreateJobAsync"
-       OnCancel="@(() => _showCreateJobModal = false)"
-       OkButtonProps="@(new ButtonProps { Disabled = string.IsNullOrWhiteSpace(_newJobName), Loading = _creatingJob })">
-    <div style="display: flex; flex-direction: column; gap: 16px;">
+<Drawer Closable="true" @bind-Visible="_showCreateJobModal" Placement="DrawerPlacement.Right"
+        Width="480" Title="@("New job")"
+        OnClose="() => _showCreateJobModal = false"
+        BodyStyle="display: flex; flex-direction: column; padding: 0; overflow: hidden;">
+    <div style="flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 16px;">
         <div>
             <label style="display: block; margin-bottom: 4px; font-weight: 500;">Name</label>
-            <Input @bind-Value="_newJobName" Placeholder="My Job" />
+            <Input @bind-Value="_newJobName" Placeholder="My job" />
         </div>
         <div>
             <label style="display: block; margin-bottom: 4px; font-weight: 500;">Description</label>
@@ -82,7 +81,13 @@
             <Alert Type="@AlertType.Error" Message="@_createJobError" ShowIcon="true" />
         }
     </div>
-</Modal>
+    <div class="drawer-footer">
+        <Button OnClick="() => _showCreateJobModal = false">Cancel</Button>
+        <Button Type="@ButtonType.Primary" OnClick="ConfirmCreateJobAsync"
+                Disabled="@(string.IsNullOrWhiteSpace(_newJobName) || _creatingJob)"
+                Loading="@_creatingJob">Create</Button>
+    </div>
+</Drawer>
 
 @code {
     private Menu? _menu;

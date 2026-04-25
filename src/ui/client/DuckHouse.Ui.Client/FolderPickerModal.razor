@@ -1,53 +1,57 @@
 @using DuckHouse.Ui.Shared.Workspace
 @inject IWorkspaceService WorkspaceService
 
-<Modal Title="@Title"
-       Visible="Visible"
-       OnOk="ConfirmAsync"
-       OnCancel="OnCancel"
-       OkText="@OkText"
-       Width="480">
-    <Breadcrumb Style="margin-bottom: 12px;">
-        @foreach (var (crumb, index) in _breadcrumbs.Select((c, i) => (c, i)))
-        {
-            if (index < _breadcrumbs.Count - 1)
+<Drawer Closable="true" Visible="Visible" Placement="DrawerPlacement.Right"
+        Width="480" Title="@Title"
+        OnClose="OnCancel"
+        BodyStyle="display: flex; flex-direction: column; padding: 0; overflow: hidden;">
+    <div style="flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+        <Breadcrumb Style="margin-bottom: 12px;">
+            @foreach (var (crumb, index) in _breadcrumbs.Select((c, i) => (c, i)))
             {
-                <BreadcrumbItem>
-                    <a @onclick="() => NavigateToCrumbAsync(index)" @onclick:preventDefault style="cursor: pointer;">
-                        @crumb.Name
-                    </a>
-                </BreadcrumbItem>
+                if (index < _breadcrumbs.Count - 1)
+                {
+                    <BreadcrumbItem>
+                        <a @onclick="() => NavigateToCrumbAsync(index)" @onclick:preventDefault style="cursor: pointer;">
+                            @crumb.Name
+                        </a>
+                    </BreadcrumbItem>
+                }
+                else
+                {
+                    <BreadcrumbItem>@crumb.Name</BreadcrumbItem>
+                }
             }
-            else
+        </Breadcrumb>
+        @if (_loading)
+        {
+            <Flex Justify="@("center")" Style="padding: 20px 0;"><Spin /></Flex>
+        }
+        else if (_folders.Count == 0)
+        {
+            <span style="color: rgba(0,0,0,.45); font-style: italic;">No subfolders here.</span>
+        }
+        else
+        {
+            @foreach (var folder in _folders)
             {
-                <BreadcrumbItem>@crumb.Name</BreadcrumbItem>
+                var f = folder;
+                <div @onclick="() => NavigateToFolderAsync(f)"
+                     style="padding: 7px 10px; cursor: pointer; border-radius: 6px; display: flex; align-items: center; gap: 8px;"
+                     @onmouseenter="@(_ => _hoveredId = f.Id)" @onmouseleave="@(_ => _hoveredId = null)"
+                     class="@(_hoveredId == f.Id ? "picker-row-hover" : "picker-row")">
+                    <Icon Type="@IconType.Outline.Folder" Style="color: #faad14;" />
+                    <span>@f.Name</span>
+                    <Icon Type="@IconType.Outline.Right" Style="margin-left: auto; color: #bbb; font-size: 0.75rem;" />
+                </div>
             }
         }
-    </Breadcrumb>
-    @if (_loading)
-    {
-        <Flex Justify="@("center")" Style="padding: 20px 0;"><Spin /></Flex>
-    }
-    else if (_folders.Count == 0)
-    {
-        <span style="color: rgba(0,0,0,.45); font-style: italic;">No subfolders here.</span>
-    }
-    else
-    {
-        @foreach (var folder in _folders)
-        {
-            var f = folder;
-            <div @onclick="() => NavigateToFolderAsync(f)"
-                 style="padding: 7px 10px; cursor: pointer; border-radius: 6px; display: flex; align-items: center; gap: 8px;"
-                 @onmouseenter="@(_ => _hoveredId = f.Id)" @onmouseleave="@(_ => _hoveredId = null)"
-                 class="@(_hoveredId == f.Id ? "picker-row-hover" : "picker-row")">
-                <Icon Type="@IconType.Outline.Folder" Style="color: #faad14;" />
-                <span>@f.Name</span>
-                <Icon Type="@IconType.Outline.Right" Style="margin-left: auto; color: #bbb; font-size: 0.75rem;" />
-            </div>
-        }
-    }
-</Modal>
+    </div>
+    <div class="drawer-footer">
+        <Button OnClick="OnCancel">Cancel</Button>
+        <Button Type="@ButtonType.Primary" OnClick="ConfirmAsync">@OkText</Button>
+    </div>
+</Drawer>
 
 @code {
     [Parameter] public bool Visible { get; set; }
