@@ -7,6 +7,7 @@
 @inject IRecentItemsService RecentItemsService
 @inject NavigationManager Navigation
 @inject IJSRuntime JS
+@inject IMessageService MessageService
 
 <PageTitle>@(_job?.Name ?? "Job Editor") — DuckHouse</PageTitle>
 <NavigationLock ConfirmExternalNavigation="@_isDirty"
@@ -44,11 +45,6 @@
             </Space>
             <Space>
                 <SpaceItem>
-                    <Button Type="@ButtonType.Primary" OnClick="SaveAsync" Disabled="!_isDirty">
-                        <Icon Type="@IconType.Outline.Save" /> Save
-                    </Button>
-                </SpaceItem>
-                <SpaceItem>
                     <Button Type="@ButtonType.Primary" OnClick="() => _showTriggerModal = true">
                         <Icon Type="@IconType.Outline.PlayCircle" /> Run
                     </Button>
@@ -80,6 +76,11 @@
                         <div>
                             <label style="display: block; margin-bottom: 4px; font-weight: 500;">Enabled</label>
                             <Switch @bind-Checked="_editEnabled" OnChange="@((bool _) => _isDirty = true)" />
+                        </div>
+                        <div>
+                            <Button Type="@ButtonType.Primary" OnClick="SaveAsync" Disabled="!_isDirty">
+                                <Icon Type="@IconType.Outline.Save" /> Save
+                            </Button>
                         </div>
                     </div>
                 </div>
@@ -477,23 +478,14 @@
         }
     }
 
-    private string? ValidateBeforeSave()
+    private string? ValidateTasksBeforeSave()
     {
-        // Task name validation
         var taskNames = _editTasks.Select(t => t.Name.Trim()).ToList();
         if (taskNames.Any(string.IsNullOrWhiteSpace))
             return "All tasks must have a name.";
         if (taskNames.Distinct(StringComparer.OrdinalIgnoreCase).Count() != taskNames.Count)
             return "Task names must be unique (case-insensitive).";
 
-        // Parameter name validation
-        var paramNames = _editParams.Select(p => p.Name.Trim()).ToList();
-        if (paramNames.Any(string.IsNullOrWhiteSpace))
-            return "All parameters must have a name.";
-        if (paramNames.Distinct(StringComparer.OrdinalIgnoreCase).Count() != paramNames.Count)
-            return "Parameter names must be unique (case-insensitive).";
-
-        // Type-specific validation
         foreach (var t in _editTasks)
         {
             if (t.TaskType == TaskType.Notebook && t.NotebookId is null)
@@ -504,7 +496,6 @@
                 return $"Task '{t.Name}': a sub-job must be selected.";
         }
 
-        // Dependency validation
         var nameSet = new HashSet<string>(taskNames, StringComparer.OrdinalIgnoreCase);
         foreach (var t in _editTasks)
         {
@@ -520,9 +511,37 @@
         return null;
     }
 
+    private string? ValidateParametersBeforeSave()
+    {
+        var paramNames = _editParams.Select(p => p.Name.Trim()).ToList();
+        if (paramNames.Any(string.IsNullOrWhiteSpace))
+            return "All parameters must have a name.";
+        if (paramNames.Distinct(StringComparer.OrdinalIgnoreCase).Count() != paramNames.Count)
+            return "Parameter names must be unique (case-insensitive).";
+
+        return null;
+    }
+
     private async Task SaveAsync()
     {
-        var validationError = ValidateBeforeSave();
+        try
+        {
+            await JobService.UpdateJobAsync(Id, new UpdateJobRequest(
+                _editName, _editDescription, _job!.FolderId, _editMaxConcurrent, _editEnabled,
+                null, null));
+            _error = null;
+            await LoadAsync();
+            MessageService.Success("Job updated");
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to save: {ex.Message}";
+        }
+    }
+
+    private async Task SaveTasksAsync()
+    {
+        var validationError = ValidateTasksBeforeSave();
         if (validationError is not null)
         {
             _error = validationError;
@@ -545,19 +564,86 @@
                 t.Dependencies.Select(d => new UpdateDependencyRequest(d.TaskName, d.Condition)).ToList()
             )).ToList();
 
+            await JobService.UpdateJobAsync(Id, new UpdateJobRequest(
+                _job!.Name, _job.Description, _job.FolderId, _job.MaxConcurrentRuns, _job.IsEnabled,
+                tasks, null));
+            _error = null;
+            await RefreshJobAsync();
+            MessageService.Success("Job updated");
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to save tasks: {ex.Message}";
+        }
+    }
+
+    private async Task SaveParametersAsync()
+    {
+        var validationError = ValidateParametersBeforeSave();
+        if (validationError is not null)
+        {
+            _error = validationError;
+            return;
+        }
+
+        try
+        {
             var parameters = _editParams.Select(p => new UpdateParameterRequest(
                 p.Name, p.DefaultValue, p.IsRequired, p.Description
             )).ToList();
 
             await JobService.UpdateJobAsync(Id, new UpdateJobRequest(
-                _editName, _editDescription, _job!.FolderId, _editMaxConcurrent, _editEnabled,
-                tasks, parameters));
+                _job!.Name, _job.Description, _job.FolderId, _job.MaxConcurrentRuns, _job.IsEnabled,
+                null, parameters));
             _error = null;
-            await LoadAsync();
+            await RefreshJobAsync();
+            MessageService.Success("Job updated");
         }
         catch (Exception ex)
         {
-            _error = $"Failed to save: {ex.Message}";
+            _error = $"Failed to save parameters: {ex.Message}";
+        }
+    }
+
+    /// <summary>
+    /// Silent refresh: reloads _job and rebuilds _editTasks/_editParams without resetting
+    /// the Settings tab edit state (_editName, _editDescription, etc.) or _isDirty.
+    /// </summary>
+    private async Task RefreshJobAsync()
+    {
+        try
+        {
+            var fresh = await JobService.GetJobAsync(Id);
+            if (fresh is null) return;
+
+            _job = fresh;
+
+            _editTasks = _job.Tasks.Select(t => new EditableTask
+            {
+                Name = t.Name,
+                TaskType = t.TaskType,
+                MaxRetries = t.MaxRetries,
+                RetryInterval = t.RetryInterval.ToString(),
+                Timeout = t.Timeout?.ToString(),
+                NotebookId = t.NotebookId,
+                QueryId = t.QueryId,
+                SubJobId = t.SubJobId,
+                NodePoolRef = t.NodePoolRef,
+                Parameters = t.Parameters?.Select(kv => new EditableTaskParameter { Key = kv.Key, Value = kv.Value }).ToList() ?? [],
+                Dependencies = t.Dependencies.Select(d => new EditableDependency { TaskName = d.DependsOnTaskName, Condition = d.Condition }).ToList(),
+            }).ToList();
+
+            _editParams = _job.Parameters.Select(p => new EditableParameter
+            {
+                Name = p.Name,
+                DefaultValue = p.DefaultValue,
+                IsRequired = p.IsRequired,
+                Description = p.Description,
+            }).ToList();
+        }
+        catch
+        {
+            // Refresh failure is non-critical; the save already succeeded.
         }
     }
 
@@ -579,7 +665,7 @@
         _showTaskDrawer = true;
     }
 
-    private void OnTaskSaved(EditableTask task)
+    private async Task OnTaskSaved(EditableTask task)
     {
         if (_taskEditIndex >= 0 && _taskEditIndex < _editTasks.Count)
         {
@@ -589,14 +675,14 @@
         {
             _editTasks.Add(task);
         }
-        _isDirty = true;
         _showTaskDrawer = false;
+        await SaveTasksAsync();
     }
 
-    private void DeleteTask(EditableTask task)
+    private async Task DeleteTask(EditableTask task)
     {
         _editTasks.Remove(task);
-        _isDirty = true;
+        await SaveTasksAsync();
     }
 
     // --- Parameter editor ---
@@ -615,7 +701,7 @@
         _showParamModal = true;
     }
 
-    private void OnParameterSaved(EditableParameter param)
+    private async Task OnParameterSaved(EditableParameter param)
     {
         if (_paramEditIndex >= 0 && _paramEditIndex < _editParams.Count)
         {
@@ -625,14 +711,14 @@
         {
             _editParams.Add(param);
         }
-        _isDirty = true;
         _showParamModal = false;
+        await SaveParametersAsync();
     }
 
-    private void DeleteParameter(EditableParameter param)
+    private async Task DeleteParameter(EditableParameter param)
     {
         _editParams.Remove(param);
-        _isDirty = true;
+        await SaveParametersAsync();
     }
 
     // --- Other actions ---
@@ -643,7 +729,8 @@
         {
             var request = parameters?.Count > 0 ? new TriggerJobRequest(parameters) : null;
             await JobService.TriggerJobAsync(Id, request);
-            await LoadAsync();
+            await RefreshJobAsync();
+            await RefreshRunsAsync();
         }
         catch (Exception ex)
         {
@@ -684,7 +771,7 @@
         _newCron = "";
         _newTimeZone = "";
         // Pre-populate required parameters that have no default so the user sees what must be filled in.
-        _newScheduleParameters = _job!.Parameters
+        _newScheduleParameters = _editParams
             .Where(p => p.IsRequired && p.DefaultValue is null)
             .Select(p => new EditableTaskParameter { Key = p.Name, Value = "" })
             .ToList();
@@ -722,8 +809,7 @@
     /// </summary>
     private List<string> GetMissingRequiredScheduleParams()
     {
-        if (_job is null) return [];
-        return _job.Parameters
+        return _editParams
             .Where(p => p.IsRequired && p.DefaultValue is null)
             .Where(p => !_newScheduleParameters.Any(sp =>
                 string.Equals(sp.Key?.Trim(), p.Name, StringComparison.OrdinalIgnoreCase)
@@ -755,7 +841,8 @@
                     new CreateScheduleRequest(_newCron.Trim(), true, tz, parameters?.Count > 0 ? parameters : null));
             }
             _showScheduleModal = false;
-            await LoadAsync();
+            await RefreshJobAsync();
+            MessageService.Success("Job updated");
         }
         catch (Exception ex)
         {
@@ -769,7 +856,8 @@
         {
             await JobService.UpdateScheduleAsync(Id, schedule.Id,
                 new UpdateScheduleRequest(schedule.CronExpression, enabled, schedule.TimeZone, schedule.Parameters));
-            await LoadAsync();
+            await RefreshJobAsync();
+            MessageService.Success("Job updated");
         }
         catch (Exception ex)
         {
@@ -782,7 +870,8 @@
         try
         {
             await JobService.DeleteScheduleAsync(Id, schedule.Id);
-            await LoadAsync();
+            await RefreshJobAsync();
+            MessageService.Success("Job updated");
         }
         catch (Exception ex)
         {
