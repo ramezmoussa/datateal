@@ -264,4 +264,46 @@ internal class CatalogMetadataService : ICatalogMetadataService
             result[(reader.GetInt64(0), reader.GetInt64(1))] = ((int)reader.GetInt64(2), reader.GetString(3));
         return result;
     }
+
+    public async Task<CatalogInfoResult> GetCatalogInfoAsync(
+        string catalogHost,
+        int catalogPort,
+        string catalogDatabase,
+        string catalogUser,
+        string catalogPassword,
+        CancellationToken cancellationToken = default)
+    {
+        var connectionString = new NpgsqlConnectionStringBuilder
+        {
+            Host = catalogHost,
+            Port = catalogPort,
+            Username = catalogUser,
+            Password = catalogPassword,
+            Database = catalogDatabase,
+        }.ConnectionString;
+
+        await using var conn = new NpgsqlConnection(connectionString);
+        await conn.OpenAsync(cancellationToken);
+
+        var entries = new List<CatalogMetadataEntry>();
+        const string sql = """
+            SELECT key, value, scope, scope_id
+            FROM ducklake_metadata
+            ORDER BY scope NULLS FIRST, key
+            """;
+        try
+        {
+            await using var cmd = new NpgsqlCommand(sql, conn);
+            await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+                entries.Add(new CatalogMetadataEntry(
+                    reader.GetString(0),
+                    reader.GetString(1),
+                    reader.IsDBNull(2) ? null : reader.GetString(2),
+                    reader.IsDBNull(3) ? null : reader.GetInt64(3)));
+        }
+        catch { /* ducklake_metadata may not exist in older DuckLake installations */ }
+
+        return new CatalogInfoResult(entries);
+    }
 }

@@ -1,5 +1,13 @@
 namespace DuckHouse.Ui.Shared.Catalogs;
 
+public record CatalogInfoDto(IReadOnlyList<CatalogMetadataEntryDto> Metadata);
+
+public record CatalogMetadataEntryDto(
+    string Key,
+    string Value,
+    string? Scope,
+    long? ScopeId);
+
 public record CatalogMetadataDto(
     IReadOnlyList<SchemaDto> Schemas);
 

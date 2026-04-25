@@ -234,6 +234,16 @@
                 Table = table,
             });
         }
+        else if (node.NodeType == BrowserNodeType.Catalog
+            && _catalogLookup.TryGetValue(node.CatalogName!, out var catalog))
+        {
+            await OnObjectSelected.InvokeAsync(new CatalogObjectSelection
+            {
+                CatalogName = node.CatalogName!,
+                ObjectType = "CATALOG",
+                SelectedCatalog = catalog,
+            });
+        }
         else
         {
             await OnObjectSelected.InvokeAsync(null);

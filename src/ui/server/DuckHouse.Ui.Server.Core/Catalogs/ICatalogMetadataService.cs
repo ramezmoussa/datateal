@@ -13,6 +13,14 @@ public interface ICatalogMetadataService
         string catalogUser,
         string catalogPassword,
         CancellationToken cancellationToken = default);
+
+    Task<CatalogInfoResult> GetCatalogInfoAsync(
+        string catalogHost,
+        int catalogPort,
+        string catalogDatabase,
+        string catalogUser,
+        string catalogPassword,
+        CancellationToken cancellationToken = default);
 }
 
 public record CatalogMetadataResult(
@@ -36,3 +44,7 @@ public record CatalogColumnResult(
     string? Comment,
     int? PartitionKeyIndex,
     string? PartitionTransform);
+
+public record CatalogInfoResult(IReadOnlyList<CatalogMetadataEntry> Metadata);
+
+public record CatalogMetadataEntry(string Key, string Value, string? Scope, long? ScopeId);

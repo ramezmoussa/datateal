@@ -12,6 +12,7 @@ public interface ICatalogService
     Task<UnmanagedCatalogDto?> UpdateUnmanagedCatalogAsync(Guid id, UpdateUnmanagedCatalogRequest request, CancellationToken ct = default);
     Task DeleteCatalogAsync(Guid id, CancellationToken ct = default);
     Task<CatalogMetadataDto> GetMetadataAsync(Guid catalogId, CancellationToken ct = default);
+    Task<CatalogInfoDto> GetCatalogInfoAsync(Guid catalogId, CancellationToken ct = default);
 
     Task<ExecutionHandle> SetupCatalogsOnKernelAsync(string nodeName, string kernelId, List<string> catalogNames, CancellationToken ct = default);
     Task<ExecutionHandle> ConnectCatalogOnKernelAsync(string nodeName, string kernelId, string catalogName, CancellationToken ct = default);

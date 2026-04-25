@@ -72,4 +72,11 @@ public class CatalogsController(IMediator mediator) : ControllerBase
         var metadata = await mediator.SendAsync(new Qry.GetCatalogMetadataRequest(id), ct);
         return metadata is null ? NotFound() : Ok(metadata);
     }
+
+    [HttpGet("{id:guid}/info")]
+    public async Task<IActionResult> GetInfo(Guid id, CancellationToken ct)
+    {
+        var info = await mediator.SendAsync(new Qry.GetCatalogInfoRequest(id), ct);
+        return info is null ? NotFound() : Ok(info);
+    }
 }
