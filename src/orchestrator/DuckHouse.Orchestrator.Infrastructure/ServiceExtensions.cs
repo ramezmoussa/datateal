@@ -1,3 +1,4 @@
+using DuckHouse.Auth.ApiKey;
 using DuckHouse.Orchestrator.Core.Configuration;
 using DuckHouse.Orchestrator.Core.Interfaces;
 using DuckHouse.Orchestrator.Core.Repositories;
@@ -16,8 +17,12 @@ public static class ServiceExtensions
         var controlPlaneBaseAddress = configuration["ControlPlane:BaseAddress"]
             ?? throw new InvalidOperationException("ControlPlane:BaseAddress is not configured.");
 
+        services.Configure<ApiKeyDelegatingOptions>(configuration.GetSection("ServiceAuth:ControlPlane"));
+        services.AddTransient<ApiKeyDelegatingHandler>();
+
         services.AddHttpClient("ControlPlane", client =>
-            client.BaseAddress = new Uri(controlPlaneBaseAddress));
+            client.BaseAddress = new Uri(controlPlaneBaseAddress))
+            .AddHttpMessageHandler<ApiKeyDelegatingHandler>();
 
         services.AddScoped<IJobRepository, JobRepository>();
         services.AddScoped<IJobRunRepository, JobRunRepository>();

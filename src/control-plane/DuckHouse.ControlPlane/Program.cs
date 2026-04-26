@@ -1,3 +1,4 @@
+using DuckHouse.Auth;
 using DuckHouse.ControlPlane;
 using DuckHouse.ControlPlane.Application;
 using DuckHouse.ControlPlane.Application.InactivityEviction;
@@ -15,6 +16,8 @@ builder.Services.AddOpenApi();
 
 builder.Services.AddExceptionHandler<RuntimeProxyExceptionHandler>();
 builder.Services.AddProblemDetails();
+
+builder.Services.AddDuckHouseApiKeyAuthentication(builder.Configuration);
 
 builder.Services.Configure<InactivityEvictionOptions>(
     builder.Configuration.GetSection("InactivityEviction"));
@@ -44,8 +47,10 @@ if (app.Environment.IsDevelopment())
 
 app.UseExceptionHandler();
 app.UseHttpsRedirection();
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.MapDefaultEndpoints();
-app.MapNodeEndpoints();
+app.MapGroup(string.Empty).RequireAuthorization().MapNodeEndpoints();
 
 app.Run();

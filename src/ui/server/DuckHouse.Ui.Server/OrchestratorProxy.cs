@@ -1,13 +1,21 @@
+using DuckHouse.Auth.ApiKey;
+using Microsoft.Extensions.Options;
+
 namespace DuckHouse.Ui.Server;
 
 public static class OrchestratorProxy
 {
-    public static IServiceCollection AddOrchestratorProxy(this IServiceCollection services)
+    public static IServiceCollection AddOrchestratorProxy(this IServiceCollection services, IConfiguration configuration)
     {
+        var apiKey = configuration["ServiceAuth:Orchestrator:ApiKey"]
+            ?? throw new InvalidOperationException("ServiceAuth:Orchestrator:ApiKey is not configured.");
+
         services.AddHttpClient("Orchestrator", client =>
         {
             client.BaseAddress = new Uri("https+http://orchestrator");
-        });
+        })
+        .AddHttpMessageHandler(() => new ApiKeyDelegatingHandler(
+            Options.Create(new ApiKeyDelegatingOptions { ApiKey = apiKey })));
         return services;
     }
 
@@ -48,7 +56,7 @@ public static class OrchestratorProxy
             {
                 await responseMessage.Content.CopyToAsync(context.Response.Body, context.RequestAborted);
             }
-        });
+        }).RequireAuthorization();
 
         return endpoints;
     }

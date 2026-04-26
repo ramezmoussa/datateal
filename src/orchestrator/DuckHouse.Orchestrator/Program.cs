@@ -1,3 +1,4 @@
+using DuckHouse.Auth;
 using DuckHouse.Data;
 using DuckHouse.Orchestrator.Application;
 using DuckHouse.Orchestrator.Endpoints;
@@ -13,6 +14,8 @@ builder.AddServiceDefaults();
 builder.Services.AddOpenApi();
 
 builder.Services.AddProblemDetails();
+
+builder.Services.AddDuckHouseApiKeyAuthentication(builder.Configuration);
 
 builder.Services.AddApplicationServices();
 builder.Services.AddInfrastructureServices(builder.Configuration);
@@ -43,13 +46,16 @@ if (app.Environment.IsDevelopment())
 
 app.UseExceptionHandler();
 app.UseHttpsRedirection();
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.MapDefaultEndpoints();
 
-app.MapJobEndpoints();
-app.MapRunEndpoints();
-app.MapNodePoolEndpoints();
-app.MapAdminEndpoints();
+var api = app.MapGroup(string.Empty).RequireAuthorization();
+api.MapJobEndpoints();
+api.MapRunEndpoints();
+api.MapNodePoolEndpoints();
+api.MapAdminEndpoints();
 
 app.Run();
 

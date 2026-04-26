@@ -1,3 +1,4 @@
+using DuckHouse.Auth.ApiKey;
 using DuckHouse.Ui.Server.Core.Catalogs;
 using DuckHouse.Ui.Server.Core.Repositories;
 using DuckHouse.Ui.Server.Infrastructure.Catalogs;
@@ -5,6 +6,7 @@ using DuckHouse.Ui.Server.Infrastructure.Data;
 using DuckHouse.Ui.Server.Infrastructure.Repositories;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace DuckHouse.Ui.Server.Infrastructure;
 
@@ -15,10 +17,17 @@ public static class ServiceExtensions
         var baseAddress = configuration["ControlPlane:BaseAddress"]
             ?? throw new InvalidOperationException("ControlPlane:BaseAddress is not configured.");
 
+        var controlPlaneApiKey = configuration["ServiceAuth:ControlPlane:ApiKey"]
+            ?? throw new InvalidOperationException("ServiceAuth:ControlPlane:ApiKey is not configured.");
+
         services.AddHttpClient<INodeRepository, NodeRepository>(
-            client => client.BaseAddress = new Uri(baseAddress));
+            client => client.BaseAddress = new Uri(baseAddress))
+            .AddHttpMessageHandler(() => new ApiKeyDelegatingHandler(
+                Options.Create(new ApiKeyDelegatingOptions { ApiKey = controlPlaneApiKey })));
         services.AddHttpClient<IKernelRepository, KernelRepository>(
-            client => client.BaseAddress = new Uri(baseAddress));
+            client => client.BaseAddress = new Uri(baseAddress))
+            .AddHttpMessageHandler(() => new ApiKeyDelegatingHandler(
+                Options.Create(new ApiKeyDelegatingOptions { ApiKey = controlPlaneApiKey })));
 
         services.AddScoped<IWorkspaceRepository, WorkspaceRepository>();
         services.AddScoped<IWheelPackageRepository, WheelPackageRepository>();
@@ -27,5 +36,6 @@ public static class ServiceExtensions
         services.AddScoped<ICatalogDatabaseService, CatalogDatabaseService>();
         services.AddScoped<ICatalogMetadataService, CatalogMetadataService>();
         services.AddScoped<IInteractivePoolRepository, InteractivePoolRepository>();
+        services.AddScoped<IUserRepository, UserRepository>();
     }
 }

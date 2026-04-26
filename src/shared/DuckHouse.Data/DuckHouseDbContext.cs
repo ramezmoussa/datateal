@@ -1,4 +1,5 @@
 using System.Text.Json;
+using DuckHouse.Core.Users;
 using DuckHouse.Core.Catalogs;
 using DuckHouse.Core.Environment;
 using DuckHouse.Core.Nodes;
@@ -47,6 +48,10 @@ public class DuckHouseDbContext(DbContextOptions<DuckHouseDbContext> options)
     // ── Data Protection ───────────────────────────────────────────────────
     public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
 
+    // ── Users ─────────────────────────────────────────────────────────────
+    public DbSet<AppUser> AppUsers => Set<AppUser>();
+    public DbSet<UserCatalogAccess> UserCatalogAccess => Set<UserCatalogAccess>();
+
     // ── Orchestrator ──────────────────────────────────────────────────────
     public DbSet<Job> Jobs => Set<Job>();
     public DbSet<JobParameter> JobParameters => Set<JobParameter>();
@@ -63,6 +68,7 @@ public class DuckHouseDbContext(DbContextOptions<DuckHouseDbContext> options)
         ConfigureCatalogs(modelBuilder);
         ConfigureRuntimePackages(modelBuilder);
         ConfigureEnvironment(modelBuilder);
+        ConfigureUsers(modelBuilder);
         ConfigureOrchestrator(modelBuilder);
     }
 
@@ -167,6 +173,34 @@ public class DuckHouseDbContext(DbContextOptions<DuckHouseDbContext> options)
             entity.Property(e => e.EncryptedValue).IsRequired();
             entity.Property(e => e.Description).HasMaxLength(1024);
             entity.HasIndex(e => e.Key).IsUnique();
+        });
+    }
+
+    private static void ConfigureUsers(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<AppUser>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Email).HasMaxLength(256).IsRequired();
+            entity.HasIndex(e => e.Email).IsUnique();
+            entity.Property(e => e.ExternalId).HasMaxLength(256);
+            entity.HasIndex(e => e.ExternalId).IsUnique().HasFilter("\"ExternalId\" IS NOT NULL");
+            entity.Property(e => e.DisplayName).HasMaxLength(256).IsRequired();
+            entity.PrimitiveCollection(e => e.Roles).HasColumnType("jsonb");
+        });
+
+        modelBuilder.Entity<UserCatalogAccess>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasOne(e => e.User)
+                .WithMany(u => u.CatalogAccessList)
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(e => e.Catalog)
+                .WithMany()
+                .HasForeignKey(e => e.CatalogId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(e => new { e.UserId, e.CatalogId }).IsUnique();
         });
     }
 

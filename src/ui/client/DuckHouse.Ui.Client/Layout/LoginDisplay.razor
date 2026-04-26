@@ -1,0 +1,15 @@
+@using Microsoft.AspNetCore.Components.Authorization
+
+<AuthorizeView>
+    <Authorized>
+        <span style="color: rgba(255,255,255,0.65); margin-right: 12px;">
+            @context.User.Identity?.Name
+        </span>
+        <form method="post" action="authentication/logout">
+            <AntDesign.Button HtmlType="submit" Size="@ButtonSize.Small">Sign out</AntDesign.Button>
+        </form>
+    </Authorized>
+    <NotAuthorized>
+        <a href="authentication/login" style="color: rgba(255,255,255,0.85);">Sign in</a>
+    </NotAuthorized>
+</AuthorizeView>

@@ -3,6 +3,9 @@ using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 
+builder.Services.AddAuthorizationCore();
+builder.Services.AddAuthenticationStateDeserialization();
+
 builder.Services.AddAntDesign();
 
 builder.Services.AddHttpClient<INodeService, NodeService>(
@@ -22,6 +25,8 @@ builder.Services.AddHttpClient<IWheelPackageService, WheelPackageService>(
 builder.Services.AddHttpClient<IEnvironmentService, EnvironmentService>(
     client => client.BaseAddress = new Uri(builder.HostEnvironment.BaseAddress));
 builder.Services.AddHttpClient<ICatalogService, CatalogService>(
+    client => client.BaseAddress = new Uri(builder.HostEnvironment.BaseAddress));
+builder.Services.AddHttpClient<IUserService, UserService>(
     client => client.BaseAddress = new Uri(builder.HostEnvironment.BaseAddress));
 
 builder.Services.AddScoped<IThemeService, ThemeService>();

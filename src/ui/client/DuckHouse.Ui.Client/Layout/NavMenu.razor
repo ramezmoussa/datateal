@@ -61,6 +61,12 @@
         <Icon Type="@IconType.Outline.Setting" />
         <span>Settings</span>
     </MenuItem>
+    <AuthorizeView Policy="Admin">
+        <MenuItem Key="users" RouterLink="/users" RouterMatch="NavLinkMatch.Prefix">
+            <Icon Type="@IconType.Outline.Team" />
+            <span>Users</span>
+        </MenuItem>
+    </AuthorizeView>
 </Menu>
 
 <Drawer Closable="true" @bind-Visible="_showCreateJobModal" Placement="DrawerPlacement.Right"
@@ -184,6 +190,7 @@
             _ when path.StartsWith("/environment") => ["environment"],
             _ when path.StartsWith("/catalogs") => ["catalogs"],
             _ when path.StartsWith("/settings") => ["settings"],
+            _ when path.StartsWith("/users") => ["users"],
             _ => []
         };
     }

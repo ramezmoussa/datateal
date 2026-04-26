@@ -1,10 +1,14 @@
 using System.Text.Json.Serialization;
+using DuckHouse.Auth;
+using DuckHouse.Auth.EntraId;
 using DuckHouse.Data;
 using DuckHouse.Ui.Server;
 using DuckHouse.Ui.Server.Application;
+using DuckHouse.Ui.Server.Auth;
 using DuckHouse.Ui.Server.Components;
 using DuckHouse.Ui.Server.Core.Catalogs;
 using DuckHouse.Ui.Server.Infrastructure;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 
@@ -14,7 +18,8 @@ builder.AddServiceDefaults();
 
 // Add services to the container.
 builder.Services.AddRazorComponents()
-	.AddInteractiveWebAssemblyComponents();
+	.AddInteractiveWebAssemblyComponents()
+	.AddAuthenticationStateSerialization(options => options.SerializeAllClaims = true);
 
 builder.Services.AddControllers()
 	.AddJsonOptions(options =>
@@ -22,6 +27,13 @@ builder.Services.AddControllers()
 
 builder.Services.AddExceptionHandler<UpstreamExceptionHandler>();
 builder.Services.AddProblemDetails();
+
+// Authentication — pluggable OIDC provider (Entra ID)
+builder.Services.AddEntraIdAuthentication();
+builder.Services.AddDuckHouseWebAppAuthentication(builder.Configuration);
+builder.Services.AddDuckHouseAuthorizationPolicies();
+builder.Services.Configure<AdminUsersOptions>(builder.Configuration.GetSection("Authorization"));
+builder.Services.AddScoped<IClaimsTransformation, AppClaimsTransformation>();
 
 builder.Services.AddApplicationServices();
 builder.Services.AddInfrastructureServices(builder.Configuration);
@@ -34,7 +46,7 @@ builder.Services.AddDataProtection()
 
 builder.AddNpgsqlDbContext<DuckHouseDbContext>("duckhouse-ui");
 
-builder.Services.AddOrchestratorProxy();
+builder.Services.AddOrchestratorProxy(builder.Configuration);
 
 builder.Services.AddAntDesign();
 
@@ -62,11 +74,15 @@ else
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
 app.UseHttpsRedirection();
 
+app.UseAuthentication();
+app.UseAuthorization();
+
 app.UseAntiforgery();
 
 app.MapStaticAssets();
 app.MapControllers();
 app.MapOrchestratorProxy();
+app.MapLoginAndLogout();
 app.MapRazorComponents<App>()
 	.AddInteractiveWebAssemblyRenderMode()
 	.AddAdditionalAssemblies(typeof(DuckHouse.Ui.Client._Imports).Assembly);

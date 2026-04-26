@@ -15,6 +15,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\DuckHouse.Orchestrator.Core\DuckHouse.Orchestrator.Core.csproj" />
+    <ProjectReference Include="..\..\shared\DuckHouse.Auth\DuckHouse.Auth.csproj" />
     <ProjectReference Include="..\..\shared\DuckHouse.Data\DuckHouse.Data.csproj" />
   </ItemGroup>
 
