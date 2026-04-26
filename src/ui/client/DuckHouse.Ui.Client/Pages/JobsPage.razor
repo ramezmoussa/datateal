@@ -41,8 +41,7 @@
         <Spin Spinning="_loading">
             <Table TItem="JobSummary" DataSource="_jobs" Size="@TableSize.Small" PageSize="int.MaxValue" PaginationPosition="none">
                 <PropertyColumn Property="c => c.Name" Title="Name" Sortable>
-                    <a @onclick="@(() => Navigation.NavigateTo($"/jobs/{context.Id}"))"
-                       @onclick:preventDefault style="cursor: pointer;">@context.Name</a>
+                    <a href="@($"/jobs/{context.Id}")">@context.Name</a>
                 </PropertyColumn>
                 <PropertyColumn Property="c => c.Description" Title="Description" />
                 <PropertyColumn Property="c => c.IsEnabled" Title="Enabled">
@@ -141,12 +140,10 @@
                 <Table TItem="JobRunSummary" DataSource="_allRuns" Size="@TableSize.Small"
                        PageSize="int.MaxValue" PaginationPosition="none">
                     <PropertyColumn Property="c => c.JobName" Title="Job" Sortable>
-                        <a @onclick="@(() => Navigation.NavigateTo($"/jobs/{context.JobId}"))"
-                           @onclick:preventDefault style="cursor: pointer;">@context.JobName</a>
+                        <a href="@($"/jobs/{context.JobId}")">@context.JobName</a>
                     </PropertyColumn>
                     <PropertyColumn Property="c => c.Status" Title="Status">
-                        <a @onclick="@(() => Navigation.NavigateTo($"/runs/{context.Id}"))"
-                           @onclick:preventDefault style="cursor: pointer;">
+                        <a href="@($"/runs/{context.Id}")">
                             <Tag Color="@GetStatusColor(context.Status)">@context.Status</Tag>
                         </a>
                     </PropertyColumn>

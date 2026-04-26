@@ -76,14 +76,14 @@ else
                 }
                 else if (context.IsNotebook)
                 {
-                    <a @onclick="() => OpenItem(context.Item!)" @onclick:preventDefault style="cursor: pointer; font-weight: 500;">
+                    <a href="@($"/notebook/{context.Item!.Id}")" style="font-weight: 500;">
                         <Icon Type="@IconType.Outline.FileText" Style="margin-right: 6px; color: #1677ff;" />
                         @context.Name
                     </a>
                 }
                 else
                 {
-                    <a @onclick="() => OpenItem(context.Item!)" @onclick:preventDefault style="cursor: pointer; font-weight: 500;">
+                    <a href="@($"/query/{context.Item!.Id}")" style="font-weight: 500;">
                         <Icon Type="@IconType.Outline.Code" Style="margin-right: 6px; color: #52c41a;" />
                         @context.Name
                     </a>
