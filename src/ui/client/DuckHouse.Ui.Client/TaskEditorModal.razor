@@ -119,6 +119,7 @@
                                     TItemValue="Guid?"
                                     DataSource="_jobOptions"
                                     @bind-Value="_subJobId"
+                                    @bind-Value:after="OnSubJobIdChangedAsync"
                                     LabelName="@nameof(JobOption.Label)"
                                     ValueName="@nameof(JobOption.Value)"
                                     EnableSearch
@@ -130,6 +131,12 @@
                                 <div style="color: #ff4d4f; font-size: 12px; margin-top: 2px;">A sub-job must be selected.</div>
                             }
                         </div>
+                        @if (GetMissingRequiredSubJobParams() is { Count: > 0 } missingSubJobParams)
+                        {
+                            <div style="color: #ff4d4f; font-size: 12px; margin-top: 8px;">
+                                Required parameter(s) with no default value must be passed: <strong>@string.Join(", ", missingSubJobParams)</strong>
+                            </div>
+                        }
                     }
                 </div>
             </div>
@@ -262,6 +269,7 @@
     // Data sources
     private List<NodePoolOption> _nodePoolOptions = [];
     private List<JobOption> _jobOptions = [];
+    private List<JobParameterDto> _subJobParameters = [];
 
     protected override async Task OnInitializedAsync()
     {
@@ -283,7 +291,7 @@
         catch { /* Jobs may fail to load */ }
     }
 
-    protected override void OnParametersSet()
+    protected override async Task OnParametersSetAsync()
     {
         if (Visible && !_prevVisible)
         {
@@ -301,6 +309,9 @@
                 _nodePoolRef = Task.NodePoolRef;
                 _parameters = Task.Parameters.Select(p => new EditableTaskParameter { Key = p.Key, Value = p.Value }).ToList();
                 _dependencies = Task.Dependencies.Select(d => new EditableDependency { TaskName = d.TaskName, Condition = d.Condition }).ToList();
+
+                if (_taskType == TaskType.SubJob && _subJobId.HasValue)
+                    await LoadSubJobParamsAsync(_subJobId.Value);
             }
             else
             {
@@ -313,6 +324,7 @@
                 _notebookId = null;
                 _queryId = null;
                 _subJobId = null;
+                _subJobParameters = [];
                 _nodePoolRef = null;
                 _parameters = [];
                 _dependencies = [];
@@ -327,6 +339,7 @@
         _queryId = null;
         _subJobId = null;
         _nodePoolRef = null;
+        _subJobParameters = [];
     }
 
     private bool IsDuplicateName() =>
@@ -343,7 +356,49 @@
         if (ValidationHelper.ValidateTimeSpan(_retryInterval, required: true) is not null) return true;
         if (ValidationHelper.ValidateTimeSpan(_timeout, required: false) is not null) return true;
         if (_taskType == TaskType.Notebook && _parameters.Any(p => ValidationHelper.ValidatePythonIdentifier(p.Key) is not null)) return true;
+        if (_taskType == TaskType.SubJob && GetMissingRequiredSubJobParams().Count > 0) return true;
         return false;
+    }
+
+    private async Task LoadSubJobParamsAsync(Guid subJobId)
+    {
+        try
+        {
+            var detail = await JobService.GetJobAsync(subJobId);
+            _subJobParameters = detail?.Parameters?.ToList() ?? [];
+        }
+        catch
+        {
+            _subJobParameters = [];
+        }
+    }
+
+    private async Task OnSubJobIdChangedAsync()
+    {
+        if (_subJobId is null)
+        {
+            _subJobParameters = [];
+            return;
+        }
+
+        await LoadSubJobParamsAsync(_subJobId.Value);
+
+        foreach (var p in _subJobParameters.Where(p => p.IsRequired && p.DefaultValue is null))
+        {
+            if (!_parameters.Any(tp => string.Equals(tp.Key?.Trim(), p.Name, StringComparison.OrdinalIgnoreCase)))
+                _parameters.Add(new EditableTaskParameter { Key = p.Name, Value = "" });
+        }
+    }
+
+    private List<string> GetMissingRequiredSubJobParams()
+    {
+        return _subJobParameters
+            .Where(p => p.IsRequired && p.DefaultValue is null)
+            .Where(p => !_parameters.Any(tp =>
+                string.Equals(tp.Key?.Trim(), p.Name, StringComparison.OrdinalIgnoreCase)
+                && !string.IsNullOrWhiteSpace(tp.Value)))
+            .Select(p => p.Name)
+            .ToList();
     }
 
     private async Task HandleSave()
