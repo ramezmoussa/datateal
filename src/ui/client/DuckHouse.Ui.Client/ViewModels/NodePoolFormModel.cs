@@ -1,12 +1,8 @@
-using System.ComponentModel.DataAnnotations;
-
 namespace DuckHouse.Ui.Client.ViewModels;
 
 public class NodePoolFormModel
 {
-    [Required]
     public string Name { get; set; } = "";
-    [Required]
     public string VmSize { get; set; } = "";
     public int KernelIdleMin { get; set; }
     public int? NodeIdleMin { get; set; }

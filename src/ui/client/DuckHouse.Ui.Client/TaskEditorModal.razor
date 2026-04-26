@@ -18,8 +18,8 @@
                 <div>
                     <label style="display: block; margin-bottom: 4px; font-weight: 500;">Name</label>
                     <Input @bind-Value="_name" Placeholder="task-name"
-                           Status="@(IsDuplicateName() ? "error" : "")"
-                           OnInput="@(e => _name = e.Value?.ToString() ?? "")"
+                           Class="@(IsDuplicateName() ? "ant-input-status-error" : "")"
+                           BindOnInput
                            OnPressEnter="@(async _ => await HandleSave())" />
                     @if (IsDuplicateName())
                     {
@@ -145,8 +145,8 @@
                     <div>
                         <label style="display: block; margin-bottom: 4px; font-weight: 500;">Retry interval</label>
                         <Input @bind-Value="_retryInterval" Placeholder="00:00:30"
-                               Status="@(ValidationHelper.ValidateTimeSpan(_retryInterval, required: true) is not null ? "error" : "")"
-                               OnInput="@(e => _retryInterval = e.Value?.ToString() ?? "")"
+                               Class="@(ValidationHelper.ValidateTimeSpan(_retryInterval, required: true) is not null ? "ant-input-status-error" : "")"
+                               BindOnInput
                                OnPressEnter="@(async _ => await HandleSave())" />
                         @if (ValidationHelper.ValidateTimeSpan(_retryInterval, required: true) is { } retryErr)
                         {
@@ -156,7 +156,7 @@
                     <div>
                         <label style="display: block; margin-bottom: 4px; font-weight: 500;">Timeout</label>
                         <Input @bind-Value="_timeout" Placeholder="01:00:00 (optional)"
-                               Status="@(ValidationHelper.ValidateTimeSpan(_timeout, required: false) is not null ? "error" : "")"
+                               Class="@(ValidationHelper.ValidateTimeSpan(_timeout, required: false) is not null ? "ant-input-status-error" : "")"
                                OnInput="@(e => _timeout = string.IsNullOrEmpty(e.Value?.ToString()) ? null : e.Value.ToString())"
                                OnPressEnter="@(async _ => await HandleSave())" />
                         @if (ValidationHelper.ValidateTimeSpan(_timeout, required: false) is { } timeoutErr)
@@ -181,7 +181,7 @@
                         <div style="display: flex; gap: 8px; align-items: flex-start;">
                             <div style="flex: 1;">
                                 <Input @bind-Value="param.Key" Placeholder="Key"
-                                       Status="@(keyErr is not null ? "error" : "")" />
+                                       Class="@(keyErr is not null ? "ant-input-status-error" : "")" />
                                 @if (keyErr is not null)
                                 {
                                     <div style="color: #ff4d4f; font-size: 12px; margin-top: 2px;">@keyErr</div>

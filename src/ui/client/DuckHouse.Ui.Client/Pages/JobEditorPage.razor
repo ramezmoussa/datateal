@@ -280,7 +280,7 @@
                 <Form Model="@_scheduleForm" Layout="FormLayout.Vertical" ValidateOnChange="true">
                     <FormItem Label="Cron Expression" Rules="@_cronRules">
                         <Input @bind-Value="context.Cron"
-                               OnInput="@(e => _scheduleForm.Cron = e.Value?.ToString() ?? "")"
+                               BindOnInput
                                OnPressEnter="@(async _ => await ConfirmSchedule())"
                                Placeholder="0 0 6 * * ?" />
                     </FormItem>
@@ -307,9 +307,9 @@
                             var idx = index;
                             <div style="display: flex; gap: 8px; margin-bottom: 8px; align-items: center;">
                                 <Input @bind-Value="param.Key" Placeholder="Key" Style="flex: 1;"
-                                       OnInput="@(e => param.Key = e.Value?.ToString() ?? "")" />
+                                       BindOnInput />
                                 <Input @bind-Value="param.Value" Placeholder="Value" Style="flex: 1;"
-                                       OnInput="@(e => param.Value = e.Value?.ToString() ?? "")" />
+                                       BindOnInput />
                                 <Button Danger Size="@ButtonSize.Small" OnClick="() => _scheduleForm.Parameters.RemoveAt(idx)">
                                     <Icon Type="@IconType.Outline.Delete" />
                                 </Button>
@@ -354,6 +354,7 @@
 
         <ParameterEditorModal @bind-Visible="_showParamModal"
                               Parameter="_paramBeingEdited"
+                              ExistingParameters="_editParams"
                               OnSave="OnParameterSaved" />
 
         <TriggerJobModal @bind-Visible="_showTriggerModal"

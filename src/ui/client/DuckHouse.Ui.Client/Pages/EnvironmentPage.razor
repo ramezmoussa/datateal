@@ -195,26 +195,31 @@
         BodyStyle="display: flex; flex-direction: column; padding: 0; overflow: hidden;">
     <div style="flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 16px;">
         <Form Model="@_varForm" Layout="FormLayout.Vertical" ValidateOnChange="true">
-            <FormItem Label="Key" Rules="@_varKeyRules">
+            <FormItem Label="Key">
                 <Input @bind-Value="context.Key" Placeholder="MY_VARIABLE"
-                       OnInput="@(e => _varForm.Key = e.Value?.ToString() ?? "")"
+                       BindOnInput
+                       Class="@(VarKeyDisplayError is not null ? "ant-input-status-error" : "")"
                        OnPressEnter="@(async _ => await ConfirmSaveVariable())" />
+                @if (VarKeyDisplayError is not null)
+                {
+                    <div class="ant-form-item-explain-error">@VarKeyDisplayError</div>
+                }
             </FormItem>
             <FormItem Label="Value" Rules="@_requiredRule">
                 <Input @bind-Value="context.Value" Placeholder="https://example.com"
-                       OnInput="@(e => _varForm.Value = e.Value?.ToString() ?? "")"
+                       BindOnInput
                        OnPressEnter="@(async _ => await ConfirmSaveVariable())" />
             </FormItem>
             <FormItem Label="Description">
                 <TextArea @bind-Value="context.Description" Rows="2"
-                          OnInput="@(e => _varForm.Description = e.Value?.ToString())" />
+                          BindOnInput />
             </FormItem>
         </Form>
     </div>
     <div class="drawer-footer">
         <Button OnClick="() => _showVarModal = false">Cancel</Button>
         <Button Type="@ButtonType.Primary" OnClick="ConfirmSaveVariable"
-                Disabled="@(string.IsNullOrWhiteSpace(_varForm.Key) || string.IsNullOrWhiteSpace(_varForm.Value) || ValidationHelper.ValidateEnvVarKey(_varForm.Key) is not null)">Save</Button>
+                Disabled="@(GetVarKeyError() is not null || string.IsNullOrWhiteSpace(_varForm.Value))">Save</Button>
     </div>
 </Drawer>
 
@@ -225,28 +230,33 @@
         BodyStyle="display: flex; flex-direction: column; padding: 0; overflow: hidden;">
     <div style="flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 16px;">
         <Form Model="@_secretForm" Layout="FormLayout.Vertical" ValidateOnChange="true">
-            <FormItem Label="Key" Rules="@_secretKeyRules">
+            <FormItem Label="Key">
                 <Input @bind-Value="context.Key" Placeholder="API_TOKEN"
-                       OnInput="@(e => _secretForm.Key = e.Value?.ToString() ?? "")"
+                       BindOnInput
+                       Class="@(SecretKeyDisplayError is not null ? "ant-input-status-error" : "")"
                        OnPressEnter="@(async _ => await ConfirmSaveSecret())" />
+                @if (SecretKeyDisplayError is not null)
+                {
+                    <div class="ant-form-item-explain-error">@SecretKeyDisplayError</div>
+                }
             </FormItem>
             <FormItem Label="@(_editSecretTarget is not null ? "Value (leave blank to keep current)" : "Value")"
                       Rules="@(_editSecretTarget is null ? _requiredRule : Array.Empty<FormValidationRule>())">
                 <InputPassword @bind-Value="context.Value"
                                Placeholder="@(_editSecretTarget is not null ? "••••••••" : "Enter secret value")"
-                               OnInput="@(e => _secretForm.Value = e.Value?.ToString() ?? "")"
+                               BindOnInput
                                OnPressEnter="@(async _ => await ConfirmSaveSecret())" />
             </FormItem>
             <FormItem Label="Description">
                 <TextArea @bind-Value="context.Description" Rows="2"
-                          OnInput="@(e => _secretForm.Description = e.Value?.ToString())" />
+                          BindOnInput />
             </FormItem>
         </Form>
     </div>
     <div class="drawer-footer">
         <Button OnClick="() => _showSecretModal = false">Cancel</Button>
         <Button Type="@ButtonType.Primary" OnClick="ConfirmSaveSecret"
-                Disabled="@(string.IsNullOrWhiteSpace(_secretForm.Key) || (_editSecretTarget is null && string.IsNullOrWhiteSpace(_secretForm.Value)) || ValidationHelper.ValidateEnvVarKey(_secretForm.Key) is not null)">Save</Button>
+                Disabled="@(GetSecretKeyError() is not null || (_editSecretTarget is null && string.IsNullOrWhiteSpace(_secretForm.Value)))">Save</Button>
     </div>
 </Drawer>
 
@@ -269,11 +279,41 @@
     private bool _showVarModal;
     private EnvironmentVariableDto? _editVarTarget;
     private VariableFormModel _varForm = new();
+    private bool _varKeySubmitAttempted;
+
+    private string? VarKeyDisplayError =>
+        (_varKeySubmitAttempted || !string.IsNullOrEmpty(_varForm.Key)) ? GetVarKeyError() : null;
+
+    private string? GetVarKeyError()
+    {
+        if (string.IsNullOrEmpty(_varForm.Key)) return "Key is required.";
+        if (ValidationHelper.ValidateEnvVarKey(_varForm.Key) is { } formatError) return formatError;
+        var trimmed = _varForm.Key.Trim();
+        if (_variables.Any(v => v.Key.Equals(trimmed, StringComparison.OrdinalIgnoreCase)
+                                && v != _editVarTarget))
+            return "A variable with this key already exists.";
+        return null;
+    }
 
     // Secret modal state
     private bool _showSecretModal;
     private SecretDto? _editSecretTarget;
     private SecretFormModel _secretForm = new();
+    private bool _secretKeySubmitAttempted;
+
+    private string? SecretKeyDisplayError =>
+        (_secretKeySubmitAttempted || !string.IsNullOrEmpty(_secretForm.Key)) ? GetSecretKeyError() : null;
+
+    private string? GetSecretKeyError()
+    {
+        if (string.IsNullOrEmpty(_secretForm.Key)) return "Key is required.";
+        if (ValidationHelper.ValidateEnvVarKey(_secretForm.Key) is { } formatError) return formatError;
+        var trimmed = _secretForm.Key.Trim();
+        if (_secrets.Any(s => s.Key.Equals(trimmed, StringComparison.OrdinalIgnoreCase)
+                              && s != _editSecretTarget))
+            return "A secret with this key already exists.";
+        return null;
+    }
 
     private static readonly FormValidationRule[] _requiredRule =
     [
@@ -323,19 +363,23 @@
     {
         _editVarTarget = null;
         _varForm = new VariableFormModel();
+        _varKeySubmitAttempted = false;
         _showVarModal = true;
     }
 
     private void StartEditVariable(EnvironmentVariableDto variable)
     {
         _editVarTarget = variable;
+        _varKeySubmitAttempted = false;
         _varForm = new VariableFormModel { Key = variable.Key, Value = variable.Value, Description = variable.Description };
         _showVarModal = true;
     }
 
     private async Task ConfirmSaveVariable()
     {
-        if (string.IsNullOrWhiteSpace(_varForm.Key) || string.IsNullOrWhiteSpace(_varForm.Value)) return;
+        _varKeySubmitAttempted = true;
+        if (GetVarKeyError() is not null) return;
+        if (string.IsNullOrWhiteSpace(_varForm.Value)) return;
 
         try
         {
@@ -371,19 +415,22 @@
     {
         _editSecretTarget = null;
         _secretForm = new SecretFormModel();
+        _secretKeySubmitAttempted = false;
         _showSecretModal = true;
     }
 
     private void StartEditSecret(SecretDto secret)
     {
         _editSecretTarget = secret;
+        _secretKeySubmitAttempted = false;
         _secretForm = new SecretFormModel { Key = secret.Key, Description = secret.Description };
         _showSecretModal = true;
     }
 
     private async Task ConfirmSaveSecret()
     {
-        if (string.IsNullOrWhiteSpace(_secretForm.Key)) return;
+        _secretKeySubmitAttempted = true;
+        if (GetSecretKeyError() is not null) return;
         if (_editSecretTarget is null && string.IsNullOrWhiteSpace(_secretForm.Value)) return;
 
         try

@@ -141,12 +141,12 @@
         <Form Model="@_form" Layout="FormLayout.Vertical">
             <FormItem Label="Name">
                 <Input @bind-Value="context.Name" Placeholder="my_catalog"
-                       OnInput="@OnNameInput"
-                       Class="@(_nameError is not null ? "ant-input-status-error" : "")"
+                       BindOnInput
+                       Class="@(NameDisplayError is not null ? "ant-input-status-error" : "")"
                        OnPressEnter="@(async _ => await ConfirmSave())" />
-                @if (_nameError is not null)
+                @if (NameDisplayError is not null)
                 {
-                    <div class="ant-form-item-explain-error">@_nameError</div>
+                    <div class="ant-form-item-explain-error">@NameDisplayError</div>
                 }
             </FormItem>
 
@@ -176,18 +176,18 @@
             {
                 <FormItem Label="Data path" Rules="@_requiredRule">
                     <Input @bind-Value="context.DataPath" Placeholder="/data/ducklake/my_catalog or abfss://..."
-                           OnInput="@(e => _form.DataPath = e.Value?.ToString() ?? "")"
+                           BindOnInput
                            OnPressEnter="@(async _ => await ConfirmSave())" />
                 </FormItem>
                 <FormItem Label="@("Storage connection string (Azure only)")">
                     <InputPassword @bind-Value="context.StorageConnectionString"
                         Placeholder="@(_editTarget is UnmanagedCatalogDto u1 && u1.HasStorageConnectionString ? "••••••••" : "DefaultEndpointsProtocol=https;...")"
-                        OnInput="@(e => _form.StorageConnectionString = e.Value?.ToString() ?? "")"
+                        BindOnInput
                         OnPressEnter="@(async _ => await ConfirmSave())" />
                 </FormItem>
                 <FormItem Label="Catalog host" Rules="@_requiredRule">
                     <Input @bind-Value="context.CatalogHost" Placeholder="localhost"
-                           OnInput="@(e => _form.CatalogHost = e.Value?.ToString() ?? "")"
+                           BindOnInput
                            OnPressEnter="@(async _ => await ConfirmSave())" />
                 </FormItem>
                 <FormItem Label="Catalog port">
@@ -195,18 +195,18 @@
                 </FormItem>
                 <FormItem Label="Catalog database" Rules="@_requiredRule">
                     <Input @bind-Value="context.CatalogDatabase" Placeholder="my_catalog"
-                           OnInput="@(e => _form.CatalogDatabase = e.Value?.ToString() ?? "")"
+                           BindOnInput
                            OnPressEnter="@(async _ => await ConfirmSave())" />
                 </FormItem>
                 <FormItem Label="Catalog user" Rules="@_requiredRule">
                     <Input @bind-Value="context.CatalogUser" Placeholder="postgres"
-                           OnInput="@(e => _form.CatalogUser = e.Value?.ToString() ?? "")"
+                           BindOnInput
                            OnPressEnter="@(async _ => await ConfirmSave())" />
                 </FormItem>
                 <FormItem Label="@(_editTarget is not null ? "Catalog password (leave blank to keep current)" : "Catalog password")">
                     <InputPassword @bind-Value="context.CatalogPassword"
                         Placeholder="@(_editTarget is UnmanagedCatalogDto u2 && u2.HasCatalogPassword ? "••••••••" : "Enter password")"
-                        OnInput="@(e => _form.CatalogPassword = e.Value?.ToString() ?? "")"
+                        BindOnInput
                         OnPressEnter="@(async _ => await ConfirmSave())" />
                 </FormItem>
             }
@@ -239,23 +239,15 @@
     private bool _showModal;
     private CatalogDto? _editTarget;
     private CatalogFormModel _form = new();
-    private string? _nameError;
+    private bool _nameSubmitAttempted;
+
+    private string? NameDisplayError =>
+        (_nameSubmitAttempted || !string.IsNullOrEmpty(_form.Name)) ? GetNameError() : null;
 
     private static readonly FormValidationRule[] _requiredRule =
     [
         new() { Required = true, Message = "This field is required." }
     ];
-
-    private void OnNameInput(ChangeEventArgs e)
-    {
-        _form.Name = e.Value?.ToString() ?? "";
-        var error = GetNameError();
-        // Always re-evaluate if already in error state.
-        // Also show new errors proactively (format, duplicate), but suppress
-        // "Name is required." on a fresh empty field before first submit attempt.
-        if (_nameError is not null || (error is not null && !string.IsNullOrEmpty(_form.Name)))
-            _nameError = error;
-    }
 
     private string? GetNameError()
     {
@@ -349,14 +341,14 @@
     {
         _editTarget = null;
         _form = new CatalogFormModel();
-        _nameError = null;
+        _nameSubmitAttempted = false;
         _showModal = true;
     }
 
     private void StartEdit(CatalogDto catalog)
     {
         _editTarget = catalog;
-        _nameError = null;
+        _nameSubmitAttempted = false;
         _form = new CatalogFormModel
         {
             Name = catalog.Name,
@@ -377,8 +369,8 @@
 
     private async Task ConfirmSave()
     {
-        _nameError = GetNameError();
-        if (_nameError is not null) return;
+        _nameSubmitAttempted = true;
+        if (GetNameError() is not null) return;
         if (!IsFormValid()) return;
 
         try

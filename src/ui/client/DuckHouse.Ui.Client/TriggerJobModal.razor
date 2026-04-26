@@ -36,7 +36,7 @@
                                 }
                                 <Input @bind-Value="_paramValues[param.Name]"
                                        Placeholder="@(param.DefaultValue ?? "")"
-                                       OnInput="@(e => _paramValues[param.Name] = e.Value?.ToString() ?? "")"
+                                       BindOnInput
                                        OnPressEnter="@(_ => HandleConfirm())" />
                             </div>
                         }

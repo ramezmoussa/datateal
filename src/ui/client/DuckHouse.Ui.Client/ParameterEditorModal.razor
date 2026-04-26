@@ -1,21 +1,25 @@
 @using DuckHouse.Ui.Client.Models
 @using DuckHouse.Ui.Client.Validation
-@using System.ComponentModel.DataAnnotations
 
 <Drawer Closable="true" Visible="Visible" Placement="DrawerPlacement.Right"
         Width="480" Title="@(_isEdit ? "Edit parameter" : "Add parameter")"
         OnClose="HandleCancel"
         BodyStyle="display: flex; flex-direction: column; padding: 0; overflow: hidden;">
     <div style="flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 16px;">
-        <Form Model="@_form" Layout="FormLayout.Vertical" ValidateOnChange="true">
-            <FormItem Label="Name" Rules="@_nameRules">
+        <Form Model="@_form" Layout="FormLayout.Vertical">
+            <FormItem Label="Name">
                 <Input @bind-Value="context.Name" Placeholder="parameter_name"
-                       OnInput="@(e => _form.Name = e.Value?.ToString() ?? "")"
+                       BindOnInput
+                       Class="@(NameDisplayError is not null ? "ant-input-status-error" : "")"
                        OnPressEnter="@(async _ => await HandleSave())" />
+                @if (NameDisplayError is not null)
+                {
+                    <div class="ant-form-item-explain-error">@NameDisplayError</div>
+                }
             </FormItem>
             <FormItem Label="Default value">
                 <Input @bind-Value="context.DefaultValue" Placeholder="Optional default value"
-                       OnInput="@(e => _form.DefaultValue = e.Value?.ToString())"
+                       BindOnInput
                        OnPressEnter="@(async _ => await HandleSave())" />
             </FormItem>
             <FormItem Label="Required">
@@ -23,14 +27,14 @@
             </FormItem>
             <FormItem Label="Description">
                 <TextArea @bind-Value="context.Description" Rows="3" Placeholder="Optional description"
-                          OnInput="@(e => _form.Description = e.Value?.ToString())" />
+                          BindOnInput />
             </FormItem>
         </Form>
     </div>
     <div class="drawer-footer">
         <Button OnClick="HandleCancel">Cancel</Button>
         <Button Type="@ButtonType.Primary" OnClick="HandleSave"
-                Disabled="@(string.IsNullOrWhiteSpace(_form.Name) || ValidationHelper.ValidatePythonIdentifier(_form.Name) is not null)">Save</Button>
+                Disabled="@(NameDisplayError is not null)">Save</Button>
     </div>
 </Drawer>
 
@@ -39,23 +43,32 @@
     [Parameter] public EventCallback<bool> VisibleChanged { get; set; }
     [Parameter] public EditableParameter? Parameter { get; set; }
     [Parameter] public EventCallback<EditableParameter> OnSave { get; set; }
+    [Parameter] public IReadOnlyList<EditableParameter> ExistingParameters { get; set; } = [];
 
     private ParameterFormModel _form = new();
     private bool _isEdit;
     private bool _prevVisible;
+    private bool _nameSubmitAttempted;
 
-    private static readonly FormValidationRule[] _nameRules =
-    [
-        new() { Required = true, Message = "Name is required." },
-        new() { Validator = ctx =>
-            ValidationHelper.ValidatePythonIdentifier(ctx.Value?.ToString()) is { } err
-                ? new ValidationResult(err, [ctx.FieldName]) : null }
-    ];
+    private string? NameDisplayError =>
+        (_nameSubmitAttempted || !string.IsNullOrEmpty(_form.Name)) ? GetNameError() : null;
+
+    private string? GetNameError()
+    {
+        if (string.IsNullOrEmpty(_form.Name)) return "Name is required.";
+        if (ValidationHelper.ValidatePythonIdentifier(_form.Name) is { } err) return err;
+        var isDuplicate = ExistingParameters
+            .Where(p => p != Parameter)
+            .Any(p => string.Equals(p.Name, _form.Name.Trim(), StringComparison.Ordinal));
+        if (isDuplicate) return "A parameter with this name already exists.";
+        return null;
+    }
 
     protected override void OnParametersSet()
     {
         if (Visible && !_prevVisible)
         {
+            _nameSubmitAttempted = false;
             if (Parameter is not null)
             {
                 _isEdit = true;
@@ -78,6 +91,8 @@
 
     private async Task HandleSave()
     {
+        _nameSubmitAttempted = true;
+        if (GetNameError() is not null) return;
         var result = new EditableParameter
         {
             Name = _form.Name.Trim(),

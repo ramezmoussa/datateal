@@ -245,14 +245,19 @@
         BodyStyle="display: flex; flex-direction: column; padding: 0; overflow: hidden;">
     <div style="flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 16px;">
         <Form Model="@_form" Layout="FormLayout.Vertical" ValidateOnChange="true">
-            <FormItem Label="Name" Rules="@_nodePoolNameRules">
+            <FormItem Label="Name">
                 <Input @bind-Value="context.Name" Placeholder="Analytics Node Pool"
-                       OnInput="@(e => _form.Name = e.Value?.ToString() ?? "")"
+                       BindOnInput
+                       Class="@(NameDisplayError is not null ? "ant-input-status-error" : "")"
                        OnPressEnter="@(async _ => await ConfirmSave())" />
+                @if (NameDisplayError is not null)
+                {
+                    <div class="ant-form-item-explain-error">@NameDisplayError</div>
+                }
             </FormItem>
             <FormItem Label="VM Size" Rules="@_requiredRule">
                 <Input @bind-Value="context.VmSize" Placeholder="Standard_D4as_v5"
-                       OnInput="@(e => _form.VmSize = e.Value?.ToString() ?? "")"
+                       BindOnInput
                        OnPressEnter="@(async _ => await ConfirmSave())" />
             </FormItem>
             <FormItem Label="Kernel idle timeout (minutes)">
@@ -267,7 +272,7 @@
             </FormItem>
             <FormItem Label="Kernel requirements (pip)">
                 <TextArea @bind-Value="context.KernelReqs" Rows="3" Placeholder="@("scipy>=1.14\nscikit-learn>=1.6")"
-                          OnInput="@(e => _form.KernelReqs = e.Value?.ToString())" />
+                          BindOnInput />
             </FormItem>
             @{
                 var isJobPool = _editTarget?.PoolType == NodePoolType.Job || (_editTarget is null && _activeTab == "job");
@@ -333,7 +338,7 @@
             </FormItem>
             <FormItem Label="Description">
                 <TextArea @bind-Value="context.Description" Rows="2"
-                          OnInput="@(e => _form.Description = e.Value?.ToString())" />
+                          BindOnInput />
             </FormItem>
         </Form>
     </div>
@@ -368,6 +373,21 @@
     private string? _formValidationError;
     private NodePoolConfigDto? _editTarget;
     private NodePoolFormModel _form = new();
+    private bool _nameSubmitAttempted;
+
+    private string? NameDisplayError =>
+        (_nameSubmitAttempted || !string.IsNullOrEmpty(_form.Name)) ? GetNameError() : null;
+
+    private string? GetNameError()
+    {
+        if (string.IsNullOrEmpty(_form.Name)) return "Name is required.";
+        if (ValidationHelper.ValidateNodePoolName(_form.Name) is { } formatError) return formatError;
+        var trimmed = _form.Name.Trim();
+        if (_jobAndInteractivePools.Any(p => p.Name.Equals(trimmed, StringComparison.OrdinalIgnoreCase)
+                                            && p != _editTarget))
+            return "A node pool with this name already exists.";
+        return null;
+    }
 
     private static readonly FormValidationRule[] _nodePoolNameRules =
     [
@@ -433,6 +453,7 @@
     {
         _editTarget = null;
         _form = new NodePoolFormModel();
+        _nameSubmitAttempted = false;
         _formValidationError = null;
         _showDrawer = true;
     }
@@ -440,6 +461,7 @@
     private void StartEdit(NodePoolConfigDto pool)
     {
         _editTarget = pool;
+        _nameSubmitAttempted = false;
         _form = new NodePoolFormModel
         {
             Name = pool.Name,
@@ -461,7 +483,9 @@
 
     private async Task ConfirmSave()
     {
-        if (string.IsNullOrWhiteSpace(_form.Name) || string.IsNullOrWhiteSpace(_form.VmSize)) return;
+        _nameSubmitAttempted = true;
+        if (GetNameError() is not null) return;
+        if (string.IsNullOrWhiteSpace(_form.VmSize)) return;
 
         var isJobPool = _editTarget?.PoolType == NodePoolType.Job || (_editTarget is null && _activeTab == "job");
         if (isJobPool)

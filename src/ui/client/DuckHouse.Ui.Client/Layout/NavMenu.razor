@@ -68,15 +68,20 @@
         OnClose="() => _showCreateJobModal = false"
         BodyStyle="display: flex; flex-direction: column; padding: 0; overflow: hidden;">
     <div style="flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 16px;">
-        <Form Model="@_jobForm" Layout="FormLayout.Vertical" ValidateOnChange="true">
-            <FormItem Label="Name" Rules="@_jobNameRules">
+        <Form Model="@_jobForm" Layout="FormLayout.Vertical">
+            <FormItem Label="Name">
                 <Input @bind-Value="context.Name" Placeholder="My job"
-                       OnInput="@(e => _jobForm.Name = e.Value?.ToString() ?? "")"
+                       BindOnInput
+                       Class="@(JobNameDisplayError is not null ? "ant-input-status-error" : "")"
                        OnPressEnter="@(async _ => await ConfirmCreateJobAsync())" />
+                @if (JobNameDisplayError is not null)
+                {
+                    <div class="ant-form-item-explain-error">@JobNameDisplayError</div>
+                }
             </FormItem>
             <FormItem Label="Description">
                 <TextArea @bind-Value="context.Description" Placeholder="Optional description" Rows="3"
-                          OnInput="@(e => _jobForm.Description = e.Value?.ToString())" />
+                          BindOnInput />
             </FormItem>
             @if (_createJobError is not null)
             {
@@ -87,7 +92,7 @@
     <div class="drawer-footer">
         <Button OnClick="() => _showCreateJobModal = false">Cancel</Button>
         <Button Type="@ButtonType.Primary" OnClick="ConfirmCreateJobAsync"
-                Disabled="@(string.IsNullOrWhiteSpace(_jobForm.Name) || _creatingJob)"
+                Disabled="@(GetJobNameError() is not null || _creatingJob)"
                 Loading="@_creatingJob">Create</Button>
     </div>
 </Drawer>
@@ -107,22 +112,39 @@
     private CreateJobFormModel _jobForm = new();
     private bool _creatingJob;
     private string? _createJobError;
+    private bool _jobNameSubmitAttempted;
+    private IReadOnlyList<JobSummary> _existingJobs = [];
+
+    private string? JobNameDisplayError =>
+        (_jobNameSubmitAttempted || !string.IsNullOrEmpty(_jobForm.Name)) ? GetJobNameError() : null;
+
+    private string? GetJobNameError()
+    {
+        if (string.IsNullOrEmpty(_jobForm.Name)) return "Name is required.";
+        var trimmed = _jobForm.Name.Trim();
+        if (_existingJobs.Any(j => j.Name.Equals(trimmed, StringComparison.OrdinalIgnoreCase)))
+            return "A job with this name already exists.";
+        return null;
+    }
 
     private static readonly FormValidationRule[] _jobNameRules =
     [
         new() { Required = true, Message = "Name is required." }
     ];
 
-    private void StartCreateJob()
+    private async Task StartCreateJob()
     {
         _jobForm = new CreateJobFormModel();
         _createJobError = null;
+        _jobNameSubmitAttempted = false;
+        try { _existingJobs = await JobService.GetJobsAsync(); } catch { /* non-fatal */ }
         _showCreateJobModal = true;
     }
 
     private async Task ConfirmCreateJobAsync()
     {
-        if (string.IsNullOrWhiteSpace(_jobForm.Name)) return;
+        _jobNameSubmitAttempted = true;
+        if (GetJobNameError() is not null) return;
         _creatingJob = true;
         _createJobError = null;
         try

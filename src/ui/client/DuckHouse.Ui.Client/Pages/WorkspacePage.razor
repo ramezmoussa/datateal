@@ -246,7 +246,7 @@ else
         <Form Model="@_renameFolderForm" Layout="FormLayout.Vertical" ValidateOnChange="true">
             <FormItem Label="Name" Rules="@_renameRules">
                 <Input @bind-Value="context.Name" Placeholder="Folder name"
-                       OnInput="@(e => _renameFolderForm.Name = e.Value?.ToString() ?? "")"
+                       BindOnInput
                        OnPressEnter="@(async _ => await ConfirmRenameFolderAsync())" />
             </FormItem>
         </Form>
@@ -267,7 +267,7 @@ else
         <Form Model="@_renameItemForm" Layout="FormLayout.Vertical" ValidateOnChange="true">
             <FormItem Label="Title" Rules="@_renameRules">
                 <Input @bind-Value="context.Title" Placeholder="Title"
-                       OnInput="@(e => _renameItemForm.Title = e.Value?.ToString() ?? "")"
+                       BindOnInput
                        OnPressEnter="@(async _ => await ConfirmRenameItemAsync())" />
             </FormItem>
         </Form>
