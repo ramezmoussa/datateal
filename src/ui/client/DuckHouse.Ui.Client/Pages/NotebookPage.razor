@@ -32,6 +32,15 @@
                     CatalogSetupRunning="@_catalog.SetupRunning" />
     <div class="cp-main" style="margin-left: 24px;">
 
+        @if (_isLoading)
+        {
+            <div style="display: flex; align-items: center; justify-content: center; height: 300px;">
+                <Spin Size="SpinSize.Large" />
+            </div>
+        }
+        else
+        {
+
         <div class="nb-header">
         <Flex Justify="FlexJustify.SpaceBetween" Align="FlexAlign.Center" Style="margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
             <Space Align="SpaceAlign.End" Size="SpaceSize.Middle">
@@ -269,6 +278,8 @@
                         OnConfirm="ConfirmSaveToFolderAsync"
                         OnCancel="@(() => _showFolderPicker = false)" />
 
+        }@* end else (not loading) *@
+
     </div>@* end .cp-main *@
 </div>@* end .cp-layout *@
 
@@ -302,6 +313,7 @@
     private IEnumerable<string> _selectedCatalogNames = [];
     private CatalogSession _catalog = default!;
 
+    private bool _isLoading;
     private bool HasKernel => !string.IsNullOrEmpty(_kernelId);
     private bool AnyExecuting => _notebook.Cells.Any(c => c.IsExecuting);
     private InteractivePoolDto? SelectedPool => _pools.FirstOrDefault(p => p.Name == _poolName);
@@ -338,6 +350,7 @@
         // Load notebook from workspace if an Id was provided
         if (Id != Guid.Empty)
         {
+            _isLoading = true;
             try
             {
                 var detail = await WorkspaceService.GetNotebookAsync(Id);
@@ -367,6 +380,10 @@
             catch (Exception ex)
             {
                 _error = $"Failed to load notebook: {ex.Message}";
+            }
+            finally
+            {
+                _isLoading = false;
             }
         }
 

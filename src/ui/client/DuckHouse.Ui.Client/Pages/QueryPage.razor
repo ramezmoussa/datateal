@@ -31,6 +31,15 @@
                     CatalogSetupRunning="@_catalog.SetupRunning" />
     <div class="qp-page" style="margin-left: 24px;">
 
+        @if (_isLoading)
+        {
+            <div style="display: flex; align-items: center; justify-content: center; height: 300px;">
+                <Spin Size="SpinSize.Large" />
+            </div>
+        }
+        else
+        {
+
         @* ── Title row ── *@
         <Flex Justify="FlexJustify.SpaceBetween" Align="FlexAlign.Center" Style="margin-bottom: 12px; flex-wrap: wrap; gap: 8px; flex-shrink: 0;">
             <Space Align="SpaceAlign.End" Size="SpaceSize.Middle">
@@ -285,6 +294,8 @@
             </div>
         </div>
 
+        }@* end else (not loading) *@
+
     </div>@* end .qp-page *@
 </div>@* end .cp-layout *@
 
@@ -339,6 +350,7 @@
     private IEnumerable<string> _selectedCatalogNames = [];
     private CatalogSession _catalog = default!;
 
+    private bool _isLoading;
     private bool HasKernel => !string.IsNullOrEmpty(_kernelId);
 
     protected override async Task OnInitializedAsync()
@@ -350,6 +362,7 @@
 
         if (Id != Guid.Empty)
         {
+            _isLoading = true;
             try
             {
                 var detail = await WorkspaceService.GetQueryAsync(Id);
@@ -390,6 +403,10 @@
             catch (Exception ex)
             {
                 _error = $"Failed to load query: {ex.Message}";
+            }
+            finally
+            {
+                _isLoading = false;
             }
         }
         else
