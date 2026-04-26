@@ -80,7 +80,7 @@ app.UseAuthorization();
 app.UseAntiforgery();
 
 app.MapStaticAssets();
-app.MapControllers();
+app.MapControllers().RequireAuthorization();
 app.MapOrchestratorProxy();
 app.MapLoginAndLogout();
 app.MapRazorComponents<App>()

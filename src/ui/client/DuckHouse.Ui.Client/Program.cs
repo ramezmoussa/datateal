@@ -1,9 +1,10 @@
 using DuckHouse.Ui.Client.Services;
+using DuckHouse.Ui.Shared.Users;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 
-builder.Services.AddAuthorizationCore();
+builder.Services.AddAuthorizationCore(DuckHouseAuthorizationPolicies.Configure);
 builder.Services.AddAuthenticationStateDeserialization();
 
 builder.Services.AddAntDesign();
