@@ -2,14 +2,19 @@
 
 <AuthorizeView>
     <Authorized>
-        <span style="color: rgba(255,255,255,0.65); margin-right: 12px;">
+        <span style="margin-right: 24px;">
             @context.User.Identity?.Name
         </span>
         <form method="post" action="authentication/logout">
-            <AntDesign.Button HtmlType="submit" Size="@ButtonSize.Small">Sign out</AntDesign.Button>
+            <AntDesign.Button HtmlType="submit" Size="@ButtonSize.Small" Icon="@IconType.Outline.Logout">
+                Sign out
+            </AntDesign.Button>
         </form>
     </Authorized>
     <NotAuthorized>
-        <a href="authentication/login" style="color: rgba(255,255,255,0.85);">Sign in</a>
+        <a href="authentication/login">
+            <Icon Type="@IconType.Outline.Login" />
+            Sign in
+        </a>
     </NotAuthorized>
 </AuthorizeView>

@@ -1,3 +1,11 @@
+.site-header {
+    background: #fff;
+}
+
+html.ant-dark .site-header {
+    background: #141414;
+}
+
 /* Kernel session REPL */
 .kernel-pre {
     white-space: pre;
