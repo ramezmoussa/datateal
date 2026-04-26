@@ -20,7 +20,7 @@
             <Flex Justify="FlexJustify.SpaceBetween" Align="FlexAlign.Center" Style="margin-bottom: 16px; flex-wrap: wrap; gap: 8px;">
                 <Space Align="SpaceAlign.Center" Size="SpaceSize.Small">
                     <SpaceItem>
-                        <Button OnClick="@(() => Navigation.NavigateTo($"/jobs/{_run.JobId}"))">
+                        <Button OnClick="@(() => Navigation.NavigateTo(_run.JobId.HasValue ? $"/jobs/{_run.JobId}" : "/jobs"))">
                             <Icon Type="@IconType.Outline.ArrowLeft" /> Back to job
                         </Button>
                     </SpaceItem>

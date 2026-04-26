@@ -4,7 +4,7 @@ namespace DuckHouse.Ui.Shared.Orchestration;
 
 public record JobRunDetail(
     Guid Id,
-    Guid JobId,
+    Guid? JobId,
     string JobName,
     JobRunStatus Status,
     JobRunTrigger Trigger,

@@ -138,9 +138,16 @@
                     </div>
                 }
                 <Table TItem="JobRunSummary" DataSource="_allRuns" Size="@TableSize.Small"
-                       PageSize="int.MaxValue" PaginationPosition="none">
+                       PageSize="int.MaxValue" PaginationPosition="none" EnableVirtualization>
                     <PropertyColumn Property="c => c.JobName" Title="Job" Sortable>
-                        <a href="@($"/jobs/{context.JobId}")">@context.JobName</a>
+                        @if (context.JobId.HasValue)
+                        {
+                            <a href="@($"/jobs/{context.JobId}")">@context.JobName</a>
+                        }
+                        else
+                        {
+                            <span>@context.JobName</span>
+                        }
                     </PropertyColumn>
                     <PropertyColumn Property="c => c.Status" Title="Status">
                         <a href="@($"/runs/{context.Id}")">
