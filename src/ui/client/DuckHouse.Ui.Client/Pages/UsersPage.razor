@@ -139,7 +139,16 @@
             }
 
             <FormItem Label="Roles">
-                <CheckboxGroup @bind-Value="_selectedRoles" Options="_roleOptions" />
+                <CheckboxGroup @bind-Value="_selectedRoles" TValue="string" Style="width:100%">
+                    <GridRow Gutter="(0, 8)">
+                        @foreach (var role in DuckHouseRole.All)
+                        {
+                            <GridCol Span="12">
+                                <Checkbox Label="@role">@role</Checkbox>
+                            </GridCol>
+                        }
+                    </GridRow>
+                </CheckboxGroup>
             </FormItem>
 
             <FormItem Label="Catalog Access">
@@ -194,10 +203,6 @@
     // Checkbox group binding
     private string[] _selectedRoles = [];
     private IEnumerable<Guid> _selectedCatalogIds = [];
-
-    private readonly CheckboxOption<string>[] _roleOptions = DuckHouseRole.All
-        .Select(r => new CheckboxOption<string> { Value = r, Label = r })
-        .ToArray();
 
     private string? EmailDisplayError =>
         (_submitAttempted || !string.IsNullOrEmpty(_form.Email)) ? GetEmailError() : null;
