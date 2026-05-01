@@ -1,0 +1,163 @@
+@using DuckHouse.Core.Kernels
+@using DuckHouse.Core.Nodes
+@using DuckHouse.Ui.Shared.Kernels
+@using DuckHouse.Ui.Shared.Nodes
+
+<Dropdown Trigger="@(new Trigger[] { Trigger.Click })">
+    <Overlay>
+        <div class="nps-overlay" @onclick:stopPropagation>
+            @if (LoadingPools)
+            {
+                <div class="nps-section" style="display: flex; align-items: center; gap: 8px;">
+                    <Spin Size="SpinSize.Small" />
+                    <span style="font-size: 0.875rem;">Loading pools…</span>
+                </div>
+            }
+            else if (Connecting)
+            {
+                <div class="nps-section" style="display: flex; align-items: center; gap: 8px;">
+                    <Spin Size="SpinSize.Small" />
+                    <span style="font-size: 0.875rem;">Connecting to <strong>@PoolName</strong>…</span>
+                </div>
+            }
+            else if (HasKernel)
+            {
+                <div class="nps-section">
+                    <div style="margin-bottom: 8px; font-size: 0.875rem;">
+                        Connected to <strong>@PoolName</strong>
+                        @if (Kernel is not null)
+                        {
+                            <Tag Color="@KernelStatusColor(Kernel.Status)" Style="margin-left: 6px; font-size: 0.75rem;">@Kernel.Status</Tag>
+                        }
+                    </div>
+                    <Button Size="ButtonSize.Small"
+                            Loading="@Disconnecting"
+                            Disabled="@Disconnecting"
+                            Icon="@IconType.Outline.Disconnect"
+                            OnClick="@(() => OnDisconnect.InvokeAsync())">
+                        Disconnect
+                    </Button>
+                </div>
+            }
+            else
+            {
+                <div class="nps-section-header">
+                    <span style="font-size: 0.75rem; opacity: 0.6; text-transform: uppercase; letter-spacing: 0.04em;">Select a pool</span>
+                </div>
+
+                <div class="nps-pool-list">
+                    @if (Pools.Count == 0)
+                    {
+                        <div class="nps-section" style="font-size: 0.875rem; opacity: 0.55;">No pools available.</div>
+                    }
+                    else
+                    {
+                        @foreach (var pool in Pools)
+                        {
+                            var isSelected = pool.Name == PoolName;
+                            <div class="nps-pool-item @(isSelected ? "nps-selected" : "")"
+                                 @onclick="() => SelectPoolAsync(pool.Name)">
+                                <div style="display: flex; align-items: center; gap: 6px;">
+                                    <span>@pool.Name</span>
+                                    @if (pool.NodeState.HasValue)
+                                    {
+                                        <Tag Color="@NodeStateColor(pool.NodeState.Value)" Style="font-size: 0.75rem; line-height: 1.2;">@pool.NodeState.Value</Tag>
+                                    }
+                                    else
+                                    {
+                                        <Tag Color="@("default")" Style="font-size: 0.75rem; line-height: 1.2;">Stopped</Tag>
+                                    }
+                                </div>
+                                <div style="font-size: 11px; color: #888; margin-top: 1px;">@pool.VmSize</div>
+                            </div>
+                        }
+                    }
+                </div>
+
+                <div class="nps-section-footer">
+                    <Button Type="ButtonType.Primary"
+                            Size="ButtonSize.Small"
+                            Disabled="@(string.IsNullOrEmpty(PoolName))"
+                            Icon="@IconType.Outline.Api"
+                            OnClick="@(() => OnConnect.InvokeAsync())">
+                        @ConnectLabel
+                    </Button>
+                </div>
+            }
+        </div>
+    </Overlay>
+    <ChildContent>
+        <Button Style="display: inline-flex; align-items: center; gap: 4px;">
+            <Icon Type="@IconType.Outline.CloudServer" />
+            <span>@TriggerLabel</span>
+            @if (LoadingPools)
+            {
+                <Spin Size="SpinSize.Small" />
+            }
+            else
+            {
+                <Tag Color="@StatusTag.Color" Style="margin: 0 2px 0 2px; font-size: 0.75rem; line-height: 1.2;">@StatusTag.Text</Tag>
+            }
+            <Icon Type="@IconType.Outline.Down" Style="font-size: 10px; opacity: 0.6;" />
+        </Button>
+    </ChildContent>
+</Dropdown>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<InteractivePoolDto> Pools { get; set; } = [];
+    [Parameter] public string? PoolName { get; set; }
+    [Parameter] public EventCallback<string?> PoolNameChanged { get; set; }
+    [Parameter] public KernelInfo? Kernel { get; set; }
+    [Parameter] public bool HasKernel { get; set; }
+    [Parameter] public bool Connecting { get; set; }
+    [Parameter] public bool Disconnecting { get; set; }
+    [Parameter] public bool LoadingPools { get; set; }
+    [Parameter, EditorRequired] public EventCallback OnConnect { get; set; }
+    [Parameter, EditorRequired] public EventCallback OnDisconnect { get; set; }
+
+    private InteractivePoolDto? SelectedPool => Pools.FirstOrDefault(p => p.Name == PoolName);
+
+    private string TriggerLabel => PoolName ?? "No pool";
+
+    private (string Text, string Color) StatusTag => (HasKernel, Connecting, Kernel?.Status) switch
+    {
+        (_, true, _)                                                          => ("Connecting", "processing"),
+        (true, _, KernelStatus.Idle)                                          => ("Idle", "success"),
+        (true, _, KernelStatus.Busy)                                          => ("Busy", "warning"),
+        (true, _, KernelStatus.Starting or KernelStatus.Restarting)           => ("Starting", "processing"),
+        (true, _, KernelStatus.Dead)                                           => ("Dead", "error"),
+        (true, _, _)                                                           => ("Connected", "success"),
+        (false, _, _) when SelectedPool?.NodeState == NodeState.Running        => ("Running", "success"),
+        (false, _, _) when SelectedPool?.NodeState.HasValue == true            => (SelectedPool!.NodeState!.Value.ToString(), "warning"),
+        _                                                                      => ("Disconnected", "default"),
+    };
+
+    private string ConnectLabel => SelectedPool?.NodeState switch
+    {
+        NodeState.Running  => "Connect",
+        NodeState.Creating => "Wait and connect",
+        _                  => "Start and connect",
+    };
+
+    private async Task SelectPoolAsync(string name)
+    {
+        if (Connecting || HasKernel) return;
+        await PoolNameChanged.InvokeAsync(name);
+    }
+
+    private static string KernelStatusColor(KernelStatus status) => status switch
+    {
+        KernelStatus.Idle                                     => "success",
+        KernelStatus.Busy                                     => "warning",
+        KernelStatus.Starting or KernelStatus.Restarting     => "processing",
+        KernelStatus.Dead                                     => "error",
+        _                                                     => "default",
+    };
+
+    private static string NodeStateColor(NodeState state) => state switch
+    {
+        NodeState.Running  => "success",
+        NodeState.Failure  => "error",
+        _                  => "warning",
+    };
+}

@@ -71,9 +71,21 @@
             @* File toolbar *@
             <Space Size="SpaceSize.Small" Style="flex-wrap: wrap;">
                 <SpaceItem>
-                    <Button OnClick="OpenFileDialogAsync" Icon="@IconType.Outline.Upload">
-                        Open from file
-                    </Button>
+                    <Dropdown Trigger="@(new Trigger[] { Trigger.Click })">
+                        <Overlay>
+                            <Menu>
+                                <MenuItem OnClick="OpenFileDialogAsync">
+                                    <Icon Type="@IconType.Outline.Upload" Style="margin-right: 6px;" />Open from file
+                                </MenuItem>
+                                <MenuItem OnClick="ExportFileAsync">
+                                    <Icon Type="@IconType.Outline.Download" Style="margin-right: 6px;" />Export
+                                </MenuItem>
+                            </Menu>
+                        </Overlay>
+                        <ChildContent>
+                            <Button Icon="@IconType.Outline.Ellipsis" />
+                        </ChildContent>
+                    </Dropdown>
                     <InputFile @ref="_fileInput" style="display:none;" accept=".ipynb" OnChange="OnFileSelectedAsync" />
                 </SpaceItem>
                 @if (_workspaceNotebookId.HasValue)
@@ -96,31 +108,26 @@
                         </SpaceItem>
                     </AuthorizeView>
                 }
-                <SpaceItem>
-                    <Button Icon="@IconType.Outline.Download" OnClick="ExportFileAsync">
-                        Export
-                    </Button>
-                </SpaceItem>
                 <SpaceItem><Divider Type="DividerType.Vertical" /></SpaceItem>
                 <SpaceItem>
                     <AuthorizeView Policy="@AuthPolicy.NodePoolOperate">
-                            @if (AnyExecuting)
-                            {
-                                <Button Disabled="@(!HasKernel || !AnyExecuting)"
-                                        Icon="@IconType.Outline.Loading"
-                                        OnClick="InterruptAsync">
-                                    Interrupt
-                                </Button>
-                            }
-                            else
-                            {
-                                <Button Type="ButtonType.Primary"
-                                        Disabled="@(!HasKernel)"
-                                        Icon="@IconType.Outline.PlayCircle"
-                                        OnClick="RunAllAsync">
-                                    Run all
-                                </Button>
-                            }
+                        @if (AnyExecuting)
+                        {
+                            <Button Disabled="@(!HasKernel || !AnyExecuting)"
+                                    Icon="@IconType.Outline.Loading"
+                                    OnClick="InterruptAsync">
+                                Interrupt
+                            </Button>
+                        }
+                        else
+                        {
+                            <Button Type="ButtonType.Primary"
+                                    Disabled="@(!HasKernel)"
+                                    Icon="@IconType.Outline.PlayCircle"
+                                    OnClick="RunAllAsync">
+                                Run all
+                            </Button>
+                        }
                     </AuthorizeView>
                 </SpaceItem>
                 <SpaceItem>
@@ -129,6 +136,20 @@
                             OnClick="ClearAllOutputs">
                         Clear outputs
                     </Button>
+                </SpaceItem>
+                <SpaceItem>
+                    <AuthorizeView Policy="@AuthPolicy.NodePoolOperate">
+                        <NodePoolSelector Pools="@_pools"
+                                          PoolName="@_poolName"
+                                          PoolNameChanged="@(v => _poolName = v)"
+                                          Kernel="@_kernel"
+                                          HasKernel="@HasKernel"
+                                          Connecting="@_connecting"
+                                          Disconnecting="@_disconnecting"
+                                          LoadingPools="@_loadingPools"
+                                          OnConnect="ConnectAsync"
+                                          OnDisconnect="DisconnectAsync" />
+                    </AuthorizeView>
                 </SpaceItem>
             </Space>
         </Flex>
@@ -148,87 +169,6 @@
                 <BreadcrumbItem>@_notebook.Title</BreadcrumbItem>
             </Breadcrumb>
         }
-
-        @* Kernel connection toolbar — only shown to users who can operate node pools *@
-        <AuthorizeView Policy="@AuthPolicy.NodePoolOperate">
-        <Space Align="SpaceAlign.Center" Style="margin-bottom: 12px; flex-wrap: wrap;" Size="SpaceSize.Small">
-            <SpaceItem>
-                <Icon Type="@IconType.Outline.CloudServer" />
-            </SpaceItem>
-            <SpaceItem>
-                <Text Type="TextElementType.Secondary" Style="font-size: 0.875rem;">Pool:</Text>
-            </SpaceItem>
-            @if (_loadingPools)
-            {
-                <SpaceItem><Spin Size="SpinSize.Small" /></SpaceItem>
-            }
-            else
-            {
-                <SpaceItem>
-                    <Select TItemValue="string"
-                            TItem="InteractivePoolDto"
-                            DataSource="@_pools.ToList()"
-                            @bind-Value="@_poolName"
-                            ItemValue="p => p.Name"
-                            ItemLabel="p => p.Name"
-                            Placeholder="— select pool —"
-                            AllowClear
-                            Disabled="@(_connecting || HasKernel)"
-                            DropdownMatchSelectWidth="false"
-                            Style="min-width: 150px;">
-                        <ItemTemplate Context="poolItem">
-                            @{ var pool = (InteractivePoolDto)poolItem!; }
-                            <div style="line-height: 1.4;">
-                                <div>
-                                    <span>@pool.Name</span>
-                                    @if (pool.NodeState.HasValue)
-                                    {
-                                        <Tag Color="@NodeStateTagColor(pool.NodeState.Value)" Style="margin-left: 6px; font-size: 0.75rem;">@pool.NodeState.Value</Tag>
-                                    }
-                                    else
-                                    {
-                                        <Tag Color="@("default")" Style="margin-left: 6px; font-size: 0.75rem;">Stopped</Tag>
-                                    }
-                                </div>
-                                <div style="font-size: 11px; color: #888; margin-top: 1px;">@pool.VmSize</div>
-                            </div>
-                        </ItemTemplate>
-                    </Select>
-                </SpaceItem>
-            }
-
-            @if (!HasKernel)
-            {
-                <SpaceItem>
-                    <Button Type="ButtonType.Primary" Size="ButtonSize.Small"
-                            Disabled="@(string.IsNullOrEmpty(_poolName) || _connecting)"
-                            Loading="_connecting"
-                            Icon="@IconType.Outline.Api"
-                            OnClick="ConnectAsync">
-                        @(SelectedPool?.NodeState switch
-                        {
-                            NodeState.Running => "Connect",
-                            NodeState.Creating => "Wait and connect",
-                            _ => "Start and connect"
-                        })
-                    </Button>
-                </SpaceItem>
-            }
-            else
-            {
-                <SpaceItem><Tag Color="@StatusTagColor(_kernel!.Status)">@_kernel!.Status</Tag></SpaceItem>
-                <SpaceItem>
-                    <Button Size="ButtonSize.Small"
-                            Disabled="_disconnecting"
-                            Loading="_disconnecting"
-                            Icon="@IconType.Outline.Disconnect"
-                            OnClick="DisconnectAsync">
-                        Disconnect
-                    </Button>
-                </SpaceItem>
-            }
-        </Space>
-        </AuthorizeView>
 
         @* Catalog selector moved to the side panel *@
 

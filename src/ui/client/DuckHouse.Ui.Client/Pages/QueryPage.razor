@@ -89,6 +89,20 @@
                         </SpaceItem>
                     </AuthorizeView>
                 }
+                <AuthorizeView Policy="@AuthPolicy.NodePoolOperate">
+                    <SpaceItem>
+                        <NodePoolSelector Pools="@_pools"
+                                          PoolName="@_poolName"
+                                          PoolNameChanged="@(v => _poolName = v)"
+                                          Kernel="@_kernel"
+                                          HasKernel="@HasKernel"
+                                          Connecting="@_connecting"
+                                          Disconnecting="@_disconnecting"
+                                          LoadingPools="@_loadingPools"
+                                          OnConnect="ConnectAsync"
+                                          OnDisconnect="DisconnectAsync" />
+                    </SpaceItem>
+                </AuthorizeView>
             </Space>
         </Flex>
 
@@ -107,87 +121,6 @@
                 <BreadcrumbItem>@_title</BreadcrumbItem>
             </Breadcrumb>
         }
-
-        @* Kernel connection bar — only shown to users who can operate node pools *@
-        <AuthorizeView Policy="@AuthPolicy.NodePoolOperate">
-        <Space Align="SpaceAlign.Center" Style="margin-bottom: 12px; flex-wrap: wrap;" Size="SpaceSize.Small">
-            <SpaceItem>
-                <Icon Type="@IconType.Outline.CloudServer" />
-            </SpaceItem>
-            <SpaceItem>
-                <Text Type="TextElementType.Secondary" Style="font-size: 0.875rem;">Pool:</Text>
-            </SpaceItem>
-            @if (_loadingPools)
-            {
-                <SpaceItem><Spin Size="SpinSize.Small" /></SpaceItem>
-            }
-            else
-            {
-                <SpaceItem>
-                    <Select TItemValue="string"
-                            TItem="InteractivePoolDto"
-                            DataSource="@_pools.ToList()"
-                            @bind-Value="@_poolName"
-                            ItemValue="p => p.Name"
-                            ItemLabel="p => p.Name"
-                            Placeholder="— select pool —"
-                            AllowClear
-                            Disabled="@(_connecting || HasKernel)"
-                            DropdownMatchSelectWidth="false"
-                            Style="min-width: 150px;">
-                        <ItemTemplate Context="poolItem">
-                            @{ var pool = (InteractivePoolDto)poolItem!; }
-                            <div style="line-height: 1.4;">
-                                <div>
-                                    <span>@pool.Name</span>
-                                    @if (pool.NodeState.HasValue)
-                                    {
-                                        <Tag Color="@NodeStateTagColor(pool.NodeState.Value)" Style="margin-left: 6px; font-size: 0.75rem;">@pool.NodeState.Value</Tag>
-                                    }
-                                    else
-                                    {
-                                        <Tag Color="@("default")" Style="margin-left: 6px; font-size: 0.75rem;">Stopped</Tag>
-                                    }
-                                </div>
-                                <div style="font-size: 11px; color: #888; margin-top: 1px;">@pool.VmSize</div>
-                            </div>
-                        </ItemTemplate>
-                    </Select>
-                </SpaceItem>
-            }
-
-            @if (!HasKernel)
-            {
-                <SpaceItem>
-                    <Button Type="ButtonType.Primary" Size="ButtonSize.Small"
-                            Disabled="@(string.IsNullOrEmpty(_poolName) || _connecting)"
-                            Loading="_connecting"
-                            Icon="@IconType.Outline.Api"
-                            OnClick="ConnectAsync">
-                        @(SelectedPool?.NodeState switch
-                        {
-                            NodeState.Running => "Connect",
-                            NodeState.Creating => "Wait and connect",
-                            _ => "Start and connect"
-                        })
-                    </Button>
-                </SpaceItem>
-            }
-            else
-            {
-                <SpaceItem><Tag Color="@StatusTagColor(_kernel!.Status)">@_kernel!.Status</Tag></SpaceItem>
-                <SpaceItem>
-                    <Button Size="ButtonSize.Small"
-                            Disabled="_disconnecting"
-                            Loading="_disconnecting"
-                            Icon="@IconType.Outline.Disconnect"
-                            OnClick="DisconnectAsync">
-                        Disconnect
-                    </Button>
-                </SpaceItem>
-            }
-        </Space>
-        </AuthorizeView>
 
         @* Catalog selector moved to the side panel *@
 
@@ -210,15 +143,15 @@
                             <SpaceItem>
                                 <ExecutionTimer IsRunning="true" DurationMs="null" />
                             </SpaceItem>
-                            <AuthorizeView Policy="@AuthPolicy.NodePoolOperate">
-                                <SpaceItem>
+                            <SpaceItem>
+                                <AuthorizeView Policy="@AuthPolicy.NodePoolOperate">
                                     <Button Size="ButtonSize.Small"
                                             Icon="@IconType.Outline.Loading"
                                             OnClick="InterruptAsync">
                                         Interrupt
                                     </Button>
-                                </SpaceItem>
-                            </AuthorizeView>
+                                </AuthorizeView>
+                            </SpaceItem>
                         }
                         else
                         {
@@ -230,8 +163,8 @@
                                     </Text>
                                 </SpaceItem>
                             }
-                            <AuthorizeView Policy="@AuthPolicy.NodePoolOperate">
-                                <SpaceItem>
+                            <SpaceItem>
+                                <AuthorizeView Policy="@AuthPolicy.NodePoolOperate">
                                     <Tooltip Title="@("Ctrl+Enter")">
                                         <Button Type="ButtonType.Primary" Size="ButtonSize.Small"
                                                 Disabled="@(!HasKernel || string.IsNullOrWhiteSpace(_sql))"
@@ -240,8 +173,8 @@
                                             @(string.IsNullOrWhiteSpace(_selectedSql) ? "Run all" : "Run selected")
                                         </Button>
                                     </Tooltip>
-                                </SpaceItem>
-                            </AuthorizeView>
+                                </AuthorizeView>
+                            </SpaceItem>
                         }
                     </Space>
                 </Flex>
