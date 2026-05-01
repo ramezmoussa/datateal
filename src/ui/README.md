@@ -74,20 +74,157 @@ During local development the UI server runs on the developer machine and can rea
 
 ---
 
+## Authentication and Authorization
+
+### Overview
+
+Authentication is handled by an external identity provider (currently Entra ID) via OpenID Connect. Authorization is entirely app-managed: roles are stored in the application database and injected as claims after the OIDC token is validated. The two concerns are fully separated — the IdP only proves identity; the app decides what the user can do.
+
+### Authentication flow
+
+1. The user visits a protected page and is redirected to the OIDC login endpoint (`/authentication/login`).
+2. Entra ID validates credentials and returns an ID token. The server exchanges it for a cookie session (OpenID Connect → Cookie scheme).
+3. `AppClaimsTransformation` runs on every authenticated request. It looks up the user in the app database by Entra OID (`objectidentifier` claim) or email (`preferred_username`), then adds `ClaimTypes.Role` claims for each role stored in `AppUser.Roles`.
+4. The serialized claims principal (including role claims) is embedded in the server-rendered HTML via `AddAuthenticationStateSerialization(options => options.SerializeAllClaims = true)`. The WASM client reads this payload through `PersistentAuthenticationStateProvider` — no extra auth round-trip is needed from the browser.
+5. Logout calls `SignOutAsync` for both the Cookie and OpenID Connect schemes.
+
+### Pluggable identity provider
+
+The OIDC setup is isolated behind `IIdentityProviderSetup` (`DuckHouse.Auth.Abstractions`). Each identity provider ships its own implementation:
+
+| Package                  | Implementation                 | Extension method             |
+| ------------------------ | ------------------------------ | ---------------------------- |
+| `DuckHouse.Auth.EntraId` | `EntraIdIdentityProviderSetup` | `AddEntraIdAuthentication()` |
+
+To switch providers, replace the `AddEntraIdAuthentication()` call in `Program.cs` with the new provider's registration. Only one provider is active at a time.
+
+### Admin seed list
+
+Users listed in `appsettings` under `Authorization:AdminUsers` receive the `Admin` role unconditionally, without requiring a database record. This allows bootstrapping access before any users have been added through the UI.
+
+```json
+// appsettings.json (or appsettings.Development.json)
+"Authorization": {
+  "AdminUsers": [ "admin@example.com" ]
+}
+```
+
+### User management
+
+Users are stored in `AppUser` (Postgres via EF Core). Key fields:
+
+| Field                 | Description                                                                                                                      |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `Email`               | Primary identifier used for admin seed matching and first-login lookup                                                           |
+| `ExternalId`          | Entra OID — captured on first login for stable future lookups. Once set it becomes the primary key for `AppClaimsTransformation` |
+| `IsEnabled`           | Disabled users are authenticated but receive no role claims                                                                      |
+| `Roles`               | `List<string>` stored as a JSON array column; use `DuckHouseRole.*` constants                                                    |
+| `HasAllCatalogAccess` | `true` = user can access all catalogs (present and future)                                                                       |
+| `CatalogAccessList`   | `UserCatalogAccess` rows granting access to specific catalogs when `HasAllCatalogAccess` is `false`                              |
+
+Admin and `CatalogContributor` users always have implicit access to all catalogs regardless of `HasAllCatalogAccess`.
+
+### Roles and policies
+
+Roles are coarse-grained capability buckets. Policies are the named groups checked by `[Authorize]` and `<AuthorizeView>` — always use policy names, not role names directly.
+
+#### Roles (`DuckHouseRole`)
+
+| Role                   | What it grants                                                                                                               |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `Admin`                | Full access to everything                                                                                                    |
+| `NodePoolContributor`  | Create/edit/delete node pool configs; start/stop nodes; create kernel sessions and execute code                              |
+| `NodePoolOperator`     | Start/stop interactive node pools; create kernel sessions and execute code (no config changes)                               |
+| `JobContributor`       | Create/edit/delete jobs, tasks, params, schedules; trigger runs                                                              |
+| `JobOperator`          | Trigger and cancel job runs; monitor all jobs/runs (no config changes)                                                       |
+| `JobReader`            | Read and monitor jobs and runs; no trigger or cancel                                                                         |
+| `WorkspaceContributor` | Create/edit/delete workspace folders, notebooks, queries. Needs `NodePoolOperator` to connect to kernels and execute code    |
+| `WorkspaceReader`      | Read workspace notebooks and queries; no create/edit/delete. Needs `NodePoolOperator` to connect to kernels and execute code |
+| `CatalogContributor`   | Manage all catalog definitions; implicit access to all catalog data                                                          |
+| `EnvironmentManager`   | Manage environment variables and secrets                                                                                     |
+
+#### Policies (`AuthPolicy`)
+
+| Policy              | Roles included                                |
+| ------------------- | --------------------------------------------- |
+| `Admin`             | Admin                                         |
+| `NodePoolManage`    | Admin, NodePoolContributor                    |
+| `NodePoolOperate`   | Admin, NodePoolContributor, NodePoolOperator  |
+| `JobManage`         | Admin, JobContributor                         |
+| `JobOperate`        | Admin, JobContributor, JobOperator            |
+| `JobRead`           | Admin, JobContributor, JobOperator, JobReader |
+| `WorkspaceManage`   | Admin, WorkspaceContributor                   |
+| `WorkspaceRead`     | Admin, WorkspaceContributor, WorkspaceReader  |
+| `CatalogManage`     | Admin, CatalogContributor                     |
+| `EnvironmentManage` | Admin, EnvironmentManager                     |
+
+### Controller authorization
+
+Each controller declares a class-level `[Authorize(Policy = ...)]`. Mutating endpoints within a controller may escalate to a stricter policy:
+
+| Controller                   | Class policy                | Override for mutating endpoints                       |
+| ---------------------------- | --------------------------- | ----------------------------------------------------- |
+| `WorkspaceController`        | `WorkspaceRead`             | `WorkspaceManage` for create/rename/move/delete/clone |
+| `CatalogsController`         | `Authorize` (authenticated) | `CatalogManage` for create/update/delete              |
+| `KernelsController`          | `NodePoolOperate`           | —                                                     |
+| `InteractivePoolsController` | `NodePoolOperate`           | —                                                     |
+| `NodesController`            | `NodePoolOperate`           | —                                                     |
+| `EnvironmentController`      | `EnvironmentManage`         | —                                                     |
+| `UsersController`            | `Admin`                     | —                                                     |
+
+### Orchestrator proxy authorization
+
+Client calls to `/api/orchestrator/{**path}` are routed through `OrchestratorProxy`. The proxy enforces authorization before forwarding:
+
+| Path prefix                    | GET               | POST `/trigger` or `/cancel` | Other write methods |
+| ------------------------------ | ----------------- | ---------------------------- | ------------------- |
+| `node-pools/`                  | `NodePoolOperate` | —                            | `NodePoolManage`    |
+| `jobs/`                        | `JobRead`         | `JobOperate` (trigger)       | `JobManage`         |
+| `runs/`                        | `JobRead`         | `JobOperate` (cancel)        | `JobManage`         |
+| `admin/` (except `/timezones`) | `Admin`           | `Admin`                      | `Admin`             |
+| `admin/timezones`              | none              | —                            | —                   |
+
+Any path not handled by `GetRequiredPolicy` throws `InvalidOperationException` (no silent fallthrough).
+
+### Service-to-service authentication
+
+Backend services authenticate each other with API keys, not user tokens:
+
+- **UI → Orchestrator**: the `Orchestrator` named `HttpClient` injects an `Authorization: ApiKey <key>` header via `ApiKeyDelegatingHandler`. Key configured at `ServiceAuth:Orchestrator:ApiKey`.
+- **UI → Control Plane** (when applicable): same pattern with its own key.
+- **Orchestrator → Control Plane**: same pattern.
+- Backend services validate incoming keys via `ApiKeyAuthenticationHandler` reading `ServiceAuth:ExpectedApiKey`.
+
+### Configuration reference
+
+| Key                               | Location           | Description                                       |
+| --------------------------------- | ------------------ | ------------------------------------------------- |
+| `Authorization:AdminUsers`        | `appsettings.json` | Email list of bootstrap admin users               |
+| `AzureAd:TenantId`                | `appsettings.json` | Entra ID tenant                                   |
+| `AzureAd:ClientId`                | `appsettings.json` | Entra ID app registration client ID               |
+| `AzureAd:ClientSecret`            | secrets / env var  | Entra ID client secret                            |
+| `ServiceAuth:Orchestrator:ApiKey` | secrets / env var  | API key the UI uses when calling the orchestrator |
+
+---
+
 ## Pages
 
-| Page | Route | Description |
-|---|---|---|
-| `Home.razor` | `/` | Welcome page |
-| `WorkspacePage.razor` | `/workspace` | Workspace browser: create, rename, move, clone, delete notebooks and queries |
-| `NotebookPage.razor` | `/notebook`, `/notebook/{id}` | Polyglot notebook editor; connects to an interactive node pool |
-| `QueryPage.razor` | `/query`, `/query/{id}` | SQL editor with results panel; connects to an interactive node pool |
-| `NodePoolsPage.razor` | `/node-pools` | Node pool config management with separate tabs for Interactive and Job pools |
-| `Nodes.razor` | `/nodes` | Active nodes monitoring (admin view; admins can manually remove nodes) |
-| `Kernels.razor` | `/nodes/{name}/kernels` | Kernel management per node |
-| `KernelSession.razor` | `/nodes/{name}/kernels/{id}` | Interactive kernel REPL |
-| `CatalogsPage.razor` | `/catalogs` | DuckLake catalog management |
-| `Settings.razor` | `/settings` | Theme settings |
+| Page                  | Route                         | Policy            | Description                                                                               |
+| --------------------- | ----------------------------- | ----------------- | ----------------------------------------------------------------------------------------- |
+| `Home.razor`          | `/`                           | —                 | Welcome page                                                                              |
+| `WorkspacePage.razor` | `/workspace`                  | `WorkspaceRead`   | Workspace browser: create, rename, move, clone, delete notebooks and queries              |
+| `NotebookPage.razor`  | `/notebook`, `/notebook/{id}` | `WorkspaceRead`   | Polyglot notebook editor; kernel toolbar requires `NodePoolOperate`                       |
+| `QueryPage.razor`     | `/query`, `/query/{id}`       | `WorkspaceRead`   | SQL editor with results panel; kernel toolbar requires `NodePoolOperate`                  |
+| `NodePoolsPage.razor` | `/node-pools`                 | `NodePoolOperate` | Node pool config management; edit/delete require `NodePoolManage`                         |
+| `Nodes.razor`         | `/nodes`                      | `NodePoolOperate` | Active nodes monitoring                                                                   |
+| `Kernels.razor`       | `/nodes/{name}/kernels`       | `NodePoolOperate` | Kernel management per node                                                                |
+| `KernelSession.razor` | `/nodes/{name}/kernels/{id}`  | `NodePoolOperate` | Interactive kernel REPL                                                                   |
+| `CatalogsPage.razor`  | `/catalogs`                   | Authenticated     | DuckLake catalog management; create/edit/delete require `CatalogManage`                   |
+| `JobsPage.razor`      | `/jobs`                       | `JobRead`         | Job list; create/delete require `JobManage`, run requires `JobOperate`                    |
+| `JobEditorPage.razor` | `/jobs/{id}`                  | `JobRead`         | Job editor; save/task/param/schedule edits require `JobManage`, run requires `JobOperate` |
+| `JobRunPage.razor`    | `/runs/{id}`                  | `JobRead`         | Job run detail; cancel requires `JobOperate`                                              |
+| `UsersPage.razor`     | `/users`                      | `Admin`           | User management (create, edit roles, catalog access)                                      |
+| `Settings.razor`      | `/settings`                   | —                 | Theme settings                                                                            |
 
 ---
 

@@ -81,6 +81,62 @@ Custom CSS in `server/DuckHouse.Ui.Server/wwwroot/css/app.css`. Component-scoped
 - Tag colors: `Color="@("blue")"` not `Color="blue"` — Razor parses bare strings as C# identifiers and produces CS0103
 - **`<Text>` inside `@if` blocks cannot have attributes** (RZ1023 error) — use `<span>` instead when the element is conditional
 
+## Authentication and authorization caveats
+
+### `AuthorizeView` context shadowing in table `ActionColumn`
+AntBlazor table `ActionColumn` templates bind the row item to a parameter called `context`. `AuthorizeView` also defaults to `context` for its auth state. Nesting `<AuthorizeView>` inside `<ActionColumn>` produces a compile error. Fix: always add `Context="auth"` to `<AuthorizeView>` inside any `ActionColumn`:
+```razor
+<ActionColumn>
+    <AuthorizeView Policy="@AuthPolicy.WorkspaceManage" Context="auth">
+        <Button OnClick="() => Delete(context)">Delete</Button>
+    </AuthorizeView>
+</ActionColumn>
+```
+
+### `ItemTemplate` inside `AuthorizeView`
+If a `<Select>` with an `<ItemTemplate>` is a descendant of an `<AuthorizeView>`, the same `context` conflict arises. Add `Context="poolItem"` (or any other name) to `<ItemTemplate>`:
+```razor
+<AuthorizeView Policy="@AuthPolicy.NodePoolOperate">
+    <Select ...>
+        <ItemTemplate Context="poolItem">
+            @{ var item = (MyDto)poolItem!; }
+        </ItemTemplate>
+    </Select>
+</AuthorizeView>
+```
+
+### `AuthorizeView` only gates rendering, not code execution
+`AuthorizeView` hides UI elements but does not prevent `OnInitializedAsync` or other lifecycle code from running. If a page loads data that requires a specific policy (e.g., fetching interactive pools), gate the code-behind as well:
+```csharp
+[CascadingParameter] private Task<AuthenticationState>? AuthenticationStateTask { get; set; }
+[Inject] private IAuthorizationService AuthorizationService { get; set; } = default!;
+
+protected override async Task OnInitializedAsync()
+{
+    var authState = await AuthenticationStateTask!;
+    var result = await AuthorizationService.AuthorizeAsync(authState.User, null, AuthPolicy.NodePoolOperate);
+    if (result.Succeeded)
+    {
+        _pools = await InteractivePoolService.GetInteractivePoolsAsync();
+    }
+}
+```
+
+### Always serialize all claims for WASM
+`AddAuthenticationStateSerialization(options => options.SerializeAllClaims = true)` must be set on the server. Without it, custom `ClaimTypes.Role` claims added by `AppClaimsTransformation` are stripped before the auth state is handed to the WASM client, making all `AuthorizeView` and `[Authorize(Policy = ...)]` directives evaluate as unauthenticated.
+
+### `AppClaimsTransformation` — use `AsNoTracking()`
+`AppClaimsTransformation` runs inside the same scoped `DuckHouseDbContext` as the rest of the request. Always query with `.AsNoTracking()` here. If the user entity is tracked, subsequent repository operations in the same request may find a stale cached instance in the EF identity map, causing silent data corruption or `DbUpdateConcurrencyException`.
+
+### Updating `UserCatalogAccess` — bypass the change tracker
+Replacing a user's catalog access list must use `ExecuteDeleteAsync` (bulk SQL) rather than `Clear()` + `AddRange()` on the navigation collection. The EF change tracker cannot reliably reconcile the collection when the entity was previously loaded (even as `AsNoTracking`) in the same DI scope. The transaction must also be wrapped in `db.Database.CreateExecutionStrategy().ExecuteAsync(...)` because Npgsql's `NpgsqlRetryingExecutionStrategy` forbids user-initiated transactions outside a retriable unit.
+
+### Policy names vs role names
+`[Authorize(Policy = AuthPolicy.WorkspaceRead)]` and `AuthorizeView Policy="@AuthPolicy.WorkspaceRead"` check **policies** (which map multiple roles). Do not pass a role name where a policy name is expected — the authorization system will look for a policy named `"WorkspaceContributor"` and throw `InvalidOperationException: The AuthorizationPolicy named '...' was not found.`
+
+### OrchestratorProxy — no silent fallthrough
+`GetRequiredPolicy` in `OrchestratorProxy.cs` throws `InvalidOperationException` for any path it does not recognize. When adding a new orchestrator endpoint that the client will call via `/api/orchestrator/`, add a matching branch to `GetRequiredPolicy` first. There is no default fallback policy.
+
 ## Monaco editor (`CodeCell`)
 
 `CodeCell.razor` wraps BlazorMonaco. `Height=0` = auto-size from line count; `Height>0` = fixed pixel height. `AutomaticLayout=true` causes Monaco to reflow when its container resizes — important after a splitter drag. JS helpers in `App.razor`: `setMonacoEditorLanguage`, `getDuckhouseMonacoTheme`, `openFileAsText`, `downloadFile`, `clickElement`, `initQueryPageSplitter`.
