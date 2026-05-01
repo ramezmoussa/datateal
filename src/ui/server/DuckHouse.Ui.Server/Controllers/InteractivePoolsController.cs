@@ -1,5 +1,7 @@
+using DuckHouse.Auth;
 using DuckHouse.Core.Mediator;
 using DuckHouse.Ui.Shared.Nodes;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Cmd = DuckHouse.Ui.Server.Application.Mediator.Commands;
 using Qry = DuckHouse.Ui.Server.Application.Mediator.Queries;
@@ -7,6 +9,7 @@ using Qry = DuckHouse.Ui.Server.Application.Mediator.Queries;
 namespace DuckHouse.Ui.Server.Controllers;
 
 [ApiController]
+[Authorize(Policy = AuthPolicy.NodePoolOperate)]
 [Route("api/interactive-pools")]
 public class InteractivePoolsController(IMediator mediator) : ControllerBase
 {

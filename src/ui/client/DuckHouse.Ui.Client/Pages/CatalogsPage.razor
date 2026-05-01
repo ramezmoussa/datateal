@@ -71,6 +71,8 @@
     </TabPane>
 
     <TabPane Key="manage" Tab="Manage">
+        <AuthorizeView Policy="@AuthPolicy.CatalogManage" Context="authCtx">
+            <Authorized Context="authCtx">
         @if (!string.IsNullOrEmpty(_error))
         {
             <Alert Type="@AlertType.Error" Message="@_error" Closable OnClose="() => _error = null"
@@ -130,9 +132,18 @@
                 </ActionColumn>
             </Table>
         </Spin>
+            </Authorized>
+            <NotAuthorized>
+                <Alert Type="@AlertType.Warning" ShowIcon="true"
+                       Message="You don't have permission to manage catalogs."
+                       Style="margin-top: 8px;" />
+            </NotAuthorized>
+        </AuthorizeView>
     </TabPane>
 </Tabs>
 
+<AuthorizeView Policy="@AuthPolicy.CatalogManage" Context="authCtx">
+<Authorized Context="authCtx">
 <Drawer Closable="true" @bind-Visible="_showModal" Placement="DrawerPlacement.Right"
         Width="520" Title="@(_editTarget is null ? "New catalog" : "Edit catalog")"
         OnClose="() => _showModal = false"
@@ -217,6 +228,8 @@
         <Button Type="@ButtonType.Primary" OnClick="ConfirmSave" Disabled="@(!IsFormValid())">Save</Button>
     </div>
 </Drawer>
+</Authorized>
+</AuthorizeView>
 
 @code {
     // ── Tab state ─────────────────────────────────────────────────────

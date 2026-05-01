@@ -33,6 +33,7 @@ public static class ServiceExtensions
         services.AddScoped<IWheelPackageRepository, WheelPackageRepository>();
         services.AddScoped<IEnvironmentRepository, EnvironmentRepository>();
         services.AddScoped<ICatalogRepository, CatalogRepository>();
+        services.AddScoped<ICatalogAccessService, CatalogAccessService>();
         services.AddScoped<ICatalogDatabaseService, CatalogDatabaseService>();
         services.AddScoped<ICatalogMetadataService, CatalogMetadataService>();
         services.AddScoped<IInteractivePoolRepository, InteractivePoolRepository>();

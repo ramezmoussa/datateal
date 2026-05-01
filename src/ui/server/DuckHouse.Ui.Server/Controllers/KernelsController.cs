@@ -1,6 +1,9 @@
+using DuckHouse.Auth;
 using DuckHouse.Core.Kernels;
 using DuckHouse.Core.Mediator;
+using DuckHouse.Ui.Server.Core.Catalogs;
 using DuckHouse.Ui.Shared.Catalogs;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Cmd = DuckHouse.Ui.Server.Application.Mediator.Commands;
 using Qry = DuckHouse.Ui.Server.Application.Mediator.Queries;
@@ -9,8 +12,9 @@ using SharedKernels = DuckHouse.Ui.Shared.Kernels;
 namespace DuckHouse.Ui.Server.Controllers;
 
 [ApiController]
+[Authorize(Policy = AuthPolicy.NodePoolOperate)]
 [Route("api/nodes/{nodeName}/kernels")]
-public class KernelsController(IMediator mediator) : ControllerBase
+public class KernelsController(IMediator mediator, ICatalogAccessService catalogAccess) : ControllerBase
 {
     [HttpGet]
     public async Task<IReadOnlyList<KernelInfo>> GetKernels(string nodeName, CancellationToken ct) =>
@@ -67,6 +71,9 @@ public class KernelsController(IMediator mediator) : ControllerBase
     [HttpPost("{kernelId}/catalogs/setup")]
     public async Task<IActionResult> SetupCatalogs(string nodeName, string kernelId, KernelCatalogSetupRequest body, CancellationToken ct)
     {
+        var accessible = await catalogAccess.FilterAccessibleNamesAsync(User, body.CatalogNames, ct);
+        if (accessible.Count < body.CatalogNames.Count)
+            return Forbid();
         var handle = await mediator.SendAsync(new Cmd.SetupKernelCatalogsCommand(nodeName, kernelId, body.CatalogNames), ct);
         return Accepted(handle);
     }
@@ -74,6 +81,8 @@ public class KernelsController(IMediator mediator) : ControllerBase
     [HttpPost("{kernelId}/catalogs/{catalogName}/connect")]
     public async Task<IActionResult> ConnectCatalog(string nodeName, string kernelId, string catalogName, CancellationToken ct)
     {
+        if (!await catalogAccess.HasAccessByNameAsync(User, catalogName, ct))
+            return Forbid();
         var handle = await mediator.SendAsync(new Cmd.ConnectKernelCatalogCommand(nodeName, kernelId, catalogName), ct);
         return Accepted(handle);
     }
