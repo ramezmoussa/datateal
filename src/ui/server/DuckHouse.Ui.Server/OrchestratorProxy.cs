@@ -102,6 +102,8 @@ public static class OrchestratorProxy
         if (path.StartsWith("admin", StringComparison.OrdinalIgnoreCase))
             return path.EndsWith("/timezones", StringComparison.OrdinalIgnoreCase) ? null : AuthPolicy.Admin;
 
-        return null;
+        throw new InvalidOperationException(
+            $"No authorization policy is defined for orchestrator path '{path}' ({method}). " +
+            "Update GetRequiredPolicy to map this endpoint before it can be proxied.");
     }
 }
