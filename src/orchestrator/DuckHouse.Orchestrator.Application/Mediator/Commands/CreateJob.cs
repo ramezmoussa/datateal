@@ -62,6 +62,7 @@ internal class CreateJobHandler(IJobRepository jobRepository) : IRequestHandler<
 
         foreach (var p in request.Parameters ?? [])
         {
+            ParameterNameValidator.Validate(p.Name);
             job.Parameters.Add(new JobParameter
             {
                 Id = Guid.NewGuid(),

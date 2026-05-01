@@ -1,4 +1,5 @@
 using DuckHouse.ControlPlane.Core.Services;
+using DuckHouse.ControlPlane.Infrastructure.Nodes.Kernels;
 using DuckHouse.Core.Nodes;
 using k8s;
 using k8s.Models;
@@ -16,12 +17,18 @@ public sealed class LocalNodeService : INodeService
 
     private readonly IKubernetes _kubernetes;
     private readonly LocalNodeOptions _options;
+    private readonly RuntimeAuthOptions _runtimeAuth;
     private readonly ILogger<LocalNodeService> _logger;
 
-    public LocalNodeService(IKubernetes kubernetes, IOptions<LocalNodeOptions> options, ILogger<LocalNodeService> logger)
+    public LocalNodeService(
+        IKubernetes kubernetes,
+        IOptions<LocalNodeOptions> options,
+        IOptions<RuntimeAuthOptions> runtimeAuth,
+        ILogger<LocalNodeService> logger)
     {
         _kubernetes = kubernetes;
         _options = options.Value;
+        _runtimeAuth = runtimeAuth.Value;
         _logger = logger;
     }
 
@@ -126,6 +133,28 @@ public sealed class LocalNodeService : INodeService
             }
         }
 
+        // Inject runtime API key via a dedicated Kubernetes Secret (defense-in-depth auth).
+        if (!string.IsNullOrEmpty(_runtimeAuth.ApiKey))
+        {
+            var apiKeySecretName = $"runtime-auth-{request.Name}";
+            await CreateKubernetesSecretAsync(apiKeySecretName,
+                new Dictionary<string, string> { ["RUNTIME_API_KEY"] = _runtimeAuth.ApiKey },
+                cancellationToken);
+
+            envVars.Add(new V1EnvVar
+            {
+                Name = "RUNTIME_API_KEY",
+                ValueFrom = new V1EnvVarSource
+                {
+                    SecretKeyRef = new V1SecretKeySelector
+                    {
+                        Name = apiKeySecretName,
+                        Key = "RUNTIME_API_KEY",
+                    },
+                },
+            });
+        }
+
         var pod = new V1Pod
         {
             Metadata = new V1ObjectMeta
@@ -168,6 +197,11 @@ public sealed class LocalNodeService : INodeService
         if (request.Secrets is { Count: > 0 })
         {
             await SetSecretOwnerReferenceAsync($"env-{request.Name}", created, cancellationToken);
+        }
+
+        if (!string.IsNullOrEmpty(_runtimeAuth.ApiKey))
+        {
+            await SetSecretOwnerReferenceAsync($"runtime-auth-{request.Name}", created, cancellationToken);
         }
 
         return new NodeInfo(

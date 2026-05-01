@@ -198,3 +198,15 @@ Execution is **async/poll**: `POST .../execute` returns HTTP 202 with an `{ exec
 | `InactivityEviction:KernelIdleTimeout` | `00:10:00` | Delete kernels idle longer than this                |
 | `InactivityEviction:NodeIdleTimeout`   | `00:20:00` | Delete nodes with no kernel activity longer than this |
 | `InactivityEviction:CheckInterval`     | `00:01:00` | How often the eviction sweep runs                   |
+
+---
+
+## Security Considerations
+
+### Kernel Environment Access
+
+Kernel processes inherit the pod's environment variables. User code executing in a kernel session can access all environment variables via `os.environ`, including any secrets injected as Kubernetes Secret references. Administrators should:
+
+- Inject only the minimum required environment variables into runtime pods
+- Use scoped credentials with minimal privileges
+- Monitor kernel execution logs for suspicious activity

@@ -23,6 +23,8 @@ public static class ServiceExtensions
 {
     public static IServiceCollection AddInfrastructureServices(this IServiceCollection services, IConfiguration configuration)
     {
+        services.AddOptions<RuntimeAuthOptions>().BindConfiguration(RuntimeAuthOptions.Section);
+
         var nodeBackend = configuration.GetValue("NodeService:Backend", "Local");
 
         if (string.Equals(nodeBackend, "Aks", StringComparison.OrdinalIgnoreCase))
@@ -87,9 +89,13 @@ public static class ServiceExtensions
         }
 
         services.AddSingleton<INodeRuntimeClient>(sp =>
-            new KubernetesRuntimeClient(
+        {
+            var runtimeAuth = sp.GetRequiredService<IOptions<RuntimeAuthOptions>>().Value;
+            return new KubernetesRuntimeClient(
                 sp.GetRequiredService<Kubernetes>(),
-                sp.GetService<ITokenProvider>()));
+                sp.GetService<ITokenProvider>(),
+                runtimeAuth.ApiKey);
+        });
 
         services.AddScoped<INodeConfigRepository, NodeConfigRepository>();
 

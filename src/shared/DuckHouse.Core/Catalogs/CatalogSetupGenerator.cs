@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text;
 
 namespace DuckHouse.Core.Catalogs;
@@ -14,6 +15,9 @@ public static class CatalogSetupGenerator
     public static string GenerateSetupScript(IReadOnlyList<ResolvedCatalog> catalogs)
     {
         if (catalogs.Count == 0) return string.Empty;
+
+        foreach (var catalog in catalogs)
+            Debug.Assert(Catalog.IsValidName(catalog.Name), $"Catalog name '{catalog.Name}' is not a valid DuckDB identifier.");
 
         var sb = new StringBuilder();
         AppendPreamble(sb);
@@ -38,6 +42,8 @@ public static class CatalogSetupGenerator
     /// </summary>
     public static string GenerateAttachScript(ResolvedCatalog catalog)
     {
+        Debug.Assert(Catalog.IsValidName(catalog.Name), $"Catalog name '{catalog.Name}' is not a valid DuckDB identifier.");
+
         var sb = new StringBuilder();
         AppendPreamble(sb);
 
@@ -52,9 +58,11 @@ public static class CatalogSetupGenerator
     /// <summary>
     /// Generates a Python script to detach a catalog from the DuckDB session.
     /// </summary>
-    public static string GenerateDetachScript(string catalogName) =>
-        $"import duckdb; duckdb.execute(\"DETACH {catalogName}\")";
-
+    public static string GenerateDetachScript(string catalogName)
+    {
+        Debug.Assert(Catalog.IsValidName(catalogName), $"Catalog name '{catalogName}' is not a valid DuckDB identifier.");
+        return $"import duckdb; duckdb.execute(\"DETACH {catalogName}\")";
+    }
     private static void AppendPreamble(StringBuilder sb)
     {
         sb.AppendLine("import duckdb");

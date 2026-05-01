@@ -103,7 +103,11 @@ public static class OrchestratorProxy
         }
 
         if (path.StartsWith("admin", StringComparison.OrdinalIgnoreCase))
+        {
+            // Timezones is public reference data needed by all authenticated users for scheduling.
+            // The proxy endpoint requires authentication; no additional role restriction is needed.
             return path.EndsWith("/timezones", StringComparison.OrdinalIgnoreCase) ? null : AuthPolicy.Admin;
+        }
 
         throw new InvalidOperationException(
             $"No authorization policy is defined for orchestrator path '{path}' ({method}). " +

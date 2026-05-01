@@ -19,17 +19,19 @@ public sealed class KubernetesRuntimeClient : INodeRuntimeClient
     private readonly HttpClient _httpClient;
     private readonly Uri _baseUri;
     private readonly ITokenProvider? _tokenProvider;
+    private readonly string _runtimeApiKey;
     private readonly JsonSerializerOptions _jsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
         Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() },
     };
 
-    public KubernetesRuntimeClient(Kubernetes kubernetes, ITokenProvider? tokenProvider = null)
+    public KubernetesRuntimeClient(Kubernetes kubernetes, ITokenProvider? tokenProvider = null, string? runtimeApiKey = null)
     {
         _httpClient = kubernetes.HttpClient;
         _baseUri = kubernetes.BaseUri;
         _tokenProvider = tokenProvider;
+        _runtimeApiKey = runtimeApiKey ?? "";
     }
 
     private Uri ProxyUri(string nodeName, string path) =>
@@ -39,6 +41,8 @@ public sealed class KubernetesRuntimeClient : INodeRuntimeClient
     {
         if (_tokenProvider is not null)
             request.Headers.Authorization = await _tokenProvider.GetAuthenticationHeaderAsync(cancellationToken);
+        if (!string.IsNullOrEmpty(_runtimeApiKey))
+            request.Headers.Add("X-Api-Key", _runtimeApiKey);
         var response = await _httpClient.SendAsync(request, cancellationToken);
         response.EnsureSuccessStatusCode();
         return response;

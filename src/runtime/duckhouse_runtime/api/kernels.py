@@ -1,5 +1,6 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
+from duckhouse_runtime.api.auth import verify_api_key
 from duckhouse_runtime.kernels.manager import KernelConnection, registry
 from duckhouse_runtime.kernels.models import (
     CompleteRequest,
@@ -17,7 +18,7 @@ from duckhouse_runtime.kernels.models import (
     PollExecutionResponse,
 )
 
-router = APIRouter(prefix="/kernels", tags=["kernels"])
+router = APIRouter(prefix="/kernels", tags=["kernels"], dependencies=[Depends(verify_api_key)])
 
 
 def _to_info(conn: KernelConnection) -> KernelInfo:

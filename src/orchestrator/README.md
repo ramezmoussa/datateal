@@ -475,3 +475,26 @@ Kernel pods run in Kubernetes (Docker Desktop) and cannot reach `localhost` on t
 `CatalogHost` continues to be used for any direct Postgres connections made by the orchestrator process. `CatalogPodHost` is only injected into the DuckDB setup scripts executed by kernel pods. In production, where both the service and pods reach Postgres via the same Kubernetes service DNS name, `CatalogPodHost` can be left unset.
 
 For persistent parquet storage across pod restarts, set `BaseDataPath` to the `DataVolumeMountPath` configured in the Control Plane's `NodeService:Local` section. See the [Control Plane README](../control-plane/README.md#persistent-data-volume-local-development) for details.
+
+---
+
+## Security Considerations
+
+### Catalog Credentials in Kernel Sessions
+
+When a job task or interactive session connects to a DuckLake catalog, the catalog's Postgres password and Azure storage connection string are injected into the kernel session via `CatalogSetupGenerator`. These credentials are visible to user code:
+
+- `duckdb.execute("SELECT * FROM duckdb_secrets()")` reveals DuckDB secrets
+- `os.environ` reveals environment variables
+- Kernel output (including errors/tracebacks) may contain credential fragments
+
+**Mitigations:**
+
+- Catalog credential injection is logged with structured entries (catalog names, kernel ID, node)
+- Use database roles with minimal privileges for catalog connections
+- In the future, consider short-lived SAS tokens for Azure storage and temporary Postgres roles
+- Restrict catalog access via RBAC — only users with appropriate workspace permissions can trigger catalog attachment
+
+### Environment Variables and Secrets
+
+Environment variables and Kubernetes secrets configured on node pools are accessible to kernel user code. This is a known security caveat. Users can print `os.environ` in notebook cells or query outputs. Administrators should be aware that any secret injected into a runtime pod is potentially visible to users with access to that node pool's kernels.

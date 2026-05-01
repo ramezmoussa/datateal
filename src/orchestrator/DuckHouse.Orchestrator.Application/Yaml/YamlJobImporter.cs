@@ -72,6 +72,8 @@ public class YamlJobImporter(
             if (string.IsNullOrWhiteSpace(p.Name))
                 throw new InvalidOperationException("Parameter name is required.");
 
+            ParameterNameValidator.Validate(p.Name);
+
             job.Parameters.Add(new JobParameter
             {
                 Id = Guid.NewGuid(),

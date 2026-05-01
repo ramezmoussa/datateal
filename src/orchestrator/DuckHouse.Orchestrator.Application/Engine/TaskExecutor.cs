@@ -565,6 +565,10 @@ public class TaskExecutor(
     /// </summary>
     internal static string BuildInjectedParametersSource(Dictionary<string, string> parameters)
     {
+        // Defense in depth: reject names that aren't valid Python identifiers to prevent code injection.
+        foreach (var key in parameters.Keys)
+            Validation.ParameterNameValidator.Validate(key);
+
         var lines = parameters.Select(kvp =>
         {
             var value = kvp.Value;
@@ -596,6 +600,9 @@ public class TaskExecutor(
 
         var script = CatalogSetupGenerator.GenerateSetupScript(resolved);
         logger.LogInformation("Attaching {Count} catalog(s) to kernel {KernelId}", resolved.Count, kernelId);
+        logger.LogInformation(
+            "Security: Injecting credentials for catalog(s) {CatalogNames} into kernel {KernelId} on node {NodeName}",
+            string.Join(", ", resolved.Select(c => c.Name)), kernelId, nodeName);
 
         var result = await ExecuteCodeAsync(nodeName, kernelId, script, ct);
         if (result.Error is not null)

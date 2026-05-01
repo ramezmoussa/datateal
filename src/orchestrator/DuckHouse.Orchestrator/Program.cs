@@ -17,6 +17,12 @@ builder.Services.AddProblemDetails();
 
 builder.Services.AddDuckHouseApiKeyAuthentication(builder.Configuration);
 
+var expectedApiKey = builder.Configuration["ServiceAuth:ExpectedApiKey"];
+if (string.IsNullOrEmpty(expectedApiKey) || expectedApiKey == "dummy_value")
+    throw new InvalidOperationException(
+        "ServiceAuth:ExpectedApiKey must be configured with a real API key. " +
+        "Set it via environment variable, user secrets, or a deployment-specific appsettings override.");
+
 builder.Services.AddApplicationServices();
 builder.Services.AddInfrastructureServices(builder.Configuration);
 

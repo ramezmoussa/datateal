@@ -247,7 +247,7 @@
                 }
                 else
                 {
-                    @((MarkupString)Markdig.Markdown.ToHtml(Cell.Source, _mdPipeline))
+                    @((MarkupString)HtmlSanitizeHelper.Sanitize(Markdig.Markdown.ToHtml(Cell.Source, _mdPipeline)))
                 }
             </div>
         }
@@ -297,7 +297,7 @@
                     {
                         <div style="display: flex; gap: 8px; margin-bottom: 4px; align-items: flex-start;">
                             <span style="font-family: monospace; font-size: 0.875rem; white-space: nowrap; padding-top: 4px;">@outLabel</span>
-                            <div style="flex: 1 1 0%; border-left: 3px solid; padding-left: 8px; font-size: 0.875rem;">@((MarkupString)htmlText)</div>
+                            <div style="flex: 1 1 0%; border-left: 3px solid; padding-left: 8px; font-size: 0.875rem;">@((MarkupString)HtmlSanitizeHelper.Sanitize(htmlText))</div>
                         </div>
                     }
                     else if (plainText is not null)

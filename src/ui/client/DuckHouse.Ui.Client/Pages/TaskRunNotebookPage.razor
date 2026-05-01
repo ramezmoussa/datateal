@@ -112,7 +112,7 @@
                 @if (cell.CellType == "Markdown")
                 {
                     <div class="markdown-cell" style="padding: 12px;">
-                        @((MarkupString)Markdig.Markdown.ToHtml(cell.CellSource, _mdPipeline))
+                        @((MarkupString)HtmlSanitizeHelper.Sanitize(Markdig.Markdown.ToHtml(cell.CellSource, _mdPipeline)))
                     </div>
                 }
                 else
@@ -172,7 +172,7 @@
                                         <div style="padding: 8px 12px; border-top: 1px solid #f0f0f0; display: flex; gap: 8px; align-items: flex-start;">
                                             <span style="font-family: monospace; font-size: 13px; white-space: nowrap; padding-top: 4px;">@outLabel</span>
                                             <div style="flex: 1 1 0%; border-left: 3px solid #d9d9d9; padding-left: 8px; font-size: 13px;">
-                                                @((MarkupString)htmlText)
+                                                @((MarkupString)HtmlSanitizeHelper.Sanitize(htmlText))
                                             </div>
                                         </div>
                                     }

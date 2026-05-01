@@ -1,3 +1,5 @@
+using System.Text.RegularExpressions;
+
 namespace DuckHouse.Core.Catalogs;
 
 /// <summary>
@@ -6,6 +8,8 @@ namespace DuckHouse.Core.Catalogs;
 /// </summary>
 public abstract class Catalog
 {
+    private static readonly Regex ValidIdentifier = new("^[a-zA-Z_][a-zA-Z0-9_]*$", RegexOptions.Compiled);
+
     public Guid Id { get; set; }
 
     public CatalogType CatalogType { get; protected set; }
@@ -18,4 +22,12 @@ public abstract class Catalog
 
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
+
+    public static bool IsValidName(string name) => ValidIdentifier.IsMatch(name);
+
+    public static void ValidateName(string name)
+    {
+        if (!IsValidName(name))
+            throw new ArgumentException($"Catalog name '{name}' is not a valid identifier. Names must match [a-zA-Z_][a-zA-Z0-9_]*.", nameof(name));
+    }
 }

@@ -74,6 +74,7 @@ internal class UpdateJobHandler(IJobRepository jobRepository) : IRequestHandler<
             existing.Parameters.Clear();
             foreach (var p in request.Parameters)
             {
+                ParameterNameValidator.Validate(p.Name);
                 existing.Parameters.Add(new JobParameter
                 {
                     JobId = existing.Id,

@@ -11,15 +11,28 @@ public static class SqlCodeGenerator
     /// the result as a DataFrame. EXPLAIN queries are printed as text instead, because
     /// DuckDB's EXPLAIN output can be very wide and doesn't fit well in the DataFrame view.
     /// </summary>
-    public static string WrapSql(string sql) =>
-        $""""
-        import duckdb
-        __df = duckdb.execute("""{sql}""").df()
-        __result = None
-        if all(value in __df.columns for value in ['explain_key', 'explain_value']):
-            print('\\n'.join(str(v) for v in __df['explain_value']))
-        else:
-            __result = __df
-        __result
-        """";
+    public static string WrapSql(string sql)
+    {
+        var escaped = EscapeForPythonTripleQuote(sql);
+        return $""""
+            import duckdb
+            __df = duckdb.execute("""{escaped}""").df()
+            __result = None
+            if all(value in __df.columns for value in ['explain_key', 'explain_value']):
+                print('\\n'.join(str(v) for v in __df['explain_value']))
+            else:
+                __result = __df
+            __result
+            """";
+    }
+
+    /// <summary>
+    /// Escapes a string so it can be safely embedded inside a Python triple-quoted string
+    /// (<c>"""..."""</c>). Backslashes are escaped first to avoid corrupting existing escape
+    /// sequences, then any triple-quote sequences are escaped.
+    /// </summary>
+    private static string EscapeForPythonTripleQuote(string value) =>
+        value
+            .Replace(@"\", @"\\")
+            .Replace(@"""""""", @"\""\""\""");
 }

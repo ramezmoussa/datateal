@@ -24,6 +24,10 @@ RUN sed -i 's/\r$//' /usr/local/bin/entrypoint.sh \
 # ── Runtime configuration ────────────────────────────────────────────────────
 ENV DUCKHOUSE_KERNEL_PYTHON=/opt/venvs/kernel/bin/python
 
+RUN useradd -r -m -s /bin/false duckhouse \
+    && chown -R duckhouse:duckhouse /opt/venvs
+USER duckhouse
+
 EXPOSE 8000
 
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
