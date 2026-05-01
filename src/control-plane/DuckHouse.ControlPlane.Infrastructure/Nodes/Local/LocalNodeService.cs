@@ -79,8 +79,9 @@ public sealed class LocalNodeService : INodeService
 
         // Mount a host directory into the pod for persistent data storage (local dev only).
         // Requires DataVolumeHostPath and DataVolumeMountPath to both be configured.
-        if (!string.IsNullOrEmpty(_options.DataVolumeHostPath) &&
-            !string.IsNullOrEmpty(_options.DataVolumeMountPath))
+        var hasDataVolume = !string.IsNullOrEmpty(_options.DataVolumeHostPath) &&
+                            !string.IsNullOrEmpty(_options.DataVolumeMountPath);
+        if (hasDataVolume)
         {
             volumes.Add(new V1Volume
             {
@@ -179,6 +180,10 @@ public sealed class LocalNodeService : INodeService
                         Ports = [new V1ContainerPort { ContainerPort = 8000 }],
                         Env = envVars.Count > 0 ? envVars : null,
                         VolumeMounts = volumeMounts.Count > 0 ? volumeMounts : null,
+                        // When a host-path data volume is mounted, the container must run as root
+                        // so it can write to the host directory (local dev only). Without this,
+                        // the non-root Dockerfile USER would deny writes to the mapped path.
+                        SecurityContext = hasDataVolume ? new V1SecurityContext { RunAsUser = 0 } : null,
                     },
                 ],
                 Volumes = volumes.Count > 0 ? volumes : null,
