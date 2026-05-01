@@ -1,3 +1,4 @@
+using DuckHouse.Auth;
 using Microsoft.AspNetCore.Authorization;
 
 namespace DuckHouse.Ui.Shared.Users;
@@ -9,23 +10,23 @@ public static class DuckHouseAuthorizationPolicies
 {
     public static void Configure(AuthorizationOptions options)
     {
-        options.AddPolicy("Admin", p =>
-            p.RequireRole(AvailableRoles.Admin));
-        options.AddPolicy("NodePoolManage", p =>
-            p.RequireRole(AvailableRoles.Admin, AvailableRoles.NodePoolContributor));
-        options.AddPolicy("NodePoolOperate", p =>
-            p.RequireRole(AvailableRoles.Admin, AvailableRoles.NodePoolContributor, AvailableRoles.NodePoolOperator));
-        options.AddPolicy("JobManage", p =>
-            p.RequireRole(AvailableRoles.Admin, AvailableRoles.JobContributor));
-        options.AddPolicy("JobOperate", p =>
-            p.RequireRole(AvailableRoles.Admin, AvailableRoles.JobContributor, AvailableRoles.JobOperator));
-        options.AddPolicy("JobRead", p =>
-            p.RequireRole(AvailableRoles.Admin, AvailableRoles.JobContributor, AvailableRoles.JobOperator, AvailableRoles.JobReader));
-        options.AddPolicy("WorkspaceManage", p =>
-            p.RequireRole(AvailableRoles.Admin, AvailableRoles.WorkspaceContributor));
-        options.AddPolicy("CatalogManage", p =>
-            p.RequireRole(AvailableRoles.Admin, AvailableRoles.CatalogContributor));
-        options.AddPolicy("EnvironmentManage", p =>
-            p.RequireRole(AvailableRoles.Admin, AvailableRoles.EnvironmentManager));
+        options.AddPolicy(AuthPolicy.Admin, p =>
+            p.RequireRole(DuckHouseRole.Admin));
+        options.AddPolicy(AuthPolicy.NodePoolManage, p =>
+            p.RequireRole(DuckHouseRole.Admin, DuckHouseRole.NodePoolContributor));
+        options.AddPolicy(AuthPolicy.NodePoolOperate, p =>
+            p.RequireRole(DuckHouseRole.Admin, DuckHouseRole.NodePoolContributor, DuckHouseRole.NodePoolOperator));
+        options.AddPolicy(AuthPolicy.JobManage, p =>
+            p.RequireRole(DuckHouseRole.Admin, DuckHouseRole.JobContributor));
+        options.AddPolicy(AuthPolicy.JobOperate, p =>
+            p.RequireRole(DuckHouseRole.Admin, DuckHouseRole.JobContributor, DuckHouseRole.JobOperator));
+        options.AddPolicy(AuthPolicy.JobRead, p =>
+            p.RequireRole(DuckHouseRole.Admin, DuckHouseRole.JobContributor, DuckHouseRole.JobOperator, DuckHouseRole.JobReader));
+        options.AddPolicy(AuthPolicy.WorkspaceManage, p =>
+            p.RequireRole(DuckHouseRole.Admin, DuckHouseRole.WorkspaceContributor));
+        options.AddPolicy(AuthPolicy.CatalogManage, p =>
+            p.RequireRole(DuckHouseRole.Admin, DuckHouseRole.CatalogContributor));
+        options.AddPolicy(AuthPolicy.EnvironmentManage, p =>
+            p.RequireRole(DuckHouseRole.Admin, DuckHouseRole.EnvironmentManager));
     }
 }

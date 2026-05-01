@@ -18,6 +18,7 @@
   <Folder Name="/shared/">
     <Project Path="shared/DuckHouse.Core/DuckHouse.Core.csproj" />
     <Project Path="shared/DuckHouse.Data/DuckHouse.Data.csproj" />
+    <Project Path="shared/DuckHouse.Auth.Abstractions/DuckHouse.Auth.Abstractions.csproj" />
     <Project Path="shared/DuckHouse.Auth/DuckHouse.Auth.csproj" />
     <Project Path="shared/DuckHouse.Auth.EntraId/DuckHouse.Auth.EntraId.csproj" />
   </Folder>

@@ -11,6 +11,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\shared\DuckHouse.Auth.Abstractions\DuckHouse.Auth.Abstractions.csproj" />
     <ProjectReference Include="..\..\shared\DuckHouse.Core\DuckHouse.Core.csproj" />
   </ItemGroup>
 

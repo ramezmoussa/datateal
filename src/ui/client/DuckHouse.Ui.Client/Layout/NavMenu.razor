@@ -61,7 +61,7 @@
         <Icon Type="@IconType.Outline.Setting" />
         <span>Settings</span>
     </MenuItem>
-    <AuthorizeView Policy="Admin">
+    <AuthorizeView Policy="@AuthPolicy.Admin">
         <MenuItem Key="users" RouterLink="/users" RouterMatch="NavLinkMatch.Prefix">
             <Icon Type="@IconType.Outline.Team" />
             <span>Users</span>

@@ -1,5 +1,5 @@
 @page "/users"
-@attribute [Authorize(Policy = "Admin")]
+@attribute [Authorize(Policy = AuthPolicy.Admin)]
 
 @using DuckHouse.Ui.Shared.Catalogs
 @using DuckHouse.Ui.Shared.Users
@@ -52,7 +52,7 @@
             }
         </PropertyColumn>
         <PropertyColumn Property="u => u.HasAllCatalogAccess" Title="Catalog Access">
-            @if (context.Roles.Contains(AvailableRoles.Admin) || context.Roles.Contains(AvailableRoles.CatalogContributor))
+            @if (context.Roles.Contains(DuckHouseRole.Admin) || context.Roles.Contains(DuckHouseRole.CatalogContributor))
             {
                 <span>All (implicit)</span>
             }
@@ -149,8 +149,8 @@
                 </Checkbox>
             </FormItem>
 
-            @if (!_form.HasAllCatalogAccess && !_form.SelectedRoles.Contains(AvailableRoles.Admin)
-                && !_form.SelectedRoles.Contains(AvailableRoles.CatalogContributor))
+            @if (!_form.HasAllCatalogAccess && !_form.SelectedRoles.Contains(DuckHouseRole.Admin)
+                && !_form.SelectedRoles.Contains(DuckHouseRole.CatalogContributor))
             {
                 <FormItem Label="Specific Catalogs">
                     <Select TItem="CatalogDto"
@@ -195,7 +195,7 @@
     private string[] _selectedRoles = [];
     private IEnumerable<Guid> _selectedCatalogIds = [];
 
-    private readonly CheckboxOption<string>[] _roleOptions = AvailableRoles.All
+    private readonly CheckboxOption<string>[] _roleOptions = DuckHouseRole.All
         .Select(r => new CheckboxOption<string> { Value = r, Label = r })
         .ToArray();
 
@@ -293,8 +293,8 @@
             else
             {
                 var catalogIds = _form.HasAllCatalogAccess
-                    || roles.Contains(AvailableRoles.Admin)
-                    || roles.Contains(AvailableRoles.CatalogContributor)
+                    || roles.Contains(DuckHouseRole.Admin)
+                    || roles.Contains(DuckHouseRole.CatalogContributor)
                         ? []
                         : _selectedCatalogIds.ToList();
 
