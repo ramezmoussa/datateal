@@ -3,7 +3,7 @@
 @using DuckHouse.Ui.Shared.Kernels
 @using DuckHouse.Ui.Shared.Nodes
 
-<Dropdown Trigger="@(new Trigger[] { Trigger.Click })">
+<Dropdown Trigger="@(new Trigger[] { Trigger.Click })" Placement="@Placement.BottomRight">
     <Overlay>
         <div class="nps-overlay" @onclick:stopPropagation>
             @if (LoadingPools)
