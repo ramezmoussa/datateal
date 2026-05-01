@@ -46,11 +46,13 @@
                 </SpaceItem>
             </Space>
             <Space>
-                <SpaceItem>
-                    <Button Type="@ButtonType.Primary" OnClick="() => _showTriggerModal = true">
-                        <Icon Type="@IconType.Outline.PlayCircle" /> Run
-                    </Button>
-                </SpaceItem>
+                <AuthorizeView Policy="@AuthPolicy.JobOperate">
+                    <SpaceItem>
+                        <Button Type="@ButtonType.Primary" OnClick="() => _showTriggerModal = true">
+                            <Icon Type="@IconType.Outline.PlayCircle" /> Run
+                        </Button>
+                    </SpaceItem>
+                </AuthorizeView>
                 <SpaceItem>
                     <Button OnClick="ExportYamlAsync">
                         <Icon Type="@IconType.Outline.Download" /> Export YAML
@@ -80,9 +82,11 @@
                             <Switch @bind-Checked="_editEnabled" OnChange="@((bool _) => _isDirty = true)" />
                         </div>
                         <div>
-                            <Button Type="@ButtonType.Primary" OnClick="SaveAsync" Disabled="!_isDirty">
-                                <Icon Type="@IconType.Outline.Save" /> Save
-                            </Button>
+                            <AuthorizeView Policy="@AuthPolicy.JobManage">
+                                <Button Type="@ButtonType.Primary" OnClick="SaveAsync" Disabled="!_isDirty">
+                                    <Icon Type="@IconType.Outline.Save" /> Save
+                                </Button>
+                            </AuthorizeView>
                         </div>
                     </div>
                 </div>
@@ -91,9 +95,11 @@
             <TabPane Key="tasks" Tab="@($"Tasks ({_editTasks.Count})")">
                 <div style="margin-top: 16px;">
                     <div style="margin-bottom: 8px;">
-                        <Button Size="@ButtonSize.Small" OnClick="StartAddTask">
-                            <Icon Type="@IconType.Outline.Plus" /> Add task
-                        </Button>
+                        <AuthorizeView Policy="@AuthPolicy.JobManage">
+                            <Button Size="@ButtonSize.Small" OnClick="StartAddTask">
+                                <Icon Type="@IconType.Outline.Plus" /> Add task
+                            </Button>
+                        </AuthorizeView>
                     </div>
                     <Table TItem="EditableTask" DataSource="_editTasks" Size="@TableSize.Small" PageSize="int.MaxValue" PaginationPosition="none">
                         <PropertyColumn Property="c => c.Name" Title="Name" />
@@ -118,24 +124,26 @@
                             }
                         </PropertyColumn>
                         <ActionColumn Title="Actions">
-                            <Space>
-                                <SpaceItem>
-                                    <Tooltip Title="Edit">
-                                        <Button Size="@ButtonSize.Small" OnClick="() => StartEditTask(context)">
-                                            <Icon Type="@IconType.Outline.Edit" />
-                                        </Button>
-                                    </Tooltip>
-                                </SpaceItem>
-                                <SpaceItem>
-                                    <Tooltip Title="Delete">
-                                        <Popconfirm Title="Delete this task?" OnConfirm="() => DeleteTask(context)">
-                                            <Button Danger Size="@ButtonSize.Small">
-                                                <Icon Type="@IconType.Outline.Delete" />
+                            <AuthorizeView Policy="@AuthPolicy.JobManage" Context="auth">
+                                <Space>
+                                    <SpaceItem>
+                                        <Tooltip Title="Edit">
+                                            <Button Size="@ButtonSize.Small" OnClick="() => StartEditTask(context)">
+                                                <Icon Type="@IconType.Outline.Edit" />
                                             </Button>
-                                        </Popconfirm>
-                                    </Tooltip>
-                                </SpaceItem>
-                            </Space>
+                                        </Tooltip>
+                                    </SpaceItem>
+                                    <SpaceItem>
+                                        <Tooltip Title="Delete">
+                                            <Popconfirm Title="Delete this task?" OnConfirm="() => DeleteTask(context)">
+                                                <Button Danger Size="@ButtonSize.Small">
+                                                    <Icon Type="@IconType.Outline.Delete" />
+                                                </Button>
+                                            </Popconfirm>
+                                        </Tooltip>
+                                    </SpaceItem>
+                                </Space>
+                            </AuthorizeView>
                         </ActionColumn>
                     </Table>
                 </div>
@@ -144,9 +152,11 @@
             <TabPane Key="parameters" Tab="@($"Parameters ({_editParams.Count})")">
                 <div style="margin-top: 16px;">
                     <div style="margin-bottom: 8px;">
-                        <Button Size="@ButtonSize.Small" OnClick="StartAddParameter">
-                            <Icon Type="@IconType.Outline.Plus" /> Add parameter
-                        </Button>
+                        <AuthorizeView Policy="@AuthPolicy.JobManage">
+                            <Button Size="@ButtonSize.Small" OnClick="StartAddParameter">
+                                <Icon Type="@IconType.Outline.Plus" /> Add parameter
+                            </Button>
+                        </AuthorizeView>
                     </div>
                     <Table TItem="EditableParameter" DataSource="_editParams" Size="@TableSize.Small" PageSize="int.MaxValue" PaginationPosition="none">
                         <PropertyColumn Property="c => c.Name" Title="Name" />
@@ -167,24 +177,26 @@
                             @(context.Description ?? "—")
                         </PropertyColumn>
                         <ActionColumn Title="Actions">
-                            <Space>
-                                <SpaceItem>
-                                    <Tooltip Title="Edit">
-                                        <Button Size="@ButtonSize.Small" OnClick="() => StartEditParameter(context)">
-                                            <Icon Type="@IconType.Outline.Edit" />
-                                        </Button>
-                                    </Tooltip>
-                                </SpaceItem>
-                                <SpaceItem>
-                                    <Tooltip Title="Delete">
-                                        <Popconfirm Title="Delete this parameter?" OnConfirm="() => DeleteParameter(context)">
-                                            <Button Danger Size="@ButtonSize.Small">
-                                                <Icon Type="@IconType.Outline.Delete" />
+                            <AuthorizeView Policy="@AuthPolicy.JobManage" Context="auth">
+                                <Space>
+                                    <SpaceItem>
+                                        <Tooltip Title="Edit">
+                                            <Button Size="@ButtonSize.Small" OnClick="() => StartEditParameter(context)">
+                                                <Icon Type="@IconType.Outline.Edit" />
                                             </Button>
-                                        </Popconfirm>
-                                    </Tooltip>
-                                </SpaceItem>
-                            </Space>
+                                        </Tooltip>
+                                    </SpaceItem>
+                                    <SpaceItem>
+                                        <Tooltip Title="Delete">
+                                            <Popconfirm Title="Delete this parameter?" OnConfirm="() => DeleteParameter(context)">
+                                                <Button Danger Size="@ButtonSize.Small">
+                                                    <Icon Type="@IconType.Outline.Delete" />
+                                                </Button>
+                                            </Popconfirm>
+                                        </Tooltip>
+                                    </SpaceItem>
+                                </Space>
+                            </AuthorizeView>
                         </ActionColumn>
                     </Table>
                 </div>
@@ -193,9 +205,11 @@
             <TabPane Key="schedules" Tab="@($"Schedules ({_job.Schedules.Count})")">
                 <div style="margin-top: 16px;">
                     <div style="margin-bottom: 8px;">
-                        <Button Size="@ButtonSize.Small" OnClick="StartAddSchedule">
-                            <Icon Type="@IconType.Outline.Plus" /> Add schedule
-                        </Button>
+                        <AuthorizeView Policy="@AuthPolicy.JobManage">
+                            <Button Size="@ButtonSize.Small" OnClick="StartAddSchedule">
+                                <Icon Type="@IconType.Outline.Plus" /> Add schedule
+                            </Button>
+                        </AuthorizeView>
                     </div>
                     <Table TItem="ScheduleDto" DataSource="_job.Schedules" Size="@TableSize.Small" PageSize="int.MaxValue" PaginationPosition="none">
                         <PropertyColumn Property="c => c.CronExpression" Title="Cron Expression">
@@ -209,24 +223,40 @@
                             }
                         </PropertyColumn>
                         <PropertyColumn Property="c => c.IsEnabled" Title="Enabled">
-                            <Switch Value="@context.IsEnabled" OnChange="@(async val => await ToggleScheduleEnabledAsync(context, val))" />
+                            <AuthorizeView Policy="@AuthPolicy.JobManage" Context="auth">
+                                <Authorized>
+                                    <Switch Value="@context.IsEnabled" OnChange="@(async val => await ToggleScheduleEnabledAsync(context, val))" />
+                                </Authorized>
+                                <NotAuthorized>
+                                    @if (context.IsEnabled)
+                                    {
+                                        <Tag Color="@("green")">Enabled</Tag>
+                                    }
+                                    else
+                                    {
+                                        <Tag>Disabled</Tag>
+                                    }
+                                </NotAuthorized>
+                            </AuthorizeView>
                         </PropertyColumn>
                         <PropertyColumn Property="c => c.NextFireTime" Title="Next Run">
                             @(context.NextFireTime?.ToString("yyyy-MM-dd HH:mm zzz") ?? "—")
                         </PropertyColumn>
                         <ActionColumn Title="Actions">
-                            <Tooltip Title="Edit">
-                                <Button Size="@ButtonSize.Small" OnClick="() => StartEditSchedule(context)">
-                                    <Icon Type="@IconType.Outline.Edit" />
-                                </Button>
-                            </Tooltip>
-                            <Tooltip Title="Delete">
-                                <Popconfirm Title="Delete this schedule?" OnConfirm="() => DeleteScheduleAsync(context)">
-                                    <Button Danger Size="@ButtonSize.Small">
-                                        <Icon Type="@IconType.Outline.Delete" />
+                            <AuthorizeView Policy="@AuthPolicy.JobManage" Context="auth">
+                                <Tooltip Title="Edit">
+                                    <Button Size="@ButtonSize.Small" OnClick="() => StartEditSchedule(context)">
+                                        <Icon Type="@IconType.Outline.Edit" />
                                     </Button>
-                                </Popconfirm>
-                            </Tooltip>
+                                </Tooltip>
+                                <Tooltip Title="Delete">
+                                    <Popconfirm Title="Delete this schedule?" OnConfirm="() => DeleteScheduleAsync(context)">
+                                        <Button Danger Size="@ButtonSize.Small">
+                                            <Icon Type="@IconType.Outline.Delete" />
+                                        </Button>
+                                    </Popconfirm>
+                                </Tooltip>
+                            </AuthorizeView>
                         </ActionColumn>
                     </Table>
                 </div>

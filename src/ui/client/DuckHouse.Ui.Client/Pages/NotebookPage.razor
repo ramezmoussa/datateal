@@ -18,6 +18,7 @@
 @inject IRecentItemsService RecentItemsService
 @inject IJSRuntime JS
 @inject NavigationManager Navigation
+@inject IAuthorizationService AuthorizationService
 @implements IAsyncDisposable
 
 <PageTitle>Notebook — DuckHouse</PageTitle>
@@ -78,18 +79,22 @@
                 @if (_workspaceNotebookId.HasValue)
                 {
                     <SpaceItem>
-                        <Button Disabled="@(!_notebook.IsDirty)" Icon="@IconType.Outline.Save" OnClick="SaveToWorkspaceAsync">
-                            Save
-                        </Button>
+                        <AuthorizeView Policy="@AuthPolicy.WorkspaceManage">
+                                <Button Disabled="@(!_notebook.IsDirty)" Icon="@IconType.Outline.Save" OnClick="SaveToWorkspaceAsync">
+                                    Save
+                                </Button>
+                        </AuthorizeView>
                     </SpaceItem>
                 }
                 else
                 {
-                    <SpaceItem>
-                        <Button Disabled="@(!_notebook.IsDirty)" Icon="@IconType.Outline.CloudUpload" OnClick="OpenFolderPickerAsync">
-                            Save to workspace
-                        </Button>
-                    </SpaceItem>
+                    <AuthorizeView Policy="@AuthPolicy.WorkspaceManage">
+                        <SpaceItem>
+                            <Button Disabled="@(!_notebook.IsDirty)" Icon="@IconType.Outline.CloudUpload" OnClick="OpenFolderPickerAsync">
+                                Save to workspace
+                            </Button>
+                        </SpaceItem>
+                    </AuthorizeView>
                 }
                 <SpaceItem>
                     <Button Icon="@IconType.Outline.Download" OnClick="ExportFileAsync">
@@ -98,23 +103,25 @@
                 </SpaceItem>
                 <SpaceItem><Divider Type="DividerType.Vertical" /></SpaceItem>
                 <SpaceItem>
-                    @if (AnyExecuting)
-                    {
-                        <Button Disabled="@(!HasKernel || !AnyExecuting)"
-                                Icon="@IconType.Outline.Loading"
-                                OnClick="InterruptAsync">
-                            Interrupt
-                        </Button>
-                    }
-                    else
-                    {
-                        <Button Type="ButtonType.Primary"
-                                Disabled="@(!HasKernel)"
-                                Icon="@IconType.Outline.PlayCircle"
-                                OnClick="RunAllAsync">
-                            Run all
-                        </Button>
-                    }
+                    <AuthorizeView Policy="@AuthPolicy.NodePoolOperate">
+                            @if (AnyExecuting)
+                            {
+                                <Button Disabled="@(!HasKernel || !AnyExecuting)"
+                                        Icon="@IconType.Outline.Loading"
+                                        OnClick="InterruptAsync">
+                                    Interrupt
+                                </Button>
+                            }
+                            else
+                            {
+                                <Button Type="ButtonType.Primary"
+                                        Disabled="@(!HasKernel)"
+                                        Icon="@IconType.Outline.PlayCircle"
+                                        OnClick="RunAllAsync">
+                                    Run all
+                                </Button>
+                            }
+                    </AuthorizeView>
                 </SpaceItem>
                 <SpaceItem>
                     <Button Disabled="@(!_notebook.Cells.Any())"
@@ -142,7 +149,8 @@
             </Breadcrumb>
         }
 
-        @* Kernel connection toolbar *@
+        @* Kernel connection toolbar — only shown to users who can operate node pools *@
+        <AuthorizeView Policy="@AuthPolicy.NodePoolOperate">
         <Space Align="SpaceAlign.Center" Style="margin-bottom: 12px; flex-wrap: wrap;" Size="SpaceSize.Small">
             <SpaceItem>
                 <Icon Type="@IconType.Outline.CloudServer" />
@@ -168,8 +176,8 @@
                             Disabled="@(_connecting || HasKernel)"
                             DropdownMatchSelectWidth="false"
                             Style="min-width: 150px;">
-                        <ItemTemplate>
-                            @{ var pool = (InteractivePoolDto)context!; }
+                        <ItemTemplate Context="poolItem">
+                            @{ var pool = (InteractivePoolDto)poolItem!; }
                             <div style="line-height: 1.4;">
                                 <div>
                                     <span>@pool.Name</span>
@@ -220,6 +228,7 @@
                 </SpaceItem>
             }
         </Space>
+        </AuthorizeView>
 
         @* Catalog selector moved to the side panel *@
 
@@ -286,6 +295,7 @@
 
 @code {
     [Parameter] public Guid Id { get; set; }
+    [CascadingParameter] private Task<AuthenticationState>? AuthenticationStateTask { get; set; }
 
     private NotebookDocument _notebook = new();
     private Guid? _workspaceNotebookId;
@@ -305,6 +315,7 @@
     private InputFile _fileInput = default!;
     private CancellationTokenSource? _kernelPollingCts;
     private CancellationTokenSource? _connectCts;
+    private bool _canNodePoolOperate;
 
     // Folder picker (first-time workspace save)
     private bool _showFolderPicker;
@@ -395,10 +406,18 @@
             _notebook.IsDirty = true;
         }
 
+        // Check NodePoolOperate permission and gate all kernel/pool operations
+        var authState = await AuthenticationStateTask!;
+        var authResult = await AuthorizationService.AuthorizeAsync(authState.User, null, AuthPolicy.NodePoolOperate);
+        _canNodePoolOperate = authResult.Succeeded;
+
+        if (_canNodePoolOperate)
+        {
         _loadingPools = true;
         try { _pools = await InteractivePoolService.GetInteractivePoolsAsync(); }
         catch (Exception ex) { _error = $"Failed to load pools: {ex.Message}"; }
         finally { _loadingPools = false; }
+        }
 
         // Load available catalogs
         try { _allCatalogs = await CatalogService.GetCatalogsAsync(); }
@@ -416,7 +435,7 @@
         }
 
         // Restore last-used pool preference
-        if (_workspaceNotebookId.HasValue)
+        if (_canNodePoolOperate && _workspaceNotebookId.HasValue)
         {
             try
             {

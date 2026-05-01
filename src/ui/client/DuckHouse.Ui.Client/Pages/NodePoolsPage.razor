@@ -52,9 +52,11 @@
                     </Button>
                 </SpaceItem>
                 <SpaceItem>
-                    <Button Type="@ButtonType.Primary" OnClick="StartCreate">
-                        <Icon Type="@IconType.Outline.Plus" /> New interactive node pool
-                    </Button>
+                    <AuthorizeView Policy="@AuthPolicy.NodePoolManage">
+                        <Button Type="@ButtonType.Primary" OnClick="StartCreate">
+                            <Icon Type="@IconType.Outline.Plus" /> New interactive node pool
+                        </Button>
+                    </AuthorizeView>
                 </SpaceItem>
             </Space>
         </Flex>
@@ -104,23 +106,27 @@
                                 var poolForEdit = _jobAndInteractivePools.FirstOrDefault(p => p.Id == context.Id);
                             }
                             <SpaceItem>
-                                <Tooltip Title="Edit">
-                                    <Button Size="@ButtonSize.Small"
-                                            Disabled="@(poolForEdit is null)"
-                                            OnClick="() => StartEdit(poolForEdit!)">
-                                        <Icon Type="@IconType.Outline.Edit" />
-                                    </Button>
-                                </Tooltip>
+                                <AuthorizeView Policy="@AuthPolicy.NodePoolManage" Context="auth">
+                                    <Tooltip Title="Edit">
+                                        <Button Size="@ButtonSize.Small"
+                                                Disabled="@(poolForEdit is null)"
+                                                OnClick="() => StartEdit(poolForEdit!)">
+                                            <Icon Type="@IconType.Outline.Edit" />
+                                        </Button>
+                                    </Tooltip>
+                                </AuthorizeView>
                             </SpaceItem>
                             <SpaceItem>
-                                <Tooltip Title="Delete">
-                                    <Popconfirm Title="@($"Delete pool '{context.Name}'?")"
-                                                OnConfirm="() => DeleteInteractiveAsync(context)">
-                                        <Button Danger Size="@ButtonSize.Small">
-                                            <Icon Type="@IconType.Outline.Delete" />
-                                        </Button>
-                                    </Popconfirm>
-                                </Tooltip>
+                                <AuthorizeView Policy="@AuthPolicy.NodePoolManage" Context="auth">
+                                    <Tooltip Title="Delete">
+                                        <Popconfirm Title="@($"Delete pool '{context.Name}'?")"
+                                                    OnConfirm="() => DeleteInteractiveAsync(context)">
+                                            <Button Danger Size="@ButtonSize.Small">
+                                                <Icon Type="@IconType.Outline.Delete" />
+                                            </Button>
+                                        </Popconfirm>
+                                    </Tooltip>
+                                </AuthorizeView>
                             </SpaceItem>
                             @if (!context.NodeState.HasValue || context.NodeState.Value == NodeState.Failure)
                             {
@@ -163,11 +169,13 @@
         </p>
         <Flex Align="FlexAlign.Center" Justify="FlexJustify.End" Style="margin-bottom: 12px;">
             <Space Size="SpaceSize.Small">
-                <SpaceItem>
-                    <Button Type="@ButtonType.Primary" OnClick="StartCreate">
-                        <Icon Type="@IconType.Outline.Plus" /> New job node pool
-                    </Button>
-                </SpaceItem>
+                <AuthorizeView Policy="@AuthPolicy.NodePoolManage">
+                    <SpaceItem>
+                        <Button Type="@ButtonType.Primary" OnClick="StartCreate">
+                            <Icon Type="@IconType.Outline.Plus" /> New job node pool
+                        </Button>
+                    </SpaceItem>
+                </AuthorizeView>
             </Space>
         </Flex>
         <Spin Spinning="_loading">
@@ -214,25 +222,27 @@
                         @context.UpdatedAt.ToString("yyyy-MM-dd")
                     </PropertyColumn>
                     <ActionColumn Title="Actions">
-                        <Space>
-                            <SpaceItem>
-                                <Tooltip Title="Edit">
-                                    <Button Size="@ButtonSize.Small" OnClick="() => StartEdit(context)">
-                                        <Icon Type="@IconType.Outline.Edit" />
-                                    </Button>
-                                </Tooltip>
-                            </SpaceItem>
-                            <SpaceItem>
-                                <Tooltip Title="Delete">
-                                    <Popconfirm Title="@($"Delete node pool '{context.Name}'?")"
-                                                OnConfirm="() => DeleteAsync(context)">
-                                        <Button Danger Size="@ButtonSize.Small">
-                                            <Icon Type="@IconType.Outline.Delete" />
+                        <AuthorizeView Policy="@AuthPolicy.NodePoolManage" Context="auth">
+                            <Space>
+                                <SpaceItem>
+                                    <Tooltip Title="Edit">
+                                        <Button Size="@ButtonSize.Small" OnClick="() => StartEdit(context)">
+                                            <Icon Type="@IconType.Outline.Edit" />
                                         </Button>
-                                    </Popconfirm>
-                                </Tooltip>
-                            </SpaceItem>
-                        </Space>
+                                    </Tooltip>
+                                </SpaceItem>
+                                <SpaceItem>
+                                    <Tooltip Title="Delete">
+                                        <Popconfirm Title="@($"Delete node pool '{context.Name}'?")"
+                                                    OnConfirm="() => DeleteAsync(context)">
+                                            <Button Danger Size="@ButtonSize.Small">
+                                                <Icon Type="@IconType.Outline.Delete" />
+                                            </Button>
+                                        </Popconfirm>
+                                    </Tooltip>
+                                </SpaceItem>
+                            </Space>
+                        </AuthorizeView>
                     </ActionColumn>
                 </Table>
             }

@@ -35,13 +35,15 @@
                 <Space>
                     @if (_run.Status is JobRunStatus.Running or JobRunStatus.Pending)
                     {
-                        <SpaceItem>
-                            <Popconfirm Title="Cancel this run?" OnConfirm="CancelAsync">
-                                <Button Danger>
-                                    <Icon Type="@IconType.Outline.Stop" /> Cancel
-                                </Button>
-                            </Popconfirm>
-                        </SpaceItem>
+                        <AuthorizeView Policy="@AuthPolicy.JobOperate">
+                            <SpaceItem>
+                                <Popconfirm Title="Cancel this run?" OnConfirm="CancelAsync">
+                                    <Button Danger>
+                                        <Icon Type="@IconType.Outline.Stop" /> Cancel
+                                    </Button>
+                                </Popconfirm>
+                            </SpaceItem>
+                        </AuthorizeView>
                         <SpaceItem>
                             <Button OnClick="RefreshAsync">
                                 <Icon Type="@IconType.Outline.Reload" /> Refresh

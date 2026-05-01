@@ -27,16 +27,18 @@
     <TabPane Key="jobs" Tab="Jobs">
         <Flex Justify="FlexJustify.End" Style="margin-bottom: 12px;">
             <Space Size="SpaceSize.Small">
-                <SpaceItem>
-                    <Button Type="@ButtonType.Primary" OnClick="StartCreate">
-                        <Icon Type="@IconType.Outline.Plus" /> New job
-                    </Button>
-                </SpaceItem>
-                <SpaceItem>
-                    <Button OnClick="StartImport">
-                        <Icon Type="@IconType.Outline.Upload" /> Import
-                    </Button>
-                </SpaceItem>
+                <AuthorizeView Policy="@AuthPolicy.JobManage">
+                    <SpaceItem>
+                        <Button Type="@ButtonType.Primary" OnClick="StartCreate">
+                            <Icon Type="@IconType.Outline.Plus" /> New job
+                        </Button>
+                    </SpaceItem>
+                    <SpaceItem>
+                        <Button OnClick="StartImport">
+                            <Icon Type="@IconType.Outline.Upload" /> Import
+                        </Button>
+                    </SpaceItem>
+                </AuthorizeView>
             </Space>
         </Flex>
         <Spin Spinning="_loading">
@@ -77,21 +79,25 @@
                             </Tooltip>
                         </SpaceItem>
                         <SpaceItem>
-                            <Tooltip Title="Run">
-                                <Button Size="@ButtonSize.Small" Type="@ButtonType.Primary"
-                                        OnClick="@(() => OpenTriggerModal(context.Id))">
-                                    <Icon Type="@IconType.Outline.PlayCircle" />
-                                </Button>
-                            </Tooltip>
+                            <AuthorizeView Policy="@AuthPolicy.JobOperate" Context="auth">
+                                <Tooltip Title="Run">
+                                    <Button Size="@ButtonSize.Small" Type="@ButtonType.Primary"
+                                            OnClick="@(() => OpenTriggerModal(context.Id))">
+                                        <Icon Type="@IconType.Outline.PlayCircle" />
+                                    </Button>
+                                </Tooltip>
+                            </AuthorizeView>
                         </SpaceItem>
                         <SpaceItem>
-                            <Tooltip Title="Delete">
-                                <Popconfirm Title="@($"Delete job '{context.Name}'?")" OnConfirm="() => DeleteAsync(context)">
-                                    <Button Danger Size="@ButtonSize.Small">
-                                        <Icon Type="@IconType.Outline.Delete" />
-                                    </Button>
-                                </Popconfirm>
-                            </Tooltip>
+                            <AuthorizeView Policy="@AuthPolicy.JobManage" Context="auth">
+                                <Tooltip Title="Delete">
+                                    <Popconfirm Title="@($"Delete job '{context.Name}'?")" OnConfirm="() => DeleteAsync(context)">
+                                        <Button Danger Size="@ButtonSize.Small">
+                                            <Icon Type="@IconType.Outline.Delete" />
+                                        </Button>
+                                    </Popconfirm>
+                                </Tooltip>
+                            </AuthorizeView>
                         </SpaceItem>
                     </Space>
                 </ActionColumn>

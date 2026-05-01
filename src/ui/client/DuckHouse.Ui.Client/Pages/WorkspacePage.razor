@@ -20,7 +20,9 @@
     </Space>
     <Space Size="SpaceSize.Small">
         <SpaceItem>
-            <Button Icon="@IconType.Outline.FolderAdd" OnClick="StartNewFolder">New folder</Button>
+            <AuthorizeView Policy="@AuthPolicy.WorkspaceManage">
+                    <Button Icon="@IconType.Outline.FolderAdd" OnClick="StartNewFolder">New folder</Button>
+            </AuthorizeView>
         </SpaceItem>
         <SpaceItem>
             <Button Icon="@IconType.Outline.FileAdd" OnClick="StartNewNotebook">New notebook</Button>
@@ -110,69 +112,74 @@ else
             <ActionColumn Title="" Width="130" Align="ColumnAlign.Right">
                 @if (context.IsFolder)
                 {
-                    <Space Size="SpaceSize.Small">
-                        <SpaceItem>
-                            <Tooltip Title="Move">
-                                <Button Size="ButtonSize.Small" Icon="@IconType.Outline.Import"
-                                        OnClick="() => StartMoveFolder(context.Folder!)" />
-                            </Tooltip>
-                        </SpaceItem>
-                        <SpaceItem>
-                            <Tooltip Title="Rename">
-                                <Button Size="ButtonSize.Small" Icon="@IconType.Outline.Edit"
-                                        OnClick="() => StartRenameFolder(context.Folder!)" />
-                            </Tooltip>
-                        </SpaceItem>
-                        <SpaceItem>
-                            <Tooltip Title="Delete">
-                                <Popconfirm Title="Delete this folder and all its contents?"
-                                            OnConfirm="@(() => DeleteFolderAsync(context.Folder!))"
-                                            OkText="@("Delete")" OkType="ButtonType.Primary"
-                                            OkButtonProps="new ButtonProps { Danger = true }"
-                                            CancelText="Cancel">
-                                    <Button Size="ButtonSize.Small" Danger Icon="@IconType.Outline.Delete" />
-                                </Popconfirm>
-                            </Tooltip>
-                        </SpaceItem>
-                    </Space>
+                    <AuthorizeView Policy="@AuthPolicy.WorkspaceManage" Context="auth">
+                        <Space Size="SpaceSize.Small">
+                            <SpaceItem>
+                                <Tooltip Title="Move">
+                                    <Button Size="ButtonSize.Small" Icon="@IconType.Outline.Import"
+                                            OnClick="() => StartMoveFolder(context.Folder!)" />
+                                </Tooltip>
+                            </SpaceItem>
+                            <SpaceItem>
+                                <Tooltip Title="Rename">
+                                    <Button Size="ButtonSize.Small" Icon="@IconType.Outline.Edit"
+                                            OnClick="() => StartRenameFolder(context.Folder!)" />
+                                </Tooltip>
+                            </SpaceItem>
+                            <SpaceItem>
+                                <Tooltip Title="Delete">
+                                    <Popconfirm Title="Delete this folder and all its contents?"
+                                                OnConfirm="@(() => DeleteFolderAsync(context.Folder!))"
+                                                OkText="@("Delete")" OkType="ButtonType.Primary"
+                                                OkButtonProps="new ButtonProps { Danger = true }"
+                                                CancelText="Cancel">
+                                        <Button Size="ButtonSize.Small" Danger Icon="@IconType.Outline.Delete" />
+                                    </Popconfirm>
+                                </Tooltip>
+                            </SpaceItem>
+                        </Space>
+                    </AuthorizeView>
                 }
                 else if (context.IsNotebook)
                 {
-                    <Space Size="SpaceSize.Small">
-                        <SpaceItem>
-                            <Tooltip Title="Clone">
-                                <Button Size="ButtonSize.Small" Icon="@IconType.Outline.Copy"
-                                        OnClick="() => CloneItemAsync(context.Item!)" />
-                            </Tooltip>
-                        </SpaceItem>
-                        <SpaceItem>
-                            <Tooltip Title="Move">
-                                <Button Size="ButtonSize.Small" Icon="@IconType.Outline.Import"
-                                        OnClick="() => StartMoveItem(context.Item!)" />
-                            </Tooltip>
-                        </SpaceItem>
-                        <SpaceItem>
-                            <Tooltip Title="Rename">
-                                <Button Size="ButtonSize.Small" Icon="@IconType.Outline.Edit"
-                                        OnClick="() => StartRenameItem(context.Item!)" />
-                            </Tooltip>
-                        </SpaceItem>
-                        <SpaceItem>
-                            <Tooltip Title="Delete">
-                                <Popconfirm Title="Delete this notebook?"
-                                            OnConfirm="@(() => DeleteItemAsync(context.Item!))"
-                                            OkText="@("Delete")" OkType="ButtonType.Primary"
-                                            OkButtonProps="new ButtonProps { Danger = true }"
-                                            CancelText="Cancel">
-                                    <Button Size="ButtonSize.Small" Danger Icon="@IconType.Outline.Delete" />
-                                </Popconfirm>
-                            </Tooltip>
-                        </SpaceItem>
-                    </Space>
+                    <AuthorizeView Policy="@AuthPolicy.WorkspaceManage" Context="auth">
+                        <Space Size="SpaceSize.Small">
+                            <SpaceItem>
+                                <Tooltip Title="Clone">
+                                    <Button Size="ButtonSize.Small" Icon="@IconType.Outline.Copy"
+                                            OnClick="() => CloneItemAsync(context.Item!)" />
+                                </Tooltip>
+                            </SpaceItem>
+                            <SpaceItem>
+                                <Tooltip Title="Move">
+                                    <Button Size="ButtonSize.Small" Icon="@IconType.Outline.Import"
+                                            OnClick="() => StartMoveItem(context.Item!)" />
+                                </Tooltip>
+                            </SpaceItem>
+                            <SpaceItem>
+                                <Tooltip Title="Rename">
+                                    <Button Size="ButtonSize.Small" Icon="@IconType.Outline.Edit"
+                                            OnClick="() => StartRenameItem(context.Item!)" />
+                                </Tooltip>
+                            </SpaceItem>
+                            <SpaceItem>
+                                <Tooltip Title="Delete">
+                                    <Popconfirm Title="Delete this notebook?"
+                                                OnConfirm="@(() => DeleteItemAsync(context.Item!))"
+                                                OkText="@("Delete")" OkType="ButtonType.Primary"
+                                                OkButtonProps="new ButtonProps { Danger = true }"
+                                                CancelText="Cancel">
+                                        <Button Size="ButtonSize.Small" Danger Icon="@IconType.Outline.Delete" />
+                                    </Popconfirm>
+                                </Tooltip>
+                            </SpaceItem>
+                        </Space>
+                    </AuthorizeView>
                 }
                 else
                 {
-                    <Space Size="SpaceSize.Small">
+                    <AuthorizeView Policy="@AuthPolicy.WorkspaceManage" Context="auth">
+                        <Space Size="SpaceSize.Small">
                         <SpaceItem>
                             <Tooltip Title="Clone">
                                 <Button Size="ButtonSize.Small" Icon="@IconType.Outline.Copy"
@@ -203,6 +210,7 @@ else
                             </Tooltip>
                         </SpaceItem>
                     </Space>
+                    </AuthorizeView>
                 }
             </ActionColumn>
         </Table>
