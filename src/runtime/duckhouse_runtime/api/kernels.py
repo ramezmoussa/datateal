@@ -154,5 +154,5 @@ async def hover(kernel_id: str, body: HoverRequest):
     if not conn:
         raise HTTPException(status_code=404, detail="Kernel not found")
     contents = await conn.hover(body.code, body.line, body.column, body.context)
-    logger.info("hover kernel=%s line=%d col=%d → %d content items", kernel_id, body.line, body.column, len(contents))
+    logger.debug("hover kernel=%s line=%d col=%d → %d content items", kernel_id, body.line, body.column, len(contents))
     return HoverResponse(contents=contents)

@@ -244,12 +244,9 @@ class KernelConnection:
                 adjusted_line = line
 
             total_lines = full_code.count("\n") + 1
-            target_line_content = full_code.split("\n")[adjusted_line - 1] if adjusted_line <= total_lines else ""
-            logger.info(
-                "complete: line=%d col=%d adj_line=%d total_lines=%d "
-                "target_line=%r code_len=%d context_len=%d",
-                line, column, adjusted_line, total_lines,
-                target_line_content, len(code), len(context),
+            logger.debug(
+                "complete: line=%d col=%d adj_line=%d total_lines=%d code_len=%d context_len=%d",
+                line, column, adjusted_line, total_lines, len(code), len(context),
             )
 
             env = JediEnvironment(kernel_python)
@@ -257,10 +254,10 @@ class KernelConnection:
             try:
                 completions = script.complete(adjusted_line, column)
             except Exception:
-                logger.info("complete: script.complete() failed", exc_info=True)
+                logger.warning("complete: script.complete() failed", exc_info=True)
                 return []
 
-            logger.info("complete: %d raw completions", len(completions))
+            logger.debug("complete: %d raw completions", len(completions))
 
             def _visibility(name: str) -> int:
                 if name.startswith("__"):
@@ -390,9 +387,7 @@ class KernelConnection:
                     "token_type": token_type,
                 })
 
-            logger.info("semantic_tokens: %d names → %d tokens, sample: %s",
-                        len(names), len(tokens),
-                        [(n.name, n.type, _classify_jedi_name(n, _goto_cache)) for n in names[:20]])
+            logger.debug("semantic_tokens: %d names → %d tokens", len(names), len(tokens))
             return tokens
 
         def _is_pascal_case(n: str) -> bool:
@@ -626,9 +621,9 @@ class KernelConnection:
             adj_line = line + context_line_count
             total_lines = full_code.count("\n") + 1
 
-            logger.info(
-                "hover _run: line=%d col=%d context_lines=%d adj_line=%d total_lines=%d code_len=%d context_len=%d",
-                line, column, context_line_count, adj_line, total_lines, len(code), len(context))
+            logger.debug(
+                "hover: line=%d col=%d adj_line=%d total_lines=%d",
+                line, column, adj_line, total_lines)
 
             if adj_line < 1 or adj_line > total_lines:
                 logger.warning(
@@ -642,7 +637,7 @@ class KernelConnection:
             # ── 1. Try signatures (cursor inside call parentheses) ──
             try:
                 sigs = script.get_signatures(adj_line, column)
-                logger.info("get_signatures(%d, %d) → %d", adj_line, column, len(sigs))
+                logger.debug("get_signatures(%d, %d) → %d", adj_line, column, len(sigs))
                 if sigs:
                     sig = sigs[0]
                     params = [p.description for p in sig.params]
@@ -659,13 +654,12 @@ class KernelConnection:
                         contents.append(snippet)
                     return contents
             except Exception:
-                logger.info("get_signatures failed at (%d, %d)", adj_line, column, exc_info=True)
+                logger.warning("get_signatures failed at (%d, %d)", adj_line, column, exc_info=True)
 
             # ── 2. Try goto (resolves to definition — best for compiled modules) ──
             try:
                 defs = script.goto(adj_line, column, follow_imports=True, follow_builtin_imports=True)
-                logger.info("goto(%d, %d) → %d defs: %s", adj_line, column, len(defs),
-                            [(d.full_name, d.type) for d in defs[:3]])
+                logger.debug("goto(%d, %d) → %d defs", adj_line, column, len(defs))
                 for d in defs:
                     full_name = d.full_name or d.name
                     doc = d.docstring(raw=True)
@@ -707,13 +701,12 @@ class KernelConnection:
                     elif desc and desc != full_name:
                         return [f"**{full_name}**", f"```python\n{desc}\n```"]
             except Exception:
-                logger.info("goto failed at (%d, %d)", adj_line, column, exc_info=True)
+                logger.warning("goto failed at (%d, %d)", adj_line, column, exc_info=True)
 
             # ── 3. Try infer (type inference) ──
             try:
                 names = script.infer(adj_line, column)
-                logger.info("infer(%d, %d) → %d names: %s", adj_line, column, len(names),
-                            [(n.full_name, n.type) for n in names[:3]])
+                logger.debug("infer(%d, %d) → %d names", adj_line, column, len(names))
                 for n in names:
                     full_name = n.full_name or n.name
                     doc = n.docstring(raw=True)
@@ -722,13 +715,12 @@ class KernelConnection:
                     elif full_name:
                         return [f"**{full_name}**"]
             except Exception:
-                logger.info("infer failed at (%d, %d)", adj_line, column, exc_info=True)
+                logger.warning("infer failed at (%d, %d)", adj_line, column, exc_info=True)
 
             # ── 4. Try help (last resort) ──
             try:
                 names = script.help(adj_line, column)
-                logger.info("help(%d, %d) → %d names: %s", adj_line, column, len(names),
-                            [(n.full_name, n.type) for n in names[:3]])
+                logger.debug("help(%d, %d) → %d names", adj_line, column, len(names))
                 for n in names:
                     full_name = n.full_name or n.name
                     doc = n.docstring(raw=True)
@@ -737,7 +729,7 @@ class KernelConnection:
                     elif full_name:
                         return [f"**{full_name}**"]
             except Exception:
-                logger.info("help failed at (%d, %d)", adj_line, column, exc_info=True)
+                logger.warning("help failed at (%d, %d)", adj_line, column, exc_info=True)
 
             return []
 
