@@ -596,10 +596,24 @@ class KernelConnection:
 
         def _format_doc(full_name: str, doc: str) -> list[str]:
             """Build a markdown hover from a fully-qualified name and docstring."""
-            result: list[str] = [f"**{full_name}**"]
             doc = doc.strip()
-            if doc:
-                paragraphs = doc.split("\n\n")
+            if not doc:
+                return [f"**{full_name}**"]
+
+            lines = doc.split("\n")
+            first_line = lines[0]
+
+            # If the first line looks like a function signature (contains '('),
+            # format it as a Python code block for better readability.
+            if "(" in first_line and first_line.split("(")[0].replace(".", "").replace("_", "").isalnum():
+                result: list[str] = [f"```python\n{first_line}\n```"]
+                rest = "\n".join(lines[1:]).strip()
+            else:
+                result = [f"**{full_name}**"]
+                rest = doc
+
+            if rest:
+                paragraphs = rest.split("\n\n")
                 snippet = "\n\n".join(paragraphs[:3])
                 if len(snippet) > 1000:
                     snippet = snippet[:1000] + "…"
@@ -656,12 +670,42 @@ class KernelConnection:
                     full_name = d.full_name or d.name
                     doc = d.docstring(raw=True)
                     desc = d.description
+
                     if doc:
                         return _format_doc(full_name, doc)
+
+                    # For functions/classes without a docstring, try get_type_hint()
+                    # which returns the full signature including parameters and return
+                    # type — even for pybind11 C extensions and local functions.
+                    if d.type in ("function", "class"):
+                        try:
+                            sig_str = d.get_type_hint()
+                        except Exception:
+                            sig_str = None
+                        if sig_str:
+                            result = [f"```python\n{sig_str}\n```"]
+                            # Also check infer for a docstring to pair with the signature
+                            try:
+                                for n in script.infer(adj_line, column):
+                                    ndoc = n.docstring(raw=True).strip()
+                                    if ndoc:
+                                        # Skip the first line if it repeats the signature
+                                        lines = ndoc.split("\n")
+                                        if "(" in lines[0]:
+                                            ndoc = "\n".join(lines[1:]).strip()
+                                        if ndoc:
+                                            paragraphs = ndoc.split("\n\n")
+                                            snippet = "\n\n".join(paragraphs[:3])
+                                            if len(snippet) > 1000:
+                                                snippet = snippet[:1000] + "…"
+                                            result.append(snippet)
+                                        break
+                            except Exception:
+                                pass
+                            return result
+                        # Fall through if get_type_hint() returned nothing
                     elif desc and desc != full_name:
                         return [f"**{full_name}**", f"```python\n{desc}\n```"]
-                    elif full_name:
-                        return [f"**{full_name}**"]
             except Exception:
                 logger.info("goto failed at (%d, %d)", adj_line, column, exc_info=True)
 
