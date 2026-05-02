@@ -444,17 +444,16 @@ class KernelConnection:
                 # Decorators appear as statements sometimes
                 if n.startswith("@"):
                     return "decorator"
-                if n in KernelConnection._PYTHON_BUILTINS:
-                    return "builtin"
-                # Try to resolve the actual definition type via goto().
-                # This correctly identifies references like module names,
-                # function calls, and class references that Jedi reports
-                # as 'statement' in get_names(references=True).
+                # Try to resolve the actual definition type via goto() FIRST.
+                # This correctly differentiates builtin types (str, bool → class/teal)
+                # from builtin functions (print, len → function/gold), and also
+                # resolves references to modules, functions, and classes that Jedi
+                # reports as 'statement' in get_names(references=True).
                 resolved = _resolve_statement_type(name, goto_cache)
                 if resolved is not None:
-                    # Re-classify using the resolved type by creating a
-                    # lightweight wrapper with the resolved type.
                     if resolved == "function":
+                        if n in KernelConnection._PYTHON_BUILTINS:
+                            return "builtin"
                         if _is_pascal_case(n):
                             return "class"
                         return "function"
@@ -465,13 +464,18 @@ class KernelConnection:
                     if resolved == "instance":
                         if _is_pascal_case(n):
                             return "class"
-                        return "variable"
+                        return None  # let Monarch handle instances
                     if resolved == "property":
                         return "property"
                 # PascalCase fallback for unresolved statements
                 if _is_pascal_case(n):
                     return "class"
-                return "variable"
+                # For unresolved names, return None so that the Monarch grammar's
+                # heuristics are preserved (e.g. identifier before '(' → function.call,
+                # identifier before '.method()' → namespace).  Both Monarch's
+                # 'identifier.python' and the semantic 'variable' type use the same
+                # light-blue color, so there is no visual difference for plain variables.
+                return None
             # Fallback: skip unknown types
             return None
 
