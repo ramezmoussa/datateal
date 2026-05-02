@@ -4,6 +4,7 @@
     <table class="df-table">
         <thead>
             <tr>
+                <th></th>
                 @foreach (var col in Data.Columns)
                 {
                     <th style="@(IsNumeric(col) ? "text-align: right;" : "")">@col.Name</th>
@@ -13,10 +14,13 @@
         <tbody>
             <Virtualize Items="_rows" Context="row" ItemSize="33" SpacerElement="tr">
                 <tr>
+                    <td style="font-family: monospace; text-align: right; user-select: none; padding-left: 10px; padding-right: 10px;">
+                        <AntDesign.Text Type="TextElementType.Secondary">@row.Number</AntDesign.Text>
+                    </td>
                     @for (int i = 0; i < Data.Columns.Count; i++)
                     {
                         var col = Data.Columns[i];
-                        var cell = i < row.Count ? row[i] : null;
+                        var cell = i < row.Cells.Count ? row.Cells[i] : null;
                         <td style="font-family: monospace; @(IsNumeric(col) ? "text-align: right;" : "")">
                             @if (cell is null)
                             {
@@ -45,7 +49,9 @@
     [Parameter, EditorRequired] public DataFrameOutput Data { get; set; } = default!;
     [Parameter] public bool Fill { get; set; }
 
-    private List<IReadOnlyList<object?>> _rows = [];
+    private record struct IndexedRow(int Number, IReadOnlyList<object?> Cells);
+
+    private List<IndexedRow> _rows = [];
     private DataFrameOutput? _lastData;
     private bool _dataChanged;
 
@@ -54,7 +60,7 @@
         if (ReferenceEquals(Data, _lastData)) return;
         _lastData = Data;
         _dataChanged = true;
-        _rows = [..Data.Rows];
+        _rows = Data.Rows.Select((r, i) => new IndexedRow(i + 1, r)).ToList();
     }
 
     protected override bool ShouldRender()
