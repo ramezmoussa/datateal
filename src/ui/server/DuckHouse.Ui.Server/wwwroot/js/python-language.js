@@ -142,10 +142,30 @@ require(['vs/editor/editor.main'], function () {
                 // Decorators
                 [/@[a-zA-Z_]\w*/, 'decorator'],
 
+                // from MODULE import ... → module name is namespace (teal),
+                // imported names fall through to normal rules (semantic tokens
+                // will color them when a kernel is connected).
+                [/\b(from)(\s+)([a-zA-Z_][\w.]*)(\s+)(import)\b/,
+                    ['keyword.control', 'white', 'namespace', 'white', 'keyword.control']],
+                // import MODULE → module name is namespace (teal)
+                [/\b(import)(\s+)([a-zA-Z_][\w.]*)/,
+                    ['keyword.control', 'white', 'namespace']],
+
                 // def → highlight following name as function definition
                 [/\bdef\b/, { token: 'keyword', next: '@functionDef' }],
                 // class → highlight following name as type definition
                 [/\bclass\b/, { token: 'keyword', next: '@classDef' }],
+
+                // Identifier before .method() → likely a module/object (namespace/teal)
+                [/[a-zA-Z_]\w*(?=\.[a-zA-Z_][\w.]*\s*\()/, {
+                    cases: {
+                        '@controlKeywords': 'keyword.control',
+                        '@keywords': 'keyword',
+                        '@builtinTypes': 'type',
+                        '@builtinFunctions': 'builtin',
+                        '@default': 'namespace',
+                    },
+                }],
 
                 // Identifier followed by ( → function call (or keyword/type/builtin)
                 [/[a-zA-Z_]\w*(?=\s*\()/, {
