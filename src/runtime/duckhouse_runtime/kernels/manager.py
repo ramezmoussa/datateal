@@ -355,7 +355,7 @@ class KernelConnection:
 
             # Cache for resolved definition types: name_string → resolved_type
             # Used so we don't call goto() multiple times for the same name.
-            _goto_cache: dict[str, str | None] = {}
+            _goto_cache: dict[str, str] = {}
 
             for name in names:
                 line = name.line - context_line_count
@@ -384,14 +384,18 @@ class KernelConnection:
             """Return True if name follows PascalCase (class naming convention)."""
             return len(n) > 1 and n[0].isupper() and not n.isupper()
 
-        def _resolve_statement_type(name, cache: dict[str, str | None]) -> str | None:
+        # Sentinel indicating goto() was attempted but failed entirely.
+        _GOTO_FAILED = "_failed_"
+
+        def _resolve_statement_type(name, cache: dict[str, str]) -> str:
             """Resolve the actual definition type of a 'statement' name via goto().
 
             Jedi's get_names(references=True) returns type='statement' for
             references.  This helper calls name.goto() to find the definition
-            and returns the resolved type (e.g. 'module', 'function', 'class').
+            and returns the resolved type (e.g. 'module', 'function', 'class',
+            or 'statement' when the definition is a plain variable).
             Results are cached by name string to avoid redundant resolutions.
-            Returns None if resolution fails or the definition is also a statement.
+            Returns _GOTO_FAILED if resolution fails entirely.
             """
             n = name.name
             if n in cache:
@@ -400,15 +404,14 @@ class KernelConnection:
                 defs = name.goto()
                 if defs:
                     resolved = defs[0].type
-                    if resolved != "statement":
-                        cache[n] = resolved
-                        return resolved
+                    cache[n] = resolved
+                    return resolved
             except Exception:
                 pass
-            cache[n] = None
-            return None
+            cache[n] = _GOTO_FAILED
+            return _GOTO_FAILED
 
-        def _classify_jedi_name(name, goto_cache: dict[str, str | None]) -> str | None:
+        def _classify_jedi_name(name, goto_cache: dict[str, str]) -> str | None:
             """Map a Jedi Name object to a semantic token type."""
             n = name.name
             ntype = name.type  # function, class, module, instance, keyword, param, statement, etc.
@@ -450,31 +453,36 @@ class KernelConnection:
                 # resolves references to modules, functions, and classes that Jedi
                 # reports as 'statement' in get_names(references=True).
                 resolved = _resolve_statement_type(name, goto_cache)
-                if resolved is not None:
-                    if resolved == "function":
-                        if n in KernelConnection._PYTHON_BUILTINS:
-                            return "builtin"
-                        if _is_pascal_case(n):
-                            return "class"
-                        return "function"
-                    if resolved == "class":
+                if resolved == "function":
+                    if n in KernelConnection._PYTHON_BUILTINS:
+                        return "builtin"
+                    if _is_pascal_case(n):
                         return "class"
-                    if resolved == "module":
-                        return "namespace"
-                    if resolved == "instance":
-                        if _is_pascal_case(n):
-                            return "class"
-                        return None  # let Monarch handle instances
-                    if resolved == "property":
-                        return "property"
-                # PascalCase fallback for unresolved statements
+                    return "function"
+                if resolved == "class":
+                    return "class"
+                if resolved == "module":
+                    return "namespace"
+                if resolved == "param":
+                    return "parameter"
+                if resolved == "statement":
+                    # goto() confirmed this is a plain variable assignment.
+                    # Return "variable" so Monarch's 'namespace' heuristic
+                    # (identifier before .method()) is correctly overridden.
+                    if _is_pascal_case(n):
+                        return "class"
+                    return "variable"
+                if resolved == "instance":
+                    if _is_pascal_case(n):
+                        return "class"
+                    return "variable"
+                if resolved == "property":
+                    return "property"
+                # goto() failed entirely — we don't know what this name is.
+                # Return None so Monarch grammar heuristics are preserved
+                # (e.g. identifier before '(' → function.call).
                 if _is_pascal_case(n):
                     return "class"
-                # For unresolved names, return None so that the Monarch grammar's
-                # heuristics are preserved (e.g. identifier before '(' → function.call,
-                # identifier before '.method()' → namespace).  Both Monarch's
-                # 'identifier.python' and the semantic 'variable' type use the same
-                # light-blue color, so there is no visual difference for plain variables.
                 return None
             # Fallback: skip unknown types
             return None
