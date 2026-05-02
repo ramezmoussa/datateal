@@ -190,7 +190,7 @@
         {
             var cell = _notebook.Cells[ci];
             var index = ci; // capture for closure
-            <NotebookCellView Cell="cell"
+            <NotebookCellView @key="cell.Id" Cell="cell"
                             NodeName="@_nodeName"
                             KernelId="@_kernelId"
                             CanMoveUp="@(index > 0)"
@@ -204,10 +204,10 @@
                             OnDelete="@(() => DeleteCell(cell))"
                             OnMoveUp="@(() => MoveCell(index, -1))"
                             OnMoveDown="@(() => MoveCell(index, 1))"
-                            OnCellChanged="@(() => _notebook.IsDirty = true)"
+                            OnCellChanged="MarkDirty"
                             AlwaysConsumeMouseWheel="false"
                             OnToggleParameters="@(() => ToggleParameterCell(cell))" />
-            <AddCellBar OnAddPython="() => AddCell(index + 1, NotebookCellType.Code, NotebookCellLanguage.Python)"
+            <AddCellBar @key="@($"add-{cell.Id}")" OnAddPython="() => AddCell(index + 1, NotebookCellType.Code, NotebookCellLanguage.Python)"
                         OnAddSql="() => AddCell(index + 1, NotebookCellType.Code, NotebookCellLanguage.Sql)"
                         OnAddMarkdown="() => AddCell(index + 1, NotebookCellType.Markdown)" />
         }
@@ -269,6 +269,8 @@
     private bool HasKernel => !string.IsNullOrEmpty(_kernelId);
     private bool AnyExecuting => _notebook.Cells.Any(c => c.IsExecuting);
     private InteractivePoolDto? SelectedPool => _pools.FirstOrDefault(p => p.Name == _poolName);
+
+    private void MarkDirty() => _notebook.IsDirty = true;
 
     private void NavigateToWorkspace(Guid? folderId) =>
         Navigation.NavigateTo(folderId is null ? "/workspace" : $"/workspace?folder={folderId}");

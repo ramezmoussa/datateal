@@ -208,7 +208,7 @@
         @if (HasKernel && Cell.Language == NotebookCellLanguage.Python)
         {
             <KernelCodeCell Value="@Cell.Source"
-                            ValueChanged="@(async v => { Cell.Source = v; await OnCellChanged.InvokeAsync(); })"
+                            ValueChanged="@(v => { Cell.Source = v; OnCellChanged?.Invoke(); })"
                             NodeName="@(NodeName ?? "")"
                             KernelId="@(KernelId ?? "")"
                             PriorContext="PriorContext"
@@ -220,7 +220,7 @@
         else
         {
             <CodeCell Value="@Cell.Source"
-                      ValueChanged="@(async v => { Cell.Source = v; await OnCellChanged.InvokeAsync(); })"
+                      ValueChanged="@(v => { Cell.Source = v; OnCellChanged?.Invoke(); })"
                       Language="@(Cell.Language == NotebookCellLanguage.Sql ? "sql" : "python")"
                       OnExecute="OnExecute"
                       AlwaysConsumeMouseWheel="@AlwaysConsumeMouseWheel"
@@ -232,7 +232,7 @@
         @if (Cell.IsEditingMarkdown)
         {
             <CodeCell Value="@Cell.Source"
-                      ValueChanged="@(async v => { Cell.Source = v; await OnCellChanged.InvokeAsync(); })"
+                      ValueChanged="@(v => { Cell.Source = v; OnCellChanged?.Invoke(); })"
                       Language="markdown"
                       AlwaysConsumeMouseWheel="@AlwaysConsumeMouseWheel"
                       Class="editor-cell" />
@@ -342,9 +342,61 @@
     [Parameter] public EventCallback OnDelete { get; set; }
     [Parameter] public EventCallback OnMoveUp { get; set; }
     [Parameter] public EventCallback OnMoveDown { get; set; }
-    [Parameter] public EventCallback OnCellChanged { get; set; }
+    [Parameter] public Action? OnCellChanged { get; set; }
     [Parameter] public EventCallback OnToggleParameters { get; set; }
     [Parameter] public bool AlwaysConsumeMouseWheel { get; set; } = true;
+
+    // Change-tracking fields for ShouldRender
+    private string? _lastNodeName;
+    private string? _lastKernelId;
+    private bool _lastCanMoveUp;
+    private bool _lastCanMoveDown;
+    private string _lastSource = "";
+    private NotebookCellType _lastCellType;
+    private NotebookCellLanguage _lastLanguage;
+    private bool _lastIsExecuting;
+    private int? _lastExecutionCount;
+    private double? _lastDurationMs;
+    private ErrorInfo? _lastError;
+    private int _lastOutputsCount;
+    private bool _lastIsEditingMarkdown;
+    private bool _lastIsParameterCell;
+
+    protected override bool ShouldRender()
+    {
+        bool changed = _lastNodeName != NodeName
+            || _lastKernelId != KernelId
+            || _lastCanMoveUp != CanMoveUp
+            || _lastCanMoveDown != CanMoveDown
+            || _lastSource != Cell.Source
+            || _lastCellType != Cell.CellType
+            || _lastLanguage != Cell.Language
+            || _lastIsExecuting != Cell.IsExecuting
+            || _lastExecutionCount != Cell.ExecutionCount
+            || _lastDurationMs != Cell.DurationMs
+            || !ReferenceEquals(_lastError, Cell.Error)
+            || _lastOutputsCount != Cell.Outputs.Count
+            || _lastIsEditingMarkdown != Cell.IsEditingMarkdown
+            || _lastIsParameterCell != Cell.IsParameterCell;
+
+        if (!changed) return false;
+
+        _lastNodeName = NodeName;
+        _lastKernelId = KernelId;
+        _lastCanMoveUp = CanMoveUp;
+        _lastCanMoveDown = CanMoveDown;
+        _lastSource = Cell.Source;
+        _lastCellType = Cell.CellType;
+        _lastLanguage = Cell.Language;
+        _lastIsExecuting = Cell.IsExecuting;
+        _lastExecutionCount = Cell.ExecutionCount;
+        _lastDurationMs = Cell.DurationMs;
+        _lastError = Cell.Error;
+        _lastOutputsCount = Cell.Outputs.Count;
+        _lastIsEditingMarkdown = Cell.IsEditingMarkdown;
+        _lastIsParameterCell = Cell.IsParameterCell;
+        return true;
+    }
 
     private bool HasKernel => !string.IsNullOrEmpty(NodeName) && !string.IsNullOrEmpty(KernelId);
 
@@ -354,7 +406,7 @@
         ? "markdown"
         : Cell.Language == NotebookCellLanguage.Sql ? "sql" : "python";
 
-    private async Task OnCellTypeChanged(string value)
+    private void OnCellTypeChanged(string value)
     {
         var newType = value == "markdown" ? NotebookCellType.Markdown : NotebookCellType.Code;
         var newLang = value == "sql" ? NotebookCellLanguage.Sql : NotebookCellLanguage.Python;
@@ -375,7 +427,7 @@
 
             Cell.CellType = newType;
             Cell.Language = newLang;
-            await OnCellChanged.InvokeAsync();
+            OnCellChanged?.Invoke();
         }
     }
 
