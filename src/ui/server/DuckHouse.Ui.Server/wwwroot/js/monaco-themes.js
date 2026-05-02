@@ -29,6 +29,7 @@ require(['vs/editor/editor.main'], function () {
             { token: 'builtin', foreground: '795E26' },
             { token: 'function', foreground: '795E26' },
             { token: 'function.call', foreground: '795E26' },
+            { token: 'identifier.python', foreground: '001080' },
 
             // Python semantic token types (Workstream B)
             { token: 'class', foreground: '267F99' },
@@ -81,6 +82,7 @@ require(['vs/editor/editor.main'], function () {
             { token: 'builtin', foreground: 'DCDCAA' },
             { token: 'function', foreground: 'DCDCAA' },
             { token: 'function.call', foreground: 'DCDCAA' },
+            { token: 'identifier.python', foreground: '9CDCFE' },
 
             // Python semantic token types (Workstream B)
             { token: 'class', foreground: '4EC9B0' },

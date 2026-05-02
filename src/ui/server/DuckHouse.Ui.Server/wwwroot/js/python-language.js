@@ -119,18 +119,19 @@ require(['vs/editor/editor.main'], function () {
                 { include: '@numbers' },
 
                 // Triple-quoted strings (before single-line strings)
-                [/(?:[rR][fF]|[fF][rR]?)'''/, 'string', '@fTripleSingleString'],
-                [/(?:[rR][fF]|[fF][rR]?)"""/, 'string', '@fTripleDoubleString'],
+                // F-string triple-quoted: prefix is keyword (blue), quotes are string
+                [/((?:[rR][fF]|[fF][rR]?))(''')/, ['keyword', { token: 'string', next: '@fTripleSingleString' }]],
+                [/((?:[rR][fF]|[fF][rR]?))(""")/, ['keyword', { token: 'string', next: '@fTripleDoubleString' }]],
                 [/[rRbBuU]{0,2}'''/, 'string', '@tripleSingleString'],
                 [/[rRbBuU]{0,2}"""/, 'string', '@tripleDoubleString'],
 
-                // F-strings (single-line)
-                [/(?:[rR][fF]|[fF][rR]?)'/, 'string.escape', '@fStringBody'],
-                [/(?:[rR][fF]|[fF][rR]?)"/, 'string.escape', '@fDblStringBody'],
+                // F-strings (single-line): prefix is keyword (blue), quote is string
+                [/((?:[rR][fF]|[fF][rR]?))(')/, ['keyword', { token: 'string', next: '@fStringBody' }]],
+                [/((?:[rR][fF]|[fF][rR]?))(")/,  ['keyword', { token: 'string', next: '@fDblStringBody' }]],
 
-                // Regular strings with optional prefix
-                [/[rRbBuU]{0,2}'/, 'string.escape', '@stringBody'],
-                [/[rRbBuU]{0,2}"/, 'string.escape', '@dblStringBody'],
+                // Regular strings with optional prefix — quotes same color as text
+                [/[rRbBuU]{0,2}'/, 'string', '@stringBody'],
+                [/[rRbBuU]{0,2}"/, 'string', '@dblStringBody'],
 
                 // Delimiters & brackets
                 [/[,.:;]/, 'delimiter'],
@@ -247,14 +248,14 @@ require(['vs/editor/editor.main'], function () {
                 [/[^\\']+$/, 'string', '@popall'],
                 [/[^\\']+/, 'string'],
                 [/\\./, 'string.escape'],
-                [/'/, 'string.escape', '@popall'],
+                [/'/, 'string', '@popall'],
                 [/\\$/, 'string'],
             ],
             dblStringBody: [
                 [/[^\\"]+$/, 'string', '@popall'],
                 [/[^\\"]+/, 'string'],
                 [/\\./, 'string.escape'],
-                [/"/, 'string.escape', '@popall'],
+                [/"/, 'string', '@popall'],
                 [/\\$/, 'string'],
             ],
 
@@ -264,7 +265,7 @@ require(['vs/editor/editor.main'], function () {
                 [/[^\\'{]+/, 'string'],
                 [/\{[^}':!=]+/, 'identifier', '@fStringDetail'],
                 [/\\./, 'string.escape'],
-                [/'/, 'string.escape', '@popall'],
+                [/'/, 'string', '@popall'],
                 [/\\$/, 'string'],
             ],
             fDblStringBody: [
@@ -272,7 +273,7 @@ require(['vs/editor/editor.main'], function () {
                 [/[^\\"{]+/, 'string'],
                 [/\{[^}':!=]+/, 'identifier', '@fStringDetail'],
                 [/\\./, 'string.escape'],
-                [/"/, 'string.escape', '@popall'],
+                [/"/, 'string', '@popall'],
                 [/\\$/, 'string'],
             ],
 
