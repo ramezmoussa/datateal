@@ -34,57 +34,57 @@ require(['vs/editor/editor.main'], function () {
     // ── DuckDB keywords ──
     var keywords = [
         'abort', 'absolute', 'access', 'action', 'add', 'admin', 'after', 'aggregate', 'all', 'also',
-        'alter', 'always', 'analyse', 'analyze', 'and', 'anti', 'any', 'array', 'as', 'asc', 'asof',
-        'assertion', 'assignment', 'asymmetric', 'at', 'attach', 'attribute', 'authorization', 'backward',
-        'before', 'begin', 'between', 'bigint', 'binary', 'bit', 'boolean', 'both', 'by', 'cache', 'call',
-        'called', 'cascade', 'cascaded', 'case', 'catalog', 'centuries', 'century', 'chain',
-        'char', 'character', 'characteristics', 'check', 'checkpoint', 'class', 'close', 'cluster',
-        'collate', 'collation', 'column', 'columns', 'comment', 'comments', 'commit',
-        'committed', 'compression', 'concurrently', 'configuration', 'conflict', 'connection',
-        'constraint', 'constraints', 'content', 'continue', 'conversion', 'copy', 'cost', 'create',
-        'cross', 'csv', 'cube', 'current', 'cursor', 'cycle', 'data', 'database', 'day', 'days',
-        'deallocate', 'dec', 'decade', 'decades', 'decimal', 'declare', 'default', 'defaults',
-        'deferrable', 'deferred', 'definer', 'delete', 'delimiter', 'delimiters', 'depends', 'desc',
-        'describe', 'detach', 'dictionary', 'disable', 'discard', 'distinct', 'do', 'document', 'domain',
-        'double', 'drop', 'each', 'else', 'enable', 'encoding', 'encrypted', 'end', 'enum', 'escape', 'event', 'except', 'exclude', 'excluding', 'exclusive', 'execute', 'exists', 'explain',
-        'export', 'export_state', 'extension', 'extensions', 'external', 'false', 'family',
-        'fetch', 'filter', 'first', 'float', 'following', 'for', 'force', 'foreign', 'forward', 'freeze',
-        'from', 'full', 'function', 'functions', 'generated', 'glob', 'global', 'grant', 'granted',
-        'group', 'groups', 'handler', 'having', 'header', 'hold', 'hour',
-        'hours', 'identity', 'ignore', 'ilike', 'immediate', 'immutable', 'implicit', 'import', 'in',
-        'include', 'including', 'increment', 'index', 'indexes', 'inherit', 'inherits', 'initially',
-        'inline', 'inner', 'inout', 'input', 'insensitive', 'insert', 'install', 'instead', 'int',
-        'integer', 'intersect', 'interval', 'into', 'invoker', 'is', 'isolation', 'join', 'json',
-        'key', 'label', 'lambda', 'language', 'large', 'last', 'lateral', 'leading', 'leakproof', 'left',
-        'level', 'like', 'limit', 'listen', 'load', 'local', 'location', 'lock', 'locked', 'logged',
-        'macro', 'map', 'mapping', 'match', 'matched', 'materialized', 'maxvalue', 'merge', 'method',
-        'microsecond', 'microseconds', 'millennia', 'millennium', 'millisecond', 'milliseconds', 'minute',
-        'minutes', 'minvalue', 'mode', 'month', 'months', 'move', 'name', 'names', 'national', 'natural',
-        'nchar', 'new', 'next', 'no', 'none', 'not', 'nothing', 'notify', 'nowait', 'null',
-        'nulls', 'numeric', 'object', 'of', 'off', 'offset', 'oids', 'old', 'on', 'only',
-        'operator', 'option', 'options', 'or', 'order', 'ordinality', 'others', 'out', 'outer', 'over',
-        'overriding', 'owned', 'owner', 'parallel', 'parser', 'partial',
-        'partition', 'partitioned', 'passing', 'password', 'percent', 'persistent', 'pivot',
-        'pivot_longer', 'pivot_wider', 'placing', 'plans', 'policy', 'positional', 'pragma',
-        'preceding', 'precision', 'prepare', 'prepared', 'preserve', 'primary', 'prior', 'privileges',
-        'procedural', 'procedure', 'program', 'publication', 'qualify', 'quarter', 'quarters', 'quote',
-        'range', 'read', 'real', 'reassign', 'recheck', 'recursive', 'ref', 'references', 'referencing',
-        'refresh', 'reindex', 'relative', 'release', 'rename', 'repeatable', 'replica', 'reset',
-        'respect', 'restart', 'restrict', 'returning', 'returns', 'revoke', 'right', 'role', 'rollback',
-        'rollup', 'row', 'rows', 'rule', 'sample', 'savepoint', 'schema', 'schemas', 'scope', 'scroll',
-        'search', 'second', 'seconds', 'secret', 'security', 'select', 'semi', 'sequence', 'sequences',
-        'serializable', 'server', 'session', 'set', 'setof', 'sets', 'share', 'show', 'similar', 'simple',
-        'skip', 'smallint', 'snapshot', 'some', 'sorted', 'source', 'sql', 'stable', 'standalone', 'start',
-        'statement', 'statistics', 'stdin', 'stdout', 'storage', 'stored', 'strict', 'strip', 'struct',
-        'subscription', 'summarize', 'symmetric', 'sysid', 'system', 'table', 'tables',
-        'tablesample', 'tablespace', 'target', 'temp', 'template', 'temporary', 'text', 'then', 'ties',
-        'time', 'timestamp', 'to', 'trailing', 'transaction', 'transform', 'treat', 'trigger', 'true', 'truncate', 'trusted', 'type', 'types', 'unbounded', 'uncommitted',
-        'unencrypted', 'union', 'unique', 'unknown', 'unlisten', 'unlogged', 'unpack', 'unpivot', 'until',
-        'update', 'use', 'user', 'using', 'vacuum', 'valid', 'validate', 'validator', 'value', 'values',
-        'varchar', 'variable', 'variadic', 'varying', 'verbose', 'version', 'view', 'views', 'virtual',
-        'volatile', 'week', 'weeks', 'when', 'where', 'whitespace', 'window', 'with', 'within', 'without',
-        'work', 'wrapper', 'write', 'xml', 'xmlattributes', 'xmlconcat', 'xmlelement', 'xmlexists',
-        'xmlforest', 'xmlnamespaces', 'xmlparse', 'xmlpi', 'xmlroot', 'xmlserialize', 'xmltable', 'year',
+        'alter', 'always', 'analyse', 'analyze', 'and', 'anti', 'any', 'array', 'as', 'asc',
+        'asof', 'assertion', 'assignment', 'asymmetric', 'at', 'attach', 'attribute', 'authorization', 'backward', 'before',
+        'begin', 'between', 'bigint', 'bignum', 'binary', 'bit', 'blob', 'bool', 'boolean', 'both',
+        'box_2d', 'box_2df', 'bpchar', 'by', 'bytea', 'cache', 'call', 'called', 'cascade', 'cascaded',
+        'case', 'catalog', 'centuries', 'century', 'chain', 'char', 'character', 'characteristics', 'check', 'checkpoint',
+        'class', 'close', 'cluster', 'collate', 'collation', 'column', 'columns', 'comment', 'comments', 'commit',
+        'committed', 'compression', 'concurrently', 'configuration', 'conflict', 'connection', 'constraint', 'constraints', 'content', 'continue',
+        'conversion', 'copy', 'cost', 'create', 'cross', 'csv', 'cube', 'current', 'cursor', 'cycle',
+        'data', 'database', 'date', 'day', 'days', 'deallocate', 'dec', 'decade', 'decades', 'decimal',
+        'declare', 'default', 'defaults', 'deferrable', 'deferred', 'definer', 'delete', 'delimiter', 'delimiters', 'depends',
+        'desc', 'describe', 'detach', 'dictionary', 'disable', 'discard', 'distinct', 'do', 'document', 'domain',
+        'double', 'drop', 'each', 'else', 'enable', 'encoding', 'encrypted', 'end', 'enum', 'escape',
+        'event', 'except', 'exclude', 'excluding', 'exclusive', 'execute', 'exists', 'explain', 'export', 'export_state',
+        'extension', 'extensions', 'external', 'false', 'family', 'fetch', 'filter', 'first', 'float', 'float4',
+        'float8', 'following', 'for', 'force', 'foreign', 'forward', 'freeze', 'from', 'full', 'function',
+        'functions', 'generated', 'geometry', 'glob', 'global', 'grant', 'granted', 'group', 'groups', 'handler',
+        'having', 'header', 'hold', 'hour', 'hours', 'hugeint', 'identity', 'ignore', 'ilike', 'immediate',
+        'immutable', 'implicit', 'import', 'in', 'include', 'including', 'increment', 'index', 'indexes', 'inherit',
+        'inherits', 'initially', 'inline', 'inner', 'inout', 'input', 'insensitive', 'insert', 'install', 'instead',
+        'int', 'int1', 'int128', 'int16', 'int2', 'int32', 'int4', 'int64', 'int8', 'integer',
+        'intersect', 'interval', 'into', 'invoker', 'is', 'isolation', 'join', 'json', 'key', 'label',
+        'lambda', 'language', 'large', 'last', 'lateral', 'leading', 'leakproof', 'left', 'level', 'like',
+        'limit', 'linestring_2d', 'listen', 'load', 'local', 'location', 'lock', 'locked', 'logged', 'long',
+        'macro', 'map', 'mapping', 'match', 'matched', 'materialized', 'maxvalue', 'merge', 'method', 'microsecond',
+        'microseconds', 'millennia', 'millennium', 'millisecond', 'milliseconds', 'minute', 'minutes', 'minvalue', 'mode', 'month',
+        'months', 'move', 'name', 'names', 'national', 'natural', 'nchar', 'new', 'next', 'no',
+        'none', 'not', 'nothing', 'notify', 'nowait', 'null', 'nulls', 'numeric', 'nvarchar', 'object',
+        'of', 'off', 'offset', 'oids', 'old', 'on', 'only', 'operator', 'option', 'options',
+        'or', 'order', 'ordinality', 'others', 'out', 'outer', 'over', 'overriding', 'owned', 'owner',
+        'parallel', 'parser', 'partial', 'partition', 'partitioned', 'passing', 'password', 'percent', 'persistent', 'pivot',
+        'pivot_longer', 'pivot_wider', 'placing', 'plans', 'point_2d', 'point_3d', 'point_4d', 'policy', 'polygon_2d', 'positional',
+        'pragma', 'preceding', 'precision', 'prepare', 'prepared', 'preserve', 'primary', 'prior', 'privileges', 'procedural',
+        'procedure', 'program', 'publication', 'qualify', 'quarter', 'quarters', 'quote', 'range', 'read', 'real',
+        'reassign', 'recheck', 'recursive', 'ref', 'references', 'referencing', 'refresh', 'reindex', 'relative', 'release',
+        'rename', 'repeatable', 'replica', 'reset', 'respect', 'restart', 'restrict', 'returning', 'returns', 'revoke',
+        'right', 'role', 'rollback', 'rollup', 'row', 'rows', 'rule', 'sample', 'savepoint', 'schema',
+        'schemas', 'scope', 'scroll', 'search', 'second', 'seconds', 'secret', 'security', 'select', 'semi',
+        'sequence', 'sequences', 'serializable', 'server', 'session', 'set', 'setof', 'sets', 'share', 'short',
+        'show', 'signed', 'similar', 'simple', 'skip', 'smallint', 'snapshot', 'some', 'sorted', 'source',
+        'sql', 'stable', 'standalone', 'start', 'statement', 'statistics', 'stdin', 'stdout', 'storage', 'stored',
+        'strict', 'string', 'strip', 'struct', 'subscription', 'summarize', 'symmetric', 'sysid', 'system', 'table',
+        'tables', 'tablesample', 'tablespace', 'target', 'temp', 'template', 'temporary', 'text', 'then', 'ties',
+        'time', 'time_tz', 'timestamp', 'timestamp_ms', 'timestamp_ns', 'timestamp_s', 'timestamp_tz', 'timestamptz', 'timetz', 'tinyint',
+        'to', 'trailing', 'transaction', 'transform', 'treat', 'trigger', 'true', 'truncate', 'trusted', 'type',
+        'types', 'ubigint', 'uhugeint', 'uint128', 'uint16', 'uint32', 'uint64', 'uint8', 'uinteger', 'unbounded',
+        'uncommitted', 'unencrypted', 'union', 'unique', 'unknown', 'unlisten', 'unlogged', 'unpack', 'unpivot', 'unsigned',
+        'until', 'update', 'use', 'user', 'using', 'usmallint', 'utinyint', 'vacuum', 'valid', 'validate',
+        'validator', 'value', 'values', 'varbinary', 'varchar', 'variable', 'variadic', 'variant', 'varying', 'verbose',
+        'version', 'view', 'views', 'virtual', 'volatile', 'week', 'weeks', 'when', 'where', 'whitespace',
+        'window', 'with', 'within', 'without', 'work', 'wrapper', 'write', 'xml', 'xmlattributes', 'xmlconcat',
+        'xmlelement', 'xmlexists', 'xmlforest', 'xmlnamespaces', 'xmlparse', 'xmlpi', 'xmlroot', 'xmlserialize', 'xmltable', 'year',
         'years', 'yes', 'zone'
     ];
 
@@ -204,20 +204,10 @@ require(['vs/editor/editor.main'], function () {
         'yearweek'
     ];
 
-    // ── DuckDB data types ──
-    var typeKeywords = [
-        'bignum', 'blob', 'bool', 'box_2d', 'box_2df', 'bpchar', 'bytea', 'date', 'float4', 'float8',
-        'geometry', 'hugeint', 'int1', 'int128', 'int16', 'int2', 'int32', 'int4', 'int64', 'int8',
-        'linestring_2d', 'long', 'nvarchar', 'point_2d', 'point_3d', 'point_4d', 'polygon_2d', 'short',
-        'signed', 'string', 'time_tz', 'timestamp_ms', 'timestamp_ns', 'timestamp_s', 'timestamp_tz',
-        'timestamptz', 'timetz', 'tinyint', 'ubigint', 'uhugeint', 'uint128', 'uint16', 'uint32', 'uint64',
-        'uint8', 'uinteger', 'unsigned', 'usmallint', 'utinyint', 'varbinary', 'variant'
-    ];
 
     // Build case-insensitive lookup sets for the tokenizer.
     var keywordSet = new Set(keywords);
     var builtinSet = new Set(builtinFunctions);
-    var typeSet = new Set(typeKeywords);
 
     // ── Monarch tokenizer ──
     monaco.languages.setMonarchTokensProvider('duckdb-sql', {
@@ -226,7 +216,6 @@ require(['vs/editor/editor.main'], function () {
 
         keywords: keywords,
         builtinFunctions: builtinFunctions,
-        typeKeywords: typeKeywords,
 
         operators: [
             '=', '>', '<', '!', '~', '?', ':', '==', '<=', '>=', '!=', '<>',
@@ -268,7 +257,6 @@ require(['vs/editor/editor.main'], function () {
                 // Identifiers and keywords
                 [/[a-zA-Z_][a-zA-Z0-9_]*/, {
                     cases: {
-                        '@typeKeywords': 'type.sql',
                         '@keywords': 'keyword.sql',
                         '@builtinFunctions': 'predefined.sql',
                         '@default': 'identifier.sql',
