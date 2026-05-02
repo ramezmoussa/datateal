@@ -28,6 +28,26 @@
 </head>
 
 <body>
+    <!-- WASM loading overlay: visible immediately on page load, removed by MainLayout on first render -->
+    <div id="wasm-loading-overlay">
+        <div id="wasm-loading-content">
+            <div class="ant-spin ant-spin-spinning">
+                <span class="ant-spin-dot ant-spin-dot-spin">
+                    <i class="ant-spin-dot-item"></i>
+                    <i class="ant-spin-dot-item"></i>
+                    <i class="ant-spin-dot-item"></i>
+                    <i class="ant-spin-dot-item"></i>
+                </span>
+            </div>
+            <div id="wasm-loading-label">Loading DuckHouse…</div>
+            <div id="wasm-progress-wrapper">
+                <div id="wasm-progress-track">
+                    <div id="wasm-progress-bar"></div>
+                </div>
+                <span id="wasm-progress-pct"></span>
+            </div>
+        </div>
+    </div>
     <Routes @rendermode="_renderMode"/>
     <script src="_content/AntDesign/js/ant-design-blazor.js"></script>
     <script src="_content/BlazorMonaco/jsInterop.js"></script>
