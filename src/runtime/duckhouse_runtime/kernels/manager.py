@@ -309,6 +309,171 @@ class KernelConnection:
 
         return await asyncio.to_thread(_run)
 
+    # Python builtins that should get a distinct "builtin" token type.
+    _PYTHON_BUILTINS = frozenset([
+        "abs", "aiter", "all", "anext", "any", "ascii", "bin", "bool",
+        "breakpoint", "bytearray", "bytes", "callable", "chr", "classmethod",
+        "compile", "complex", "copyright", "credits", "delattr", "dict", "dir",
+        "display", "divmod", "enumerate", "eval", "exec", "exit", "filter",
+        "float", "format", "frozenset", "getattr", "globals", "hasattr", "hash",
+        "help", "hex", "id", "input", "int", "isinstance", "issubclass", "iter",
+        "len", "license", "list", "locals", "map", "max", "memoryview", "min",
+        "next", "object", "oct", "open", "ord", "pow", "print", "property",
+        "quit", "range", "repr", "reversed", "round", "set", "setattr", "slice",
+        "sorted", "staticmethod", "str", "sum", "super", "tuple", "type",
+        "vars", "zip", "__import__",
+        # Common constants
+        "True", "False", "None", "NotImplemented", "Ellipsis",
+        "__name__", "__doc__", "__file__", "__spec__",
+    ])
+
+    async def semantic_tokens(self, code: str, context: str = "") -> list[dict]:
+        """Return semantic token classifications using Jedi (primary) with AST fallback.
+
+        If *context* is provided it is prepended so Jedi can resolve names from
+        prior cells.  Only tokens that fall within *code* are returned, with
+        line numbers relative to *code*.
+        """
+        kernel_python = os.environ.get("DUCKHOUSE_KERNEL_PYTHON", sys.executable)
+
+        def _run_jedi() -> list[dict]:
+            context_line_count = context.count("\n") + 1 if context else 0
+            full_code = (context + "\n" + code) if context else code
+
+            env = JediEnvironment(kernel_python)
+            script = jedi.Script(full_code, environment=env)
+
+            tokens = []
+            try:
+                names = script.get_names(all_scopes=True, references=True)
+            except Exception:
+                return _run_ast()
+
+            for name in names:
+                line = name.line - context_line_count
+                if line < 1:
+                    continue
+                col = name.column
+                length = len(name.name)
+
+                token_type = _classify_jedi_name(name)
+                if token_type is None:
+                    continue
+
+                tokens.append({
+                    "line": line,
+                    "start_char": col,
+                    "length": length,
+                    "token_type": token_type,
+                })
+
+            return tokens
+
+        def _classify_jedi_name(name) -> str | None:
+            """Map a Jedi Name object to a semantic token type."""
+            n = name.name
+            desc = name.description or ""
+            ntype = name.type  # function, class, module, instance, keyword, param, statement, etc.
+
+            if ntype == "keyword":
+                return None  # already handled by Monarch grammar
+            if ntype == "param":
+                if n in ("self", "cls"):
+                    return "selfParameter"
+                return "parameter"
+            if ntype == "function":
+                if n in KernelConnection._PYTHON_BUILTINS:
+                    return "builtin"
+                return "function"
+            if ntype == "class":
+                return "class"
+            if ntype == "module":
+                return "namespace"
+            if ntype == "instance":
+                if n in KernelConnection._PYTHON_BUILTINS:
+                    return "builtin"
+                return "variable"
+            if ntype == "property":
+                return "property"
+            if ntype == "statement":
+                # Decorators appear as statements sometimes
+                if n.startswith("@"):
+                    return "decorator"
+                if n in KernelConnection._PYTHON_BUILTINS:
+                    return "builtin"
+                return "variable"
+            # Fallback: skip unknown types
+            return None
+
+        def _run_ast() -> list[dict]:
+            """Fallback: use Python's ast module for basic classification."""
+            context_line_count = context.count("\n") + 1 if context else 0
+            full_code = (context + "\n" + code) if context else code
+
+            try:
+                tree = _ast.parse(full_code)
+            except SyntaxError:
+                return []
+
+            tokens = []
+
+            for node in _ast.walk(tree):
+                if isinstance(node, _ast.FunctionDef) or isinstance(node, _ast.AsyncFunctionDef):
+                    line = node.lineno - context_line_count
+                    if line >= 1:
+                        tokens.append({
+                            "line": line,
+                            "start_char": node.col_offset,
+                            "length": len(node.name),
+                            "token_type": "function",
+                        })
+                    # Classify parameters
+                    for arg in node.args.args + node.args.posonlyargs + node.args.kwonlyargs:
+                        arg_line = arg.lineno - context_line_count
+                        if arg_line >= 1:
+                            tt = "selfParameter" if arg.arg in ("self", "cls") else "parameter"
+                            tokens.append({
+                                "line": arg_line,
+                                "start_char": arg.col_offset,
+                                "length": len(arg.arg),
+                                "token_type": tt,
+                            })
+                    # Decorators
+                    for dec in node.decorator_list:
+                        dec_line = dec.lineno - context_line_count
+                        if dec_line >= 1 and isinstance(dec, _ast.Name):
+                            tokens.append({
+                                "line": dec_line,
+                                "start_char": dec.col_offset,
+                                "length": len(dec.id),
+                                "token_type": "decorator",
+                            })
+                elif isinstance(node, _ast.ClassDef):
+                    line = node.lineno - context_line_count
+                    if line >= 1:
+                        tokens.append({
+                            "line": line,
+                            "start_char": node.col_offset,
+                            "length": len(node.name),
+                            "token_type": "class",
+                        })
+                elif isinstance(node, _ast.Name):
+                    line = node.lineno - context_line_count
+                    if line >= 1 and node.id in KernelConnection._PYTHON_BUILTINS:
+                        tokens.append({
+                            "line": line,
+                            "start_char": node.col_offset,
+                            "length": len(node.id),
+                            "token_type": "builtin",
+                        })
+
+            return tokens
+
+        try:
+            return await asyncio.to_thread(_run_jedi)
+        except Exception:
+            return await asyncio.to_thread(_run_ast)
+
 
 class KernelRegistry:
     def __init__(self) -> None:

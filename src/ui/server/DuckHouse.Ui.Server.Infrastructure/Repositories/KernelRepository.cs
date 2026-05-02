@@ -68,4 +68,11 @@ internal class KernelRepository(HttpClient httpClient) : IKernelRepository
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<DiagnoseResponse>(JsonOptions, cancellationToken))!;
     }
+
+    public async Task<SemanticTokenResponse> GetSemanticTokensAsync(string nodeName, string kernelId, SemanticTokenRequest request, CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.PostAsJsonAsync($"/nodes/{nodeName}/kernels/{kernelId}/semantic-tokens", request, JsonOptions, cancellationToken);
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<SemanticTokenResponse>(JsonOptions, cancellationToken))!;
+    }
 }

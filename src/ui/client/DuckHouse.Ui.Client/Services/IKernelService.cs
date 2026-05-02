@@ -15,4 +15,5 @@ public interface IKernelService
     Task InterruptKernelAsync(string nodeName, string kernelId, CancellationToken cancellationToken = default);
     Task<CompleteResponse> CompleteAsync(string nodeName, string kernelId, CompleteRequest request, CancellationToken cancellationToken = default);
     Task<DiagnoseResponse> DiagnoseAsync(string nodeName, string kernelId, DiagnoseRequest request, CancellationToken cancellationToken = default);
+    Task<SemanticTokenResponse> GetSemanticTokensAsync(string nodeName, string kernelId, SemanticTokenRequest request, CancellationToken cancellationToken = default);
 }

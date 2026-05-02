@@ -68,6 +68,10 @@ public class KernelsController(IMediator mediator, ICatalogAccessService catalog
     public async Task<DiagnoseResponse> Diagnose(string nodeName, string kernelId, [FromBody] DiagnoseRequest body, CancellationToken ct) =>
         await mediator.SendAsync(new Cmd.DiagnoseKernelRequest(nodeName, kernelId, body), ct);
 
+    [HttpPost("{kernelId}/semantic-tokens")]
+    public async Task<SemanticTokenResponse> GetSemanticTokens(string nodeName, string kernelId, [FromBody] SemanticTokenRequest body, CancellationToken ct) =>
+        await mediator.SendAsync(new Cmd.GetSemanticTokensRequest(nodeName, kernelId, body), ct);
+
     [HttpPost("{kernelId}/catalogs/setup")]
     public async Task<IActionResult> SetupCatalogs(string nodeName, string kernelId, KernelCatalogSetupRequest body, CancellationToken ct)
     {

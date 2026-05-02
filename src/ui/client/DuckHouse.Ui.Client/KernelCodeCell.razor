@@ -5,6 +5,7 @@
 @using DuckHouse.Ui.Client.Notebook
 @using System.Text.Json
 @using System.Text.RegularExpressions
+@using Microsoft.JSInterop
 @inject IKernelService KernelService
 @inject IJSRuntime JsRuntime
 @implements IAsyncDisposable
@@ -46,12 +47,33 @@
     private TextModel? _model;
     private string _currentCode = "";
     private CancellationTokenSource? _diagCts;
+    private CancellationTokenSource? _semanticCts;
+    private DotNetObjectReference<KernelCodeCell>? _semanticDotNetRef;
+    private IJSObjectReference? _semanticDisposable;
+    private int[]? _lastSemanticTokensEncoded;
+
+    // Semantic token type legend — indices must match window._duckhouseSemanticTokenLegend in app.js.
+    private static readonly Dictionary<string, int> SemanticTokenTypeMap = new()
+    {
+        ["function"]      = 0,
+        ["class"]         = 1,
+        ["parameter"]     = 2,
+        ["variable"]      = 3,
+        ["selfParameter"] = 4,
+        ["builtin"]       = 5,
+        ["property"]      = 6,
+        ["decorator"]     = 7,
+        ["namespace"]     = 8,
+        ["enumMember"]    = 9,
+    };
 
     private async Task OnEditorReadyAsync()
     {
         _model = await _codeCell.Editor!.GetModel();
         await RegisterCompletionProviderAsync();
+        await RegisterSemanticTokensProviderAsync();
         await RunDiagnosticsAsync(_currentCode);
+        await ScheduleSemanticTokensAsync(_currentCode);
     }
 
     private Task RegisterCompletionProviderAsync() =>
@@ -191,6 +213,7 @@
         _currentCode = value;
         await ValueChanged.InvokeAsync(value);
         await ScheduleDiagnosticsAsync(value);
+        await ScheduleSemanticTokensAsync(value);
     }
 
     private async Task ScheduleDiagnosticsAsync(string value)
@@ -235,6 +258,93 @@
         catch { /* diagnostics are best-effort */ }
     }
 
+    // ── Semantic tokens ──
+
+    private async Task RegisterSemanticTokensProviderAsync()
+    {
+        _semanticDotNetRef = DotNetObjectReference.Create(this);
+        try
+        {
+            _semanticDisposable = await JsRuntime.InvokeAsync<IJSObjectReference>(
+                "registerSemanticTokensProvider", _semanticDotNetRef);
+        }
+        catch { /* best-effort — older BlazorMonaco builds may not support this */ }
+    }
+
+    [JSInvokable]
+    public Task<int[]> GetSemanticTokensEncodedAsync()
+    {
+        return Task.FromResult(_lastSemanticTokensEncoded ?? []);
+    }
+
+    private async Task ScheduleSemanticTokensAsync(string value)
+    {
+        _semanticCts?.Cancel();
+        _semanticCts = new CancellationTokenSource();
+        var ct = _semanticCts.Token;
+        try
+        {
+            await Task.Delay(600, ct);
+            await FetchSemanticTokensAsync(value, ct);
+        }
+        catch (OperationCanceledException) { }
+    }
+
+    private async Task FetchSemanticTokensAsync(string value, CancellationToken ct = default)
+    {
+        try
+        {
+            var codeForTokens = RunMagicHelper.ReplaceRunLinesWithPass(value);
+            var response = await KernelService.GetSemanticTokensAsync(
+                NodeName, KernelId,
+                new SemanticTokenRequest(codeForTokens, PriorContext?.Invoke() ?? ""),
+                ct);
+
+            _lastSemanticTokensEncoded = EncodeSemanticTokens(response.Tokens);
+        }
+        catch (OperationCanceledException) { }
+        catch { /* semantic tokens are best-effort */ }
+    }
+
+    /// <summary>
+    /// Encode semantic tokens into Monaco's delta-encoded format:
+    /// [deltaLine, deltaStartChar, length, tokenType, tokenModifiers] per token.
+    /// </summary>
+    private static int[] EncodeSemanticTokens(IReadOnlyList<SemanticToken> tokens)
+    {
+        if (tokens.Count == 0) return [];
+
+        // Sort tokens by line then column
+        var sorted = tokens
+            .Where(t => SemanticTokenTypeMap.ContainsKey(t.TokenType))
+            .OrderBy(t => t.Line)
+            .ThenBy(t => t.StartChar)
+            .ToList();
+
+        var encoded = new int[sorted.Count * 5];
+        int prevLine = 0;
+        int prevStart = 0;
+
+        for (int i = 0; i < sorted.Count; i++)
+        {
+            var token = sorted[i];
+            int line = token.Line - 1; // Monaco uses 0-based lines for semantic tokens
+            int deltaLine = line - prevLine;
+            int deltaStart = deltaLine == 0 ? token.StartChar - prevStart : token.StartChar;
+
+            encoded[i * 5 + 0] = deltaLine;
+            encoded[i * 5 + 1] = deltaStart;
+            encoded[i * 5 + 2] = token.Length;
+            encoded[i * 5 + 3] = SemanticTokenTypeMap[token.TokenType];
+            encoded[i * 5 + 4] = 0; // no modifiers
+
+            prevLine = line;
+            prevStart = token.StartChar;
+        }
+
+        return encoded;
+    }
+
     private static string GetSortText(string label) =>
         label.StartsWith("__") ? "2" + label :
         label.StartsWith("_")  ? "1" + label :
@@ -259,5 +369,15 @@
     {
         _diagCts?.Cancel();
         _diagCts?.Dispose();
+        _semanticCts?.Cancel();
+        _semanticCts?.Dispose();
+        if (_semanticDisposable is not null)
+        {
+            try { await JsRuntime.InvokeVoidAsync("disposeSemanticTokensProvider", _semanticDisposable); }
+            catch { /* best-effort cleanup */ }
+            try { await _semanticDisposable.DisposeAsync(); }
+            catch { /* best-effort cleanup */ }
+        }
+        _semanticDotNetRef?.Dispose();
     }
 }

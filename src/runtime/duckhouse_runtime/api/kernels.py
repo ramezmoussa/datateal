@@ -16,6 +16,9 @@ from duckhouse_runtime.kernels.models import (
     KernelInfo,
     Output,
     PollExecutionResponse,
+    SemanticToken,
+    SemanticTokenRequest,
+    SemanticTokenResponse,
 )
 
 router = APIRouter(prefix="/kernels", tags=["kernels"], dependencies=[Depends(verify_api_key)])
@@ -129,3 +132,12 @@ async def diagnose(kernel_id: str, body: DiagnoseRequest):
         raise HTTPException(status_code=404, detail="Kernel not found")
     diagnostics = await conn.diagnose(body.code, body.context)
     return DiagnoseResponse(diagnostics=[Diagnostic(**d) for d in diagnostics])
+
+
+@router.post("/{kernel_id}/semantic-tokens", response_model=SemanticTokenResponse)
+async def semantic_tokens(kernel_id: str, body: SemanticTokenRequest):
+    conn = registry.get(kernel_id)
+    if not conn:
+        raise HTTPException(status_code=404, detail="Kernel not found")
+    tokens = await conn.semantic_tokens(body.code, body.context)
+    return SemanticTokenResponse(tokens=[SemanticToken(**t) for t in tokens])

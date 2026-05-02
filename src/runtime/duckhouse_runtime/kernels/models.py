@@ -80,3 +80,19 @@ class Diagnostic(BaseModel):
 
 class DiagnoseResponse(BaseModel):
     diagnostics: list[Diagnostic]
+
+
+class SemanticTokenRequest(BaseModel):
+    code: str
+    context: str = ""  # code from all prior cells joined by newlines
+
+
+class SemanticToken(BaseModel):
+    line: int        # 1-based
+    start_char: int  # 0-based
+    length: int
+    token_type: str  # function, class, parameter, variable, builtin, selfParameter, property, decorator, namespace
+
+
+class SemanticTokenResponse(BaseModel):
+    tokens: list[SemanticToken]

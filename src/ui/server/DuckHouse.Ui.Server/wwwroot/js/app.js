@@ -1,4 +1,44 @@
 // Theme interop helpers called by ThemeService and CodeCell.
+
+// ── Monaco readiness promise ──
+// Resolves when both custom themes and the DuckDB language are registered.
+window.duckhouseMonacoReady = new Promise(function (resolve) {
+    function check() {
+        if (window._duckhouseThemesReady && window._duckhouseLanguageReady) {
+            resolve();
+        }
+    }
+    // If already ready (race-safe)
+    check();
+    // Hook into the resolve callbacks set by the individual scripts
+    window._duckhouseThemesResolve = check;
+    window._duckhouseLanguageResolve = check;
+});
+
+// Waits for Monaco themes/language to be ready, then applies the correct
+// theme and re-sets the model language (in case the editor was created before
+// the custom language was registered). Called from CodeCell.razor OnEditorInitAsync.
+window.applyDuckhouseMonacoTheme = async function (editorId, language) {
+    await window.duckhouseMonacoReady;
+    var theme = window.getDuckhouseMonacoTheme();
+    if (typeof monaco !== 'undefined') {
+        monaco.editor.setTheme(theme);
+        // Re-apply the language in case the editor was created before registration
+        if (language) {
+            var holder = window.blazorMonaco?.editors?.find(function (h) { return h.id === editorId; });
+            if (holder) {
+                var model = holder.editor.getModel();
+                if (model) {
+                    var currentLang = model.getLanguageId ? model.getLanguageId() : model.getModeId();
+                    if (currentLang !== language) {
+                        monaco.editor.setModelLanguage(model, language);
+                    }
+                }
+            }
+        }
+    }
+};
+
 window.setDuckhouseTheme = function (theme) {
     localStorage.setItem('duckhouse-theme', theme);
     var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -10,17 +50,19 @@ window.setDuckhouseTheme = function (theme) {
             : '_content/AntDesign/css/ant-design-blazor.css';
     }
     document.documentElement.classList.toggle('ant-dark', effective === 'dark');
-    var monacoTheme = effective === 'dark' ? 'vs-dark' : 'vs';
-    if (typeof monaco !== 'undefined') {
-        monaco.editor.setTheme(monacoTheme);
-    }
+    var monacoTheme = effective === 'dark' ? 'duckhouse-dark' : 'duckhouse-light';
+    window.duckhouseMonacoReady.then(function () {
+        if (typeof monaco !== 'undefined') {
+            monaco.editor.setTheme(monacoTheme);
+        }
+    });
 };
 window.getStoredDuckhouseTheme = function () {
     return localStorage.getItem('duckhouse-theme') || 'auto';
 };
 window.getDuckhouseMonacoTheme = function () {
     var link = document.getElementById('ant-theme-css');
-    return link && link.href.includes('dark') ? 'vs-dark' : 'vs';
+    return link && link.href.includes('dark') ? 'duckhouse-dark' : 'duckhouse-light';
 };
 window.setMonacoEditorLanguage = function (editorId, language) {
     const holder = window.blazorMonaco?.editors?.find(h => h.id === editorId);
@@ -150,4 +192,52 @@ window.initQueryPageSplitter = function (topPaneId, handleId, dotNetRef) {
         document.body.style.userSelect = '';
         dotNetRef.invokeMethodAsync('OnSplitterDragEnd', topPane.offsetHeight);
     });
+};
+
+// ── Semantic tokens for Python ──
+// Token type legend — must match the order used in KernelCodeCell.razor and the theme rules.
+window._duckhouseSemanticTokenLegend = {
+    tokenTypes: [
+        'function',       // 0
+        'class',          // 1
+        'parameter',      // 2
+        'variable',       // 3
+        'selfParameter',  // 4
+        'builtin',        // 5
+        'property',       // 6
+        'decorator',      // 7
+        'namespace',      // 8
+        'enumMember',     // 9
+    ],
+    tokenModifiers: [],
+};
+
+// Register a DocumentSemanticTokensProvider for Python that calls back
+// to a .NET DotNetObjectReference for token data.
+window.registerSemanticTokensProvider = function (dotNetRef) {
+    var legend = window._duckhouseSemanticTokenLegend;
+
+    var disposable = monaco.languages.registerDocumentSemanticTokensProvider('python', {
+        getLegend: function () { return legend; },
+        provideDocumentSemanticTokens: async function (model, lastResultId, token) {
+            try {
+                var encoded = await dotNetRef.invokeMethodAsync('GetSemanticTokensEncodedAsync');
+                if (!encoded || encoded.length === 0) {
+                    return { data: new Uint32Array(0) };
+                }
+                return { data: new Uint32Array(encoded) };
+            } catch {
+                return { data: new Uint32Array(0) };
+            }
+        },
+        releaseDocumentSemanticTokens: function () { },
+    });
+
+    return disposable;
+};
+
+window.disposeSemanticTokensProvider = function (disposable) {
+    if (disposable && typeof disposable.dispose === 'function') {
+        disposable.dispose();
+    }
 };

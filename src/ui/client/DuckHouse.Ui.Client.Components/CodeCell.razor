@@ -49,9 +49,15 @@
 
     private StandaloneEditorConstructionOptions GetConstructionOptions(StandaloneCodeEditor _)
     {
+        // Use base vs/vs-dark for initial construction; the correct custom theme is
+        // applied in OnEditorInitAsync after Monaco AMD modules have loaded.
         string monacoTheme = "vs";
-        try { monacoTheme = JSSync?.Invoke<string>("getDuckhouseMonacoTheme") ?? "vs"; }
-        catch { /* JS not ready on first prerender — fall back to light theme */ }
+        try
+        {
+            var link = JSSync?.Invoke<string>("eval", "document.getElementById('ant-theme-css')?.href || ''") ?? "";
+            if (link.Contains("dark")) monacoTheme = "vs-dark";
+        }
+        catch { /* JS not ready on first prerender */ }
 
         return new()
         {
@@ -123,6 +129,8 @@
         {
             _suppressChange = false;
         }
+        // Apply the correct custom theme once Monaco modules are fully loaded
+        await JS.InvokeVoidAsync("applyDuckhouseMonacoTheme", _id, Language);
         // Override Monaco's default Ctrl+Enter (insertLineAfter) with execute-only command
         _dotNetRef = DotNetObjectReference.Create(this);
         await JS.InvokeVoidAsync("registerMonacoExecuteCommand", _id, _dotNetRef);
