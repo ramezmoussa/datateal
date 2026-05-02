@@ -152,6 +152,10 @@
     {
         try
         {
+            // Only respond for our own editor model — the provider is registered globally.
+            if (!string.Equals(modelUri, _modelUri, StringComparison.Ordinal))
+                return new CompletionList { Suggestions = [], Incomplete = false };
+
             // Check if the current line is a %run line
             if (_model is not null && ProvideRunMagicCompletions is not null)
             {
@@ -161,7 +165,17 @@
                     return await ProvideRunMagicCompletionListAsync(runMatch.Groups[1].Value, position);
             }
 
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+            // Read code from the model, not _currentCode, to avoid stale data.
+            // When a trigger character (e.g. '.') is typed, Monaco calls the
+            // completion provider and the change handler concurrently via JS interop.
+            // _currentCode may not include the trigger character yet.
+            var code = _model is not null
+                ? await _model.GetValue(EndOfLinePreference.LF, false)
+                : _currentCode;
+            if (string.IsNullOrEmpty(code))
+                return new CompletionList { Suggestions = [], Incomplete = false };
+
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
 
             int startCol = position.Column;
             if (_model is not null)
@@ -172,7 +186,7 @@
 
             var response = await KernelService.CompleteAsync(
                 NodeName, KernelId,
-                new CompleteRequest(_currentCode, position.LineNumber, position.Column - 1, await GetPriorContextAsync()),
+                new CompleteRequest(code, position.LineNumber, position.Column - 1, await GetPriorContextAsync()),
                 cts.Token);
 
             var range = JsonSerializer.SerializeToElement(new
@@ -197,8 +211,9 @@
 
             return new CompletionList { Suggestions = suggestions, Incomplete = false };
         }
-        catch
+        catch (Exception ex)
         {
+            await JsRuntime.InvokeVoidAsync("console.error", "Completions failed:", ex.ToString());
             return new CompletionList { Suggestions = [], Incomplete = false };
         }
     }

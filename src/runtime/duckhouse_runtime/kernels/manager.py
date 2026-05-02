@@ -243,9 +243,24 @@ class KernelConnection:
                 full_code = code
                 adjusted_line = line
 
+            total_lines = full_code.count("\n") + 1
+            target_line_content = full_code.split("\n")[adjusted_line - 1] if adjusted_line <= total_lines else ""
+            logger.info(
+                "complete: line=%d col=%d adj_line=%d total_lines=%d "
+                "target_line=%r code_len=%d context_len=%d",
+                line, column, adjusted_line, total_lines,
+                target_line_content, len(code), len(context),
+            )
+
             env = JediEnvironment(kernel_python)
             script = jedi.Script(full_code, environment=env)
-            completions = script.complete(adjusted_line, column)
+            try:
+                completions = script.complete(adjusted_line, column)
+            except Exception:
+                logger.info("complete: script.complete() failed", exc_info=True)
+                return []
+
+            logger.info("complete: %d raw completions", len(completions))
 
             def _visibility(name: str) -> int:
                 if name.startswith("__"):
