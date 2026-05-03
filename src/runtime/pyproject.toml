@@ -21,3 +21,12 @@ include = ["duckhouse_runtime*"]
 
 [project.scripts]
 duckhouse-runtime = "duckhouse_runtime.main:run"
+
+[project.optional-dependencies]
+test = [
+  "pytest>=8.0",
+  "pytest-asyncio>=1.0",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"

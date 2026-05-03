@@ -40,6 +40,28 @@ The wheel package can then be installed in development mode.
 pip install --editable .
 ```
 
+### Testing
+
+The project uses [pytest](https://docs.pytest.org/) with the [pytest-asyncio](https://pypi.org/project/pytest-asyncio/) plugin. Install the test dependencies first.
+
+```
+> pip install ".[test]"
+```
+
+Run the full test suite from the `src/runtime` directory.
+
+```
+> python -m pytest tests/ -v
+```
+
+#### Test structure
+
+| Module                            | Covers                                                                       |
+| --------------------------------- | ---------------------------------------------------------------------------- |
+| `tests/test_language_features.py` | Jedi semantic tokens, completions, hover documentation, pyflakes diagnostics |
+
+Tests exercise the `KernelConnection` language-feature methods directly (no kernel process required). The current Python interpreter is used as the Jedi environment.
+
 ### Installation (Linux)
 
 First make sure both python3 and pip are installed.
@@ -118,7 +140,6 @@ metadata:
 data:
   requirements.txt: |
     requests
-    
 ```
 
 ```yaml
