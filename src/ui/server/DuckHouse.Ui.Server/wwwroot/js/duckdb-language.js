@@ -45,12 +45,12 @@ require(['vs/editor/editor.main'], function () {
         'data', 'database', 'date', 'day', 'days', 'deallocate', 'dec', 'decade', 'decades', 'decimal',
         'declare', 'default', 'defaults', 'deferrable', 'deferred', 'definer', 'delete', 'delimiter', 'delimiters', 'depends',
         'desc', 'describe', 'detach', 'dictionary', 'disable', 'discard', 'distinct', 'do', 'document', 'domain',
-        'double', 'drop', 'each', 'else', 'enable', 'encoding', 'encrypted', 'end', 'enum', 'escape',
+        'double', 'drop', 'each', 'else', 'enable', 'encoding', 'encrypted', 'end', 'enum', 'error', 'escape',
         'event', 'except', 'exclude', 'excluding', 'exclusive', 'execute', 'exists', 'explain', 'export', 'export_state',
         'extension', 'extensions', 'external', 'false', 'family', 'fetch', 'filter', 'first', 'float', 'float4',
         'float8', 'following', 'for', 'force', 'foreign', 'forward', 'freeze', 'from', 'full', 'function',
         'functions', 'generated', 'geometry', 'glob', 'global', 'grant', 'granted', 'group', 'groups', 'handler',
-        'having', 'header', 'hold', 'hour', 'hours', 'hugeint', 'identity', 'ignore', 'ilike', 'immediate',
+        'having', 'header', 'hold', 'hour', 'hours', 'hugeint', 'identity', 'if', 'ignore', 'ilike', 'immediate',
         'immutable', 'implicit', 'import', 'in', 'include', 'including', 'increment', 'index', 'indexes', 'inherit',
         'inherits', 'initially', 'inline', 'inner', 'inout', 'input', 'insensitive', 'insert', 'install', 'instead',
         'int', 'int1', 'int128', 'int16', 'int2', 'int32', 'int4', 'int64', 'int8', 'integer',
@@ -60,24 +60,24 @@ require(['vs/editor/editor.main'], function () {
         'macro', 'map', 'mapping', 'match', 'matched', 'materialized', 'maxvalue', 'merge', 'method', 'microsecond',
         'microseconds', 'millennia', 'millennium', 'millisecond', 'milliseconds', 'minute', 'minutes', 'minvalue', 'mode', 'month',
         'months', 'move', 'name', 'names', 'national', 'natural', 'nchar', 'new', 'next', 'no',
-        'none', 'not', 'nothing', 'notify', 'nowait', 'null', 'nulls', 'numeric', 'nvarchar', 'object',
+        'none', 'not', 'nothing', 'notify', 'nowait', 'null', 'nullif', 'nulls', 'numeric', 'nvarchar', 'object',
         'of', 'off', 'offset', 'oids', 'old', 'on', 'only', 'operator', 'option', 'options',
         'or', 'order', 'ordinality', 'others', 'out', 'outer', 'over', 'overriding', 'owned', 'owner',
         'parallel', 'parser', 'partial', 'partition', 'partitioned', 'passing', 'password', 'percent', 'persistent', 'pivot',
-        'pivot_longer', 'pivot_wider', 'placing', 'plans', 'point_2d', 'point_3d', 'point_4d', 'policy', 'polygon_2d', 'positional',
+        'pivot_longer', 'pivot_wider', 'placing', 'plans', 'point_2d', 'point_3d', 'point_4d', 'policy', 'polygon_2d', 'position', 'positional',
         'pragma', 'preceding', 'precision', 'prepare', 'prepared', 'preserve', 'primary', 'prior', 'privileges', 'procedural',
         'procedure', 'program', 'publication', 'qualify', 'quarter', 'quarters', 'quote', 'range', 'read', 'real',
         'reassign', 'recheck', 'recursive', 'ref', 'references', 'referencing', 'refresh', 'reindex', 'relative', 'release',
-        'rename', 'repeatable', 'replica', 'reset', 'respect', 'restart', 'restrict', 'returning', 'returns', 'revoke',
+        'rename', 'repeatable', 'replace', 'replica', 'reset', 'respect', 'restart', 'restrict', 'returning', 'returns', 'revoke',
         'right', 'role', 'rollback', 'rollup', 'row', 'rows', 'rule', 'sample', 'savepoint', 'schema',
         'schemas', 'scope', 'scroll', 'search', 'second', 'seconds', 'secret', 'security', 'select', 'semi',
         'sequence', 'sequences', 'serializable', 'server', 'session', 'set', 'setof', 'sets', 'share', 'short',
         'show', 'signed', 'similar', 'simple', 'skip', 'smallint', 'snapshot', 'some', 'sorted', 'source',
         'sql', 'stable', 'standalone', 'start', 'statement', 'statistics', 'stdin', 'stdout', 'storage', 'stored',
-        'strict', 'string', 'strip', 'struct', 'subscription', 'summarize', 'symmetric', 'sysid', 'system', 'table',
+        'strict', 'string', 'strip', 'struct', 'subscription', 'substring', 'summarize', 'symmetric', 'sysid', 'system', 'table',
         'tables', 'tablesample', 'tablespace', 'target', 'temp', 'template', 'temporary', 'text', 'then', 'ties',
         'time', 'time_tz', 'timestamp', 'timestamp_ms', 'timestamp_ns', 'timestamp_s', 'timestamp_tz', 'timestamptz', 'timetz', 'tinyint',
-        'to', 'trailing', 'transaction', 'transform', 'treat', 'trigger', 'true', 'truncate', 'trusted', 'type',
+        'to', 'trailing', 'transaction', 'transform', 'treat', 'trigger', 'trim', 'true', 'truncate', 'trusted', 'type',
         'types', 'ubigint', 'uhugeint', 'uint128', 'uint16', 'uint32', 'uint64', 'uint8', 'uinteger', 'unbounded',
         'uncommitted', 'unencrypted', 'union', 'unique', 'unknown', 'unlisten', 'unlogged', 'unpack', 'unpivot', 'unsigned',
         'until', 'update', 'use', 'user', 'using', 'usmallint', 'utinyint', 'vacuum', 'valid', 'validate',
@@ -118,7 +118,7 @@ require(['vs/editor/editor.main'], function () {
         'duckdb_tables', 'duckdb_temporary_files', 'duckdb_types', 'duckdb_variables', 'duckdb_views', 'editdist3', 'element_at', 'enable_checkpoint_on_shutdown',
         'enable_logging', 'enable_object_cache', 'enable_optimizer', 'enable_peg_parser', 'enable_print_progress_bar', 'enable_profile', 'enable_profiling', 'enable_progress_bar',
         'enable_verification', 'encode', 'ends_with', 'entropy', 'enum_code', 'enum_first', 'enum_last', 'enum_range',
-        'enum_range_boundary', 'epoch', 'epoch_ms', 'epoch_ns', 'epoch_us', 'equi_width_bins', 'era', 'error',
+        'enum_range_boundary', 'epoch', 'epoch_ms', 'epoch_ns', 'epoch_us', 'equi_width_bins', 'era',
         'estimate_time_grain', 'even', 'exp', 'extension_versions', 'extract', 'factorial', 'favg', 'fdiv',
         'fill', 'finalize', 'first_value', 'flatten', 'floor', 'fmod', 'force_checkpoint', 'format',
         'format_bytes', 'format_pg_type', 'format_type', 'formatreadabledecimalsize', 'formatreadablesize', 'from_base64', 'from_binary', 'from_hex',
@@ -144,7 +144,7 @@ require(['vs/editor/editor.main'], function () {
         'icu_collate_te', 'icu_collate_th', 'icu_collate_tk', 'icu_collate_tn', 'icu_collate_to', 'icu_collate_tr', 'icu_collate_ug', 'icu_collate_uk',
         'icu_collate_ur', 'icu_collate_uz', 'icu_collate_vi', 'icu_collate_wae', 'icu_collate_wo', 'icu_collate_xh', 'icu_collate_yi', 'icu_collate_yo',
         'icu_collate_yue', 'icu_collate_yue_cn', 'icu_collate_zh', 'icu_collate_zh_cn', 'icu_collate_zh_hk', 'icu_collate_zh_mo', 'icu_collate_zh_sg', 'icu_collate_zh_tw',
-        'icu_collate_zu', 'icu_sort_key', 'if', 'ilike_escape', 'import_database', 'in_search_path', 'inet_client_addr', 'inet_client_port',
+        'icu_collate_zu', 'icu_sort_key', 'ilike_escape', 'import_database', 'in_search_path', 'inet_client_addr', 'inet_client_port',
         'inet_server_addr', 'inet_server_port', 'instr', 'is_histogram_other_bin', 'isfinite', 'isinf', 'isnan', 'isnull',
         'isodow', 'isoyear', 'jaccard', 'jaro_similarity', 'jaro_winkler_similarity', 'json_array', 'json_array_length', 'json_contains',
         'json_deserialize_sql', 'json_each', 'json_execute_serialized_sql', 'json_exists', 'json_extract', 'json_extract_path', 'json_extract_path_text', 'json_extract_string',
@@ -167,20 +167,20 @@ require(['vs/editor/editor.main'], function () {
         'map_from_entries', 'map_keys', 'map_to_pg_oid', 'map_values', 'max', 'max_by', 'md5', 'md5_number',
         'md5_number_lower', 'md5_number_upper', 'mean', 'median', 'metadata_info', 'min', 'min_by', 'mismatches',
         'mod', 'monthname', 'multiply', 'nanosecond', 'nextafter', 'nextval', 'nfc_normalize', 'normalized_interval',
-        'not_ilike_escape', 'not_like_escape', 'notnull', 'now', 'nth_value', 'ntile', 'nullif', 'obj_description',
+        'not_ilike_escape', 'not_like_escape', 'notnull', 'now', 'nth_value', 'ntile', 'obj_description',
         'octet_length', 'ord', 'overlaps', 'overlay', 'parquet_bloom_probe', 'parquet_file_metadata', 'parquet_full_metadata', 'parquet_kv_metadata',
         'parquet_metadata', 'parquet_scan', 'parquet_schema', 'parse_dirname', 'parse_dirpath', 'parse_duckdb_log_message', 'parse_filename', 'parse_formatted_bytes',
         'parse_path', 'percent_rank', 'pg_collation_is_visible', 'pg_conf_load_time', 'pg_conversion_is_visible', 'pg_function_is_visible', 'pg_get_constraintdef', 'pg_get_expr',
         'pg_get_viewdef', 'pg_has_role', 'pg_is_other_temp_schema', 'pg_my_temp_schema', 'pg_opclass_is_visible', 'pg_operator_is_visible', 'pg_opfamily_is_visible', 'pg_postmaster_start_time',
         'pg_size_pretty', 'pg_sleep', 'pg_table_is_visible', 'pg_timezone_names', 'pg_ts_config_is_visible', 'pg_ts_dict_is_visible', 'pg_ts_parser_is_visible', 'pg_ts_template_is_visible',
-        'pg_type_is_visible', 'pg_typeof', 'pi', 'platform', 'position', 'pow', 'power', 'pragma_collations',
+        'pg_type_is_visible', 'pg_typeof', 'pi', 'platform', 'pow', 'power', 'pragma_collations',
         'pragma_database_size', 'pragma_metadata_info', 'pragma_platform', 'pragma_show', 'pragma_storage_info', 'pragma_table_info', 'pragma_user_agent', 'pragma_version',
         'prefix', 'printf', 'product', 'quantile', 'quantile_cont', 'quantile_disc', 'query', 'query_table',
         'radians', 'random', 'rank', 'rank_dense', 'read_blob', 'read_csv', 'read_csv_auto', 'read_duckdb',
         'read_json', 'read_json_auto', 'read_json_objects', 'read_json_objects_auto', 'read_ndjson', 'read_ndjson_auto', 'read_ndjson_objects', 'read_parquet',
         'read_text', 'reduce', 'regexp_escape', 'regexp_extract', 'regexp_extract_all', 'regexp_full_match', 'regexp_matches', 'regexp_replace',
         'regexp_split_to_array', 'regexp_split_to_table', 'regr_avgx', 'regr_avgy', 'regr_count', 'regr_intercept', 'regr_r2', 'regr_slope',
-        'regr_sxx', 'regr_sxy', 'regr_syy', 'remap_struct', 'repeat', 'repeat_row', 'replace', 'replace_type',
+        'regr_sxx', 'regr_sxy', 'regr_syy', 'remap_struct', 'repeat', 'repeat_row', 'replace_type',
         'reservoir_quantile', 'reverse', 'right_grapheme', 'round', 'round_even', 'roundbankers', 'row_number', 'row_to_json',
         'rpad', 'rtrim', 'sem', 'seq_scan', 'session_user', 'set_bit', 'setseed', 'sha1',
         'sha256', 'shobj_description', 'show_databases', 'show_tables', 'show_tables_expanded', 'sign', 'signbit', 'sin',
@@ -190,18 +190,27 @@ require(['vs/editor/editor.main'], function () {
         'storage_info', 'str_split', 'str_split_regex', 'strftime', 'string_agg', 'string_split', 'string_split_regex', 'string_to_array',
         'strip_accents', 'strlen', 'strpos', 'strptime', 'struct_concat', 'struct_contains', 'struct_extract', 'struct_extract_at',
         'struct_has', 'struct_indexof', 'struct_insert', 'struct_keys', 'struct_pack', 'struct_position', 'struct_update', 'struct_values',
-        'substr', 'substring', 'substring_grapheme', 'subtract', 'suffix', 'sum', 'sum_no_overflow', 'sumkahan',
+        'substr', 'substring_grapheme', 'subtract', 'suffix', 'sum', 'sum_no_overflow', 'sumkahan',
         'summary', 'switch', 'table_info', 'tan', 'tanh', 'test_all_types', 'test_vector_types', 'time_bucket',
         'time_series_rollup', 'timetz_byte_comparable', 'timezone', 'timezone_hour', 'timezone_minute', 'to_base', 'to_base64', 'to_binary',
         'to_centuries', 'to_days', 'to_decades', 'to_hex', 'to_hours', 'to_json', 'to_microseconds', 'to_millennia',
         'to_milliseconds', 'to_minutes', 'to_months', 'to_quarters', 'to_seconds', 'to_timestamp', 'to_weeks', 'to_years',
-        'today', 'transaction_timestamp', 'translate', 'trim', 'trunc', 'truncate_duckdb_logs', 'try_cast', 'try_strptime',
+        'today', 'transaction_timestamp', 'translate', 'trunc', 'truncate_duckdb_logs', 'try_cast', 'try_strptime',
         'txid_current', 'typeof', 'ucase', 'ui_is_started', 'unbin', 'unhex', 'unicode', 'union_extract',
         'union_tag', 'union_value', 'unnest', 'unpivot_list', 'upper', 'url_decode', 'url_encode', 'user_agent',
         'uuid', 'uuid_extract_timestamp', 'uuid_extract_version', 'uuidv4', 'uuidv7', 'var_pop', 'var_samp', 'variance',
         'variant_extract', 'variant_normalize', 'variant_to_parquet_variant', 'variant_typeof', 'vector_type', 'verify_external', 'verify_fetch_row', 'verify_parallelism',
         'verify_serializer', 'wavg', 'weekday', 'weekofyear', 'weighted_avg', 'which_secret', 'write_log', 'xor',
         'yearweek'
+    ];
+
+    // ── Keywords that double as functions ──
+    // Highlighted as keywords by default, but as functions when followed by '('.
+    var keywordOrFunction = [
+        'add', 'aggregate', 'century', 'checkpoint', 'day', 'decade', 'error', 'filter', 'first', 'functions',
+        'glob', 'hour', 'if', 'json', 'last', 'left', 'map', 'microsecond', 'millennium', 'millisecond',
+        'minute', 'mode', 'month', 'nullif', 'position', 'quarter', 'range', 'replace', 'right', 'row',
+        'second', 'show', 'substring', 'trim', 'user', 'version', 'week', 'year'
     ];
 
 
@@ -216,6 +225,7 @@ require(['vs/editor/editor.main'], function () {
 
         keywords: keywords,
         builtinFunctions: builtinFunctions,
+        keywordOrFunction: keywordOrFunction,
 
         operators: [
             '=', '>', '<', '!', '~', '?', ':', '==', '<=', '>=', '!=', '<>',
@@ -254,7 +264,17 @@ require(['vs/editor/editor.main'], function () {
                 [/0[xX][0-9a-fA-F]+/, 'number.hex.sql'],
                 [/[0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?/, 'number.sql'],
 
-                // Identifiers and keywords
+                // Identifiers followed by '(' — dual-purpose keywords act as functions
+                [/[a-zA-Z_][a-zA-Z0-9_]*(?=\s*\()/, {
+                    cases: {
+                        '@keywordOrFunction': 'predefined.sql',
+                        '@builtinFunctions': 'predefined.sql',
+                        '@keywords': 'keyword.sql',
+                        '@default': 'identifier.sql',
+                    }
+                }],
+
+                // Identifiers not followed by '('
                 [/[a-zA-Z_][a-zA-Z0-9_]*/, {
                     cases: {
                         '@keywords': 'keyword.sql',
