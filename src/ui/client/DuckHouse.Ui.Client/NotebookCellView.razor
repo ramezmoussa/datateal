@@ -311,6 +311,37 @@
             }
         }
 
+        @* ── _sqldf hint (SQL cells only, after a successful DataFrame result) ── *@
+        @if (Cell.Language == NotebookCellLanguage.Sql && !Cell.IsExecuting && Cell.Error is null && HasDfOutput)
+        {
+            <div style="display: flex; gap: 8px; margin-bottom: 4px; align-items: flex-start;">
+                <span style="visibility: hidden; font-family: monospace; font-size: 0.875rem; white-space: nowrap; padding-top: 4px;">In [ ]:</span>
+                <div style="flex: 1 1 0%; padding-left: 8px; font-size: 0.8125rem; padding-top: 2px;">
+                    <Text Type="TextElementType.Secondary">
+                        This result is stored as <Text Code>_sqldf</Text> and can be used in other
+                        <Tooltip Title="Insert Python code below">
+                            <Button Type="ButtonType.Link"
+                                    Size="ButtonSize.Small"
+                                    Style="padding: 0; font-size: inherit; height: auto;"
+                                    OnClick="OnInsertPythonCellBelow">
+                                Python
+                            </Button>
+                        </Tooltip>
+                        and
+                        <Tooltip Title="Insert SQL code below">
+                            <Button Type="ButtonType.Link"
+                                    Size="ButtonSize.Small"
+                                    Style="padding: 0; font-size: inherit; height: auto;"
+                                    OnClick="OnInsertSqlCellBelow">
+                                SQL
+                            </Button>
+                        </Tooltip>
+                        cells.
+                    </Text>
+                </div>
+            </div>
+        }
+
         @if (Cell.Error is { } err)
         {
             <div style="display: flex; gap: 8px; margin-bottom: 4px; align-items: flex-start;">
@@ -344,6 +375,8 @@
     [Parameter] public EventCallback OnMoveDown { get; set; }
     [Parameter] public Action? OnCellChanged { get; set; }
     [Parameter] public EventCallback OnToggleParameters { get; set; }
+    [Parameter] public EventCallback OnInsertPythonCellBelow { get; set; }
+    [Parameter] public EventCallback OnInsertSqlCellBelow { get; set; }
     [Parameter] public bool AlwaysConsumeMouseWheel { get; set; } = true;
 
     // Change-tracking fields for ShouldRender
@@ -401,6 +434,10 @@
     private bool HasKernel => !string.IsNullOrEmpty(NodeName) && !string.IsNullOrEmpty(KernelId);
 
     private bool HasStderr => Cell.Outputs.Any(o => o.Type == "stream" && o.Name == "stderr");
+
+    private bool HasDfOutput => Cell.Outputs.Any(o =>
+        o.Type is "execute_result" or "display_data" &&
+        o.Data?.TryGetValue(DataFrameOutput.MimeType, out _) == true);
 
     private string CellTypeValue => Cell.CellType == NotebookCellType.Markdown
         ? "markdown"

@@ -206,7 +206,9 @@
                             OnMoveDown="@(() => MoveCell(index, 1))"
                             OnCellChanged="MarkDirty"
                             AlwaysConsumeMouseWheel="false"
-                            OnToggleParameters="@(() => ToggleParameterCell(cell))" />
+                            OnToggleParameters="@(() => ToggleParameterCell(cell))"
+                            OnInsertPythonCellBelow="@(() => AddCell(index + 1, NotebookCellType.Code, NotebookCellLanguage.Python, "display(_sqldf)"))"
+                            OnInsertSqlCellBelow="@(() => AddCell(index + 1, NotebookCellType.Code, NotebookCellLanguage.Sql, "FROM _sqldf"))" />
             <AddCellBar @key="@($"add-{cell.Id}")" OnAddPython="() => AddCell(index + 1, NotebookCellType.Code, NotebookCellLanguage.Python)"
                         OnAddSql="() => AddCell(index + 1, NotebookCellType.Code, NotebookCellLanguage.Sql)"
                         OnAddMarkdown="() => AddCell(index + 1, NotebookCellType.Markdown)" />
@@ -682,9 +684,9 @@
         _notebook.IsDirty = true;
     }
 
-    private void AddCell(int index, NotebookCellType cellType, NotebookCellLanguage lang = NotebookCellLanguage.Python)
+    private void AddCell(int index, NotebookCellType cellType, NotebookCellLanguage lang = NotebookCellLanguage.Python, string source = "")
     {
-        var cell = new NotebookCell { CellType = cellType, Language = lang };
+        var cell = new NotebookCell { CellType = cellType, Language = lang, Source = source };
         if (cellType == NotebookCellType.Markdown)
             cell.IsEditingMarkdown = true;
         _notebook.Cells.Insert(index, cell);
