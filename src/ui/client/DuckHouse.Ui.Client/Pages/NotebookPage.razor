@@ -723,7 +723,9 @@
         {
             if (c.Language == NotebookCellLanguage.Sql)
             {
-                parts.Add($"import duckdb; duckdb.execute(\"\"\"{c.Source}\"\"\").df()");
+                // Use WrapSql so the context mirrors actual execution: _sqldf is assigned,
+                // the SQL is properly escaped, and Jedi can infer _sqldf as pd.DataFrame.
+                parts.Add(SqlCodeGenerator.WrapSql(c.Source));
             }
             else if (c.CachedExpandedSource is not null)
             {

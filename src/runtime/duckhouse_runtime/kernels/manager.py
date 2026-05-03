@@ -235,13 +235,8 @@ class KernelConnection:
         kernel_python = os.environ.get("DUCKHOUSE_KERNEL_PYTHON", sys.executable)
 
         def _run() -> list[dict]:
-            if context:
-                context_line_count = context.count("\n") + 1
-                full_code = context + "\n" + code
-                adjusted_line = line + context_line_count
-            else:
-                full_code = code
-                adjusted_line = line
+            full_code, context_line_count = KernelConnection._build_full_code(context, code)
+            adjusted_line = line + context_line_count
 
             total_lines = full_code.count("\n") + 1
             logger.debug(
@@ -289,8 +284,7 @@ class KernelConnection:
         with row numbers relative to *code*.
         """
         def _run() -> list[dict]:
-            context_line_count = context.count("\n") + 1 if context else 0
-            full_code = (context + "\n" + code) if context else code
+            full_code, context_line_count = KernelConnection._build_full_code(context, code)
 
             diagnostics = []
             try:
@@ -342,6 +336,32 @@ class KernelConnection:
         "__name__", "__doc__", "__file__", "__spec__",
     ])
 
+    # Preamble silently prepended to every analysis request (diagnostics,
+    # completions, hover, semantic tokens).  It declares names that ipykernel
+    # injects into the user namespace at startup so that pyflakes/Jedi do not
+    # flag them as undefined and can resolve their types/signatures.
+    _KERNEL_PREAMBLE = "from IPython.display import display\n"
+
+    @classmethod
+    def _build_full_code(cls, context: str, code: str) -> tuple[str, int]:
+        """Prepend the kernel preamble and optional prior-cell context to *code*.
+
+        Returns ``(full_code, context_line_count)`` where *context_line_count*
+        is the total number of lines that precede the user's *code* inside
+        *full_code* (preamble lines + context lines).  Callers use this offset
+        to translate absolute pyflakes/Jedi line numbers back to code-relative
+        ones.
+        """
+        preamble = cls._KERNEL_PREAMBLE
+        preamble_lines = preamble.count("\n")
+        if context:
+            full_code = preamble + context + "\n" + code
+            context_line_count = preamble_lines + context.count("\n") + 1
+        else:
+            full_code = preamble + code
+            context_line_count = preamble_lines
+        return full_code, context_line_count
+
     async def semantic_tokens(self, code: str, context: str = "") -> list[dict]:
         """Return semantic token classifications using Jedi (primary) with AST fallback.
 
@@ -352,8 +372,7 @@ class KernelConnection:
         kernel_python = os.environ.get("DUCKHOUSE_KERNEL_PYTHON", sys.executable)
 
         def _run_jedi() -> list[dict]:
-            context_line_count = context.count("\n") + 1 if context else 0
-            full_code = (context + "\n" + code) if context else code
+            full_code, context_line_count = KernelConnection._build_full_code(context, code)
 
             env = JediEnvironment(kernel_python)
             script = jedi.Script(full_code, environment=env)
@@ -499,8 +518,7 @@ class KernelConnection:
 
         def _run_ast() -> list[dict]:
             """Fallback: use Python's ast module for basic classification."""
-            context_line_count = context.count("\n") + 1 if context else 0
-            full_code = (context + "\n" + code) if context else code
+            full_code, context_line_count = KernelConnection._build_full_code(context, code)
 
             try:
                 tree = _ast.parse(full_code)
@@ -616,8 +634,7 @@ class KernelConnection:
             return result
 
         def _run() -> list[str]:
-            context_line_count = context.count("\n") + 1 if context else 0
-            full_code = (context + "\n" + code) if context else code
+            full_code, context_line_count = KernelConnection._build_full_code(context, code)
             adj_line = line + context_line_count
             total_lines = full_code.count("\n") + 1
 

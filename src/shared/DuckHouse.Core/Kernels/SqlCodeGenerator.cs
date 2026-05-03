@@ -16,12 +16,12 @@ public static class SqlCodeGenerator
         var escaped = EscapeForPythonTripleQuote(sql);
         return $""""
             import duckdb
-            __df = duckdb.execute("""{escaped}""").df()
+            _sqldf = duckdb.execute("""{escaped}""").df()
             __result = None
-            if all(value in __df.columns for value in ['explain_key', 'explain_value']):
-                print('\\n'.join(str(v) for v in __df['explain_value']))
+            if all(value in _sqldf.columns for value in ['explain_key', 'explain_value']):
+                print('\\n'.join(str(v) for v in _sqldf['explain_value']))
             else:
-                __result = __df
+                __result = _sqldf
             __result
             """";
     }

@@ -201,6 +201,13 @@ class TestCompletions:
         completions = await conn.complete(code, line=1, column=0)
         assert isinstance(completions, list)
 
+    async def test_display_completion_available(self, conn):
+        """Typing 'disp' should suggest 'display' (injected by ipykernel preamble)."""
+        code = "disp"
+        completions = await conn.complete(code, line=1, column=4)
+        labels = {c["label"] for c in completions}
+        assert "display" in labels
+
 
 # ---------------------------------------------------------------------------
 # Hover
@@ -259,6 +266,14 @@ class TestHover:
         combined = "\n".join(contents)
         assert "join" in combined
 
+    async def test_hover_on_display(self, conn):
+        """Hovering over 'display' should return IPython documentation."""
+        code = "display(42)"
+        contents = await conn.hover(code, line=1, column=0)
+        assert len(contents) > 0
+        combined = "\n".join(contents).lower()
+        assert "display" in combined
+
 
 # ---------------------------------------------------------------------------
 # Diagnostics
@@ -297,3 +312,17 @@ class TestDiagnostics:
         diags = await conn.diagnose(code, context=context)
         for d in diags:
             assert d["row"] >= 1, "Diagnostic row from context leaked"
+
+    async def test_display_no_undefined_name_warning(self, conn):
+        """display() is injected by ipykernel — it must not be flagged as undefined."""
+        code = "display(42)"
+        diags = await conn.diagnose(code)
+        assert not any("display" in d["message"] for d in diags)
+
+    async def test_sqldf_context_suppresses_undefined_name(self, conn):
+        """_sqldf assigned in context (as from a SQL cell) must not be flagged."""
+        # Use a plain object assignment — pyflakes only checks name existence, not types.
+        context = "_sqldf = object()"
+        code = "_sqldf.head()"
+        diags = await conn.diagnose(code, context=context)
+        assert not any("_sqldf" in d["message"] for d in diags)
