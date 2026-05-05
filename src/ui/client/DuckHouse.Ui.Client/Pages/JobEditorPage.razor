@@ -101,7 +101,7 @@
                             </Button>
                         </AuthorizeView>
                     </div>
-                    <Table TItem="EditableTask" DataSource="_editTasks" Size="@TableSize.Small" PageSize="int.MaxValue" PaginationPosition="none">
+                    <Table TItem="EditableTask" DataSource="SortedEditTasks" Size="@TableSize.Small" PageSize="int.MaxValue" PaginationPosition="none">
                         <PropertyColumn Property="c => c.Name" Title="Name" />
                         <PropertyColumn Property="c => c.TaskType" Title="Type">
                             <Tag Color="@GetTaskTypeColor(context.TaskType)">@context.TaskType</Tag>
@@ -920,6 +920,16 @@
             _error = $"Failed to delete schedule: {ex.Message}";
         }
     }
+
+    private IEnumerable<EditableTask> SortedEditTasks =>
+        _editTasks.Count <= 1
+            ? _editTasks
+            : _editTasks.OrderBy(t => t, new TopologicalComparer<EditableTask, string>(
+                _editTasks,
+                t => t?.Name ?? "",
+                t => t.Dependencies.Select(d => d.TaskName),
+                Comparer<EditableTask>.Create((a, b) =>
+                    NaturalSortComparer.OrdinalIgnoreCase.Compare(a.Name, b.Name))));
 
     private static string GetTaskTypeColor(TaskType taskType) => taskType switch
     {
