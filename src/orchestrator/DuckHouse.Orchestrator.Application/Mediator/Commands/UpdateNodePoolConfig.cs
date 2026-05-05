@@ -4,6 +4,7 @@ using DuckHouse.Orchestrator.Application.Engine;
 using DuckHouse.Orchestrator.Core.Entities;
 using DuckHouse.Orchestrator.Core.Interfaces;
 using DuckHouse.Orchestrator.Core.Repositories;
+using Microsoft.Extensions.Logging;
 
 namespace DuckHouse.Orchestrator.Application.Mediator.Commands;
 
@@ -20,12 +21,14 @@ public record UpdateNodePoolConfigRequest(
     List<Guid>? SecretIds = null,
     int WarmNodes = 0,
     int? MaxNodes = null,
-    TimeSpan? NodeAcquireTimeout = null) : IRequest<NodePoolConfig?>;
+    TimeSpan? NodeAcquireTimeout = null,
+    bool RestartNodes = false) : IRequest<NodePoolConfig?>;
 
 internal class UpdateNodePoolConfigHandler(
     INodePoolConfigRepository repository,
     IControlPlaneClient controlPlaneClient,
-    WarmPoolManager warmPoolManager)
+    WarmPoolManager warmPoolManager,
+    ILogger<UpdateNodePoolConfigHandler> logger)
     : IRequestHandler<UpdateNodePoolConfigRequest, NodePoolConfig?>
 {
     public async Task<NodePoolConfig?> Handle(UpdateNodePoolConfigRequest request, CancellationToken cancellationToken)
@@ -73,10 +76,28 @@ internal class UpdateNodePoolConfigHandler(
                 request.KernelIdleTimeout,
                 request.NodeIdleTimeout,
                 cancellationToken);
+
+            if (request.RestartNodes)
+            {
+                try
+                {
+                    await controlPlaneClient.DeleteNodeAsync(interactive.GetNodeName(), cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    // Node was not running — nothing to restart
+                    logger.LogInformation(ex,
+                        "UpdateNodePoolConfig: interactive node '{NodeName}' not found during restart; skipping",
+                        interactive.GetNodeName());
+                }
+            }
         }
         else if (existing is JobNodePoolConfig updatedJobConfig)
         {
-            await warmPoolManager.AdjustPoolAsync(updatedJobConfig, cancellationToken);
+            if (request.RestartNodes)
+                await warmPoolManager.DrainAndReplenishAsync(updatedJobConfig, cancellationToken);
+            else
+                await warmPoolManager.AdjustPoolAsync(updatedJobConfig, cancellationToken);
         }
 
         return updated;

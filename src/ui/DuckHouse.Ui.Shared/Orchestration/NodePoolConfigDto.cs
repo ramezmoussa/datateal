@@ -47,5 +47,6 @@ public record UpdateNodePoolRequest(
     IReadOnlyList<Guid>? SecretIds = null,
     int WarmNodes = 0,
     int? MaxNodes = null,
-    TimeSpan? NodeAcquireTimeout = null);
+    TimeSpan? NodeAcquireTimeout = null,
+    bool RestartNodes = false);
 

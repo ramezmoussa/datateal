@@ -354,15 +354,38 @@
         </Form>
     </div>
     <div class="drawer-footer">
-        @if (_formValidationError is not null)
+        @if (_showRestartPrompt)
         {
-            <div style="color: #ff4d4f; font-size: 13px; margin-bottom: 8px; flex: 1;">@_formValidationError</div>
+            var isInteractive = _editTarget?.PoolType == NodePoolType.Interactive;
+            <div style="font-size: 13px; margin-bottom: 8px; flex: 1;">
+                <AntDesign.Text Type="TextElementType.Warning">
+                    @(isInteractive
+                        ? "The running node must be restarted for these changes to take effect."
+                        : "Existing warm nodes will be recreated to apply these changes.")
+                </AntDesign.Text>
+            </div>
+            <Button OnClick="CancelSave" Disabled="_saving">Cancel</Button>
+            <Button OnClick="SaveOnly" Loading="@(_saving && !_restartSaving)">Save only</Button>
+            <Button Type="@ButtonType.Primary" OnClick="SaveWithRestart" Loading="_restartSaving">
+                @(isInteractive ? "Save & restart" : "Save & recreate")
+            </Button>
         }
-        <Button OnClick="() => _showDrawer = false">Cancel</Button>
-        <Button Type="@ButtonType.Primary" OnClick="ConfirmSave" Loading="_saving"
-                Disabled="@(string.IsNullOrWhiteSpace(_form.Name) || string.IsNullOrWhiteSpace(_form.VmSize) || ValidationHelper.ValidateNodePoolName(_form.Name) is not null)">
-            Save
-        </Button>
+        else
+        {
+            @if (_formValidationError is not null)
+            {
+                <div style="font-size: 13px; margin-bottom: 8px; flex: 1;">
+                    <AntDesign.Text Type="TextElementType.Danger">
+                        @_formValidationError
+                    </AntDesign.Text>
+                </div>
+            }
+            <Button OnClick="() => _showDrawer = false">Cancel</Button>
+            <Button Type="@ButtonType.Primary" OnClick="ConfirmSave" Loading="_saving"
+                    Disabled="@(string.IsNullOrWhiteSpace(_form.Name) || string.IsNullOrWhiteSpace(_form.VmSize) || ValidationHelper.ValidateNodePoolName(_form.Name) is not null)">
+                Save
+            </Button>
+        }
     </div>
 </Drawer>
 
@@ -381,6 +404,8 @@
     // Drawer state
     private bool _showDrawer;
     private bool _saving;
+    private bool _restartSaving;
+    private bool _showRestartPrompt;
     private string? _formValidationError;
     private NodePoolConfigDto? _editTarget;
     private NodePoolFormModel _form = new();
@@ -466,6 +491,7 @@
         _form = new NodePoolFormModel();
         _nameSubmitAttempted = false;
         _formValidationError = null;
+        _showRestartPrompt = false;
         _showDrawer = true;
     }
 
@@ -489,6 +515,7 @@
             SecretIds = pool.SecretIds ?? [],
         };
         _formValidationError = null;
+        _showRestartPrompt = false;
         _showDrawer = true;
     }
 
@@ -514,6 +541,31 @@
         }
         _formValidationError = null;
 
+        if (_editTarget is not null && HasNodeImpactingChanges(_editTarget, _form) && IsNodeActive(_editTarget))
+        {
+            _showRestartPrompt = true;
+            return;
+        }
+
+        await ExecuteSaveAsync(restartNodes: false);
+    }
+
+    private Task SaveWithRestart()
+    {
+        _restartSaving = true;
+        return ExecuteSaveAsync(restartNodes: true);
+    }
+
+    private Task SaveOnly()
+    {
+        _showRestartPrompt = false;
+        return ExecuteSaveAsync(restartNodes: false);
+    }
+
+    private void CancelSave() => _showRestartPrompt = false;
+
+    private async Task ExecuteSaveAsync(bool restartNodes)
+    {
         var kernelTimeout = _form.KernelIdleMin > 0 ? TimeSpan.FromMinutes(_form.KernelIdleMin) : (TimeSpan?)null;
         var nodeTimeout = _form.NodeIdleMin.HasValue ? TimeSpan.FromMinutes(_form.NodeIdleMin.Value) : (TimeSpan?)null;
         var acquireTimeout = _form.NodeAcquireTimeoutMin.HasValue ? TimeSpan.FromMinutes(_form.NodeAcquireTimeoutMin.Value) : (TimeSpan?)null;
@@ -540,9 +592,11 @@
                     _form.WheelPackageIds.Any() ? [.. _form.WheelPackageIds] : null,
                     _form.EnvVarIds.Any() ? [.. _form.EnvVarIds] : null,
                     _form.SecretIds.Any() ? [.. _form.SecretIds] : null,
-                    _form.WarmNodes, _form.MaxNodes, acquireTimeout));
+                    _form.WarmNodes, _form.MaxNodes, acquireTimeout,
+                    RestartNodes: restartNodes));
             }
             _showDrawer = false;
+            _showRestartPrompt = false;
             await LoadAsync();
         }
         catch (Exception ex)
@@ -552,7 +606,35 @@
         finally
         {
             _saving = false;
+            _restartSaving = false;
         }
+    }
+
+    private static bool HasNodeImpactingChanges(NodePoolConfigDto original, NodePoolFormModel form)
+    {
+        if (!string.Equals(original.VmSize.Trim(), form.VmSize?.Trim(), StringComparison.OrdinalIgnoreCase))
+            return true;
+        var originalReqs = original.KernelRequirements?.Trim();
+        var formReqs = form.KernelReqs?.Trim();
+        if (!string.Equals(originalReqs, formReqs, StringComparison.Ordinal))
+            return true;
+        if (!new HashSet<Guid>(original.WheelPackageIds ?? []).SetEquals(form.WheelPackageIds))
+            return true;
+        if (!new HashSet<Guid>(original.EnvironmentVariableIds ?? []).SetEquals(form.EnvVarIds))
+            return true;
+        if (!new HashSet<Guid>(original.SecretIds ?? []).SetEquals(form.SecretIds))
+            return true;
+        return false;
+    }
+
+    private bool IsNodeActive(NodePoolConfigDto pool)
+    {
+        if (pool.PoolType == NodePoolType.Interactive)
+        {
+            var live = _interactivePools.FirstOrDefault(p => p.Id == pool.Id);
+            return live?.NodeState is NodeState.Running or NodeState.Creating;
+        }
+        return pool.WarmNodes > 0;
     }
 
     private async Task DeleteAsync(NodePoolConfigDto pool)

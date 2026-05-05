@@ -257,6 +257,60 @@ public sealed class WarmPoolManager(
         return Task.CompletedTask;
     }
 
+    // -- Drain and replenish ---------------------------------------------------
+
+    /// <summary>
+    /// Drains all queued warm standbys and replenishes the pool with fresh nodes.
+    /// Called instead of <see cref="AdjustPoolAsync"/> when a pool's node-impacting
+    /// config (VM size, requirements, packages, env vars, secrets) changes and the
+    /// user requests immediate node recreation. Rebuilds the semaphore for MaxNodes
+    /// changes and schedules a single replenishment — avoiding the double-replenishment
+    /// that would occur if AdjustPoolAsync were called first.
+    /// </summary>
+    public Task DrainAndReplenishAsync(JobNodePoolConfig config, CancellationToken ct)
+    {
+        EnsurePoolState(config);
+        var poolId = config.Id;
+
+        // Rebuild semaphore for any MaxNodes change (mirrors AdjustPoolAsync).
+        var existingSemaphore = _semaphores[poolId];
+        SemaphoreSlim? newSemaphore = config.MaxNodes.HasValue
+            ? new SemaphoreSlim(config.MaxNodes.Value, config.MaxNodes.Value)
+            : null;
+        if (existingSemaphore is not null || newSemaphore is not null)
+            _semaphores[poolId] = newSemaphore;
+
+        var queue = _available[poolId];
+        while (queue.TryDequeue(out var entry))
+        {
+            var capturedEntry = entry;
+            _ = Task.Run(async () =>
+            {
+                try { await capturedEntry.ReadyTask; } catch { /* ignore */ }
+                try
+                {
+                    await controlPlane.DeleteNodeAsync(capturedEntry.NodeName, CancellationToken.None);
+                    logger.LogInformation(
+                        "WarmPoolManager: drained warm node '{NodeName}' (pool '{PoolName}') for config update",
+                        capturedEntry.NodeName, config.Name);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogWarning(ex,
+                        "WarmPoolManager: failed to delete drained node '{NodeName}' (pool '{PoolName}')",
+                        capturedEntry.NodeName, config.Name);
+                }
+                finally
+                {
+                    _semaphores.GetValueOrDefault(poolId)?.Release();
+                }
+            }, CancellationToken.None);
+        }
+
+        ScheduleReplenishment(config);
+        return Task.CompletedTask;
+    }
+
     // -- Replenishment ---------------------------------------------------------
 
     private void ScheduleReplenishment(JobNodePoolConfig config)
