@@ -793,7 +793,10 @@
             using var reader = new StreamReader(stream);
             var json = await reader.ReadToEndAsync();
             _notebook = NotebookSerializer.Deserialize(json);
-            _notebook.IsDirty = false;
+            _notebook.IsDirty = true;
+            _workspaceNotebookId = null;
+            _workspaceNotebookFolderId = null;
+            _breadcrumbs = [];
         }
         catch (Exception ex)
         {
