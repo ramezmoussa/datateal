@@ -793,10 +793,19 @@
             using var reader = new StreamReader(stream);
             var json = await reader.ReadToEndAsync();
             _notebook = NotebookSerializer.Deserialize(json);
+            // Mark dirty so "Save to workspace" is enabled — a local file has never been saved to the workspace.
+            // Clear all workspace-bound state so the user is prompted to pick a location rather than
+            // silently overwriting whatever notebook was open before. Kernel connection is left intact
+            // because it is independent of which notebook is loaded.
             _notebook.IsDirty = true;
             _workspaceNotebookId = null;
             _workspaceNotebookFolderId = null;
             _breadcrumbs = [];
+            _selectedCatalogNames = [];
+            _error = null;
+            _editingTitle = false;
+            _editingTitleValue = "";
+            _showFolderPicker = false;
         }
         catch (Exception ex)
         {
