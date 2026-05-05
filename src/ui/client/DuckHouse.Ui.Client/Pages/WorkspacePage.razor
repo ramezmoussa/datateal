@@ -431,9 +431,9 @@ else
         {
             _items = [
                 .._listing.Folders.Select(f => new WorkspacePageItem(f, null))
-                                  .OrderBy(x => x.Name, StringComparer.OrdinalIgnoreCase),
+                                  .OrderBy(x => x.Name, NaturalSortComparer.OrdinalIgnoreCase),
                 .._listing.Items.Select(i => new WorkspacePageItem(null, i))
-                                .OrderBy(x => x.Name, StringComparer.OrdinalIgnoreCase),
+                                .OrderBy(x => x.Name, NaturalSortComparer.OrdinalIgnoreCase),
             ];
             _loading = false;
         }
