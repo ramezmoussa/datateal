@@ -62,10 +62,8 @@ Interactive node pools are a class of `NodePoolConfig` with `PoolType = "Interac
 | `WorkspacePage.razor` | `/workspace` | Workspace browser |
 | `NotebookPage.razor` | `/notebook` | Polyglot notebook editor |
 | `QueryPage.razor` | `/query` | SQL query editor with results panel |
-| `Nodes.razor` | `/nodes` | Active nodes monitoring (admin view; no create/stop/start) |
-| `NodePoolsPage.razor` | `/node-pools` | Node pool config management; separate tabs for Interactive and Job pools |
+| `NodePoolsPage.razor` | `/node-pools` | Node pool config management; tabs for Interactive, Job, and Active nodes |
 | `Kernels.razor` | `/nodes/{name}/kernels` | Kernel management per node |
-| `KernelSession.razor` | `/nodes/{name}/kernels/{id}` | Interactive kernel REPL |
 | `Settings.razor` | `/settings` | Theme settings |
 
 ## Styling

@@ -61,12 +61,6 @@
             <span>Node pools</span>
         </MenuItem>
     </AuthorizeView>
-    <AuthorizeView Policy="@AuthPolicy.NodePoolOperate">
-        <MenuItem Key="nodes" RouterLink="/nodes" RouterMatch="NavLinkMatch.Prefix">
-            <Icon Type="@IconType.Outline.CloudServer" />
-            <span>Active nodes</span>
-        </MenuItem>
-    </AuthorizeView>
     <AuthorizeView Policy="@AuthPolicy.EnvironmentManage">
         <MenuItem Key="environment" RouterLink="/environment" RouterMatch="NavLinkMatch.Prefix">
             <Icon Type="@IconType.Outline.Tool" />
@@ -196,7 +190,7 @@
         _selectedKeys = path switch
         {
             "" or "/" => ["home"],
-            _ when path.StartsWith("/nodes") => ["nodes"],
+            _ when path.StartsWith("/nodes") => ["node-pools"],
             _ when path.StartsWith("/workspace") => ["notebook"],
             _ when path.StartsWith("/notebook") => ["notebook"],
             _ when path.StartsWith("/query") => ["notebook"],

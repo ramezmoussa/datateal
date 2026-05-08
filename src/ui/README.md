@@ -215,10 +215,8 @@ Backend services authenticate each other with API keys, not user tokens:
 | `WorkspacePage.razor` | `/workspace`                  | `WorkspaceRead`   | Workspace browser: create, rename, move, clone, delete notebooks and queries              |
 | `NotebookPage.razor`  | `/notebook`, `/notebook/{id}` | `WorkspaceRead`   | Polyglot notebook editor; kernel toolbar requires `NodePoolOperate`                       |
 | `QueryPage.razor`     | `/query`, `/query/{id}`       | `WorkspaceRead`   | SQL editor with results panel; kernel toolbar requires `NodePoolOperate`                  |
-| `NodePoolsPage.razor` | `/node-pools`                 | `NodePoolOperate` | Node pool config management; edit/delete require `NodePoolManage`                         |
-| `Nodes.razor`         | `/nodes`                      | `NodePoolOperate` | Active nodes monitoring                                                                   |
+| `NodePoolsPage.razor` | `/node-pools`                 | `NodePoolOperate` | Node pool config management; Interactive and Job pool tabs; Active nodes tab; edit/delete require `NodePoolManage` |
 | `Kernels.razor`       | `/nodes/{name}/kernels`       | `NodePoolOperate` | Kernel management per node                                                                |
-| `KernelSession.razor` | `/nodes/{name}/kernels/{id}`  | `NodePoolOperate` | Interactive kernel REPL                                                                   |
 | `CatalogsPage.razor`  | `/catalogs`                   | Authenticated     | DuckLake catalog management; create/edit/delete require `CatalogManage`                   |
 | `JobsPage.razor`      | `/jobs`                       | `JobRead`         | Job list; create/delete require `JobManage`, run requires `JobOperate`                    |
 | `JobEditorPage.razor` | `/jobs/{id}`                  | `JobRead`         | Job editor; save/task/param/schedule edits require `JobManage`, run requires `JobOperate` |

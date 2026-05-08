@@ -3,12 +3,11 @@
 
 @using DuckHouse.Core.Kernels
 @inject IKernelService KernelService
-@inject NavigationManager Navigation
 
 <PageTitle>Kernels — DuckHouse</PageTitle>
 
 <Breadcrumb Style="margin-bottom: 12px;">
-    <BreadcrumbItem Href="/nodes">Nodes</BreadcrumbItem>
+    <BreadcrumbItem Href="/node-pools">Node pools</BreadcrumbItem>
     <BreadcrumbItem>@Name — Kernels</BreadcrumbItem>
 </Breadcrumb>
 
@@ -76,13 +75,6 @@ else
                 var isDead = context.Status == KernelStatus.Dead;
             }
             <Space>
-                <SpaceItem>
-                    <Button Size="ButtonSize.Small" Disabled="@isDead"
-                            Icon="@IconType.Outline.Export"
-                            OnClick="@(() => Navigation.NavigateTo($"nodes/{Name}/kernels/{id}"))">
-                        Open
-                    </Button>
-                </SpaceItem>
                 @if (!isDead)
                 {
                     <SpaceItem>

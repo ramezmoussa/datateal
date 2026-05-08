@@ -14,6 +14,7 @@
 @inject IWheelPackageService WheelPackageService
 @inject IEnvironmentService EnvironmentService
 @inject IJSRuntime JS
+@inject NavigationManager Navigation
 
 <PageTitle>Node Pools — DuckHouse</PageTitle>
 <NavigationLock ConfirmExternalNavigation="@_showDrawer"
@@ -248,6 +249,80 @@
             }
         </Spin>
     </TabPane>
+    <TabPane Key="active-nodes" Tab="Active nodes">
+        <Flex Align="FlexAlign.Center" Justify="FlexJustify.End" Style="margin-bottom: 12px;">
+            <Space Size="SpaceSize.Small">
+                <SpaceItem>
+                    <Button OnClick="LoadNodesAsync"
+                            Disabled="@(_nodesLoading || _nodesTabBusy is not null)"
+                            Icon="@IconType.Outline.Reload">
+                        Refresh
+                    </Button>
+                </SpaceItem>
+            </Space>
+        </Flex>
+        @if (_nodesLoading)
+        {
+            <Flex Justify="@("center")" Style="padding: 40px 0;">
+                <Spin />
+            </Flex>
+        }
+        else if (_nodesList.Count == 0)
+        {
+            <p><Text Type="TextElementType.Secondary">No active nodes.</Text></p>
+        }
+        else
+        {
+            <Table TItem="NodeInfo" DataSource="@_nodesList" Bordered PageSize="int.MaxValue" PaginationPosition="none">
+                <PropertyColumn Property="n => n.Name" Title="Name">
+                    <span style="font-weight: 600;">@context.Name</span>
+                </PropertyColumn>
+                <PropertyColumn Property="n => n.State" Title="State">
+                    <Tag Color="@NodeStateTagColor(context.State)">@context.State</Tag>
+                </PropertyColumn>
+                <PropertyColumn Property="n => n.VmSize" Title="VM size">
+                    <Text Type="TextElementType.Secondary" Style="font-size: 0.875rem;">@(context.VmSize ?? "—")</Text>
+                </PropertyColumn>
+                <PropertyColumn Property="n => n.KernelIdleTimeout" Title="Kernel idle">
+                    <Text Type="TextElementType.Secondary" Style="font-size: 0.875rem;">@FormatDuration(context.KernelIdleTimeout)</Text>
+                </PropertyColumn>
+                <PropertyColumn Property="n => n.NodeIdleTimeout" Title="Node idle">
+                    <Text Type="TextElementType.Secondary" Style="font-size: 0.875rem;">@FormatDuration(context.NodeIdleTimeout)</Text>
+                </PropertyColumn>
+                <ActionColumn Title="Actions">
+                    <Space>
+                        <SpaceItem>
+                            <Button Size="ButtonSize.Small"
+                                    Disabled="@(context.State != NodeState.Running)"
+                                    Icon="@IconType.Outline.Interaction"
+                                    OnClick="@(() => Navigation.NavigateTo($"nodes/{context.Name}/kernels"))">
+                                Kernels
+                            </Button>
+                        </SpaceItem>
+                        @{
+                            var nodeName = context.Name;
+                            var nodeBusy = _nodesTabBusy == nodeName;
+                        }
+                        <SpaceItem>
+                            <Popconfirm Title="@($"Are you sure you want to remove '{context.Name}'?")"
+                                        OkText="Remove"
+                                        CancelText="Cancel"
+                                        OkType="ButtonType.Primary"
+                                        OkButtonProps="new ButtonProps { Danger = true }"
+                                        OnConfirm="@(() => RemoveNodeAsync(context.Name))">
+                                <Button Size="ButtonSize.Small" Danger Type="ButtonType.Primary"
+                                        Loading="@nodeBusy"
+                                        Disabled="@(nodeBusy || (_nodesTabBusy is not null && _nodesTabBusy != nodeName))"
+                                        Icon="@IconType.Outline.Delete">
+                                    Remove...
+                                </Button>
+                            </Popconfirm>
+                        </SpaceItem>
+                    </Space>
+                </ActionColumn>
+            </Table>
+        }
+    </TabPane>
 </Tabs>
 
 <Drawer Closable="true" @bind-Visible="_showDrawer" Placement="DrawerPlacement.Right"
@@ -398,6 +473,11 @@
     private string? _busyNode;
     private string? _startingPool;
 
+    // Active nodes tab state
+    private List<NodeInfo> _nodesList = [];
+    private bool _nodesLoading = true;
+    private string? _nodesTabBusy;
+
     private List<NodePoolConfigDto> _jobPools => _jobAndInteractivePools
         .Where(p => p.PoolType == NodePoolType.Job).ToList();
 
@@ -443,7 +523,7 @@
 
     protected override async Task OnInitializedAsync()
     {
-        await Task.WhenAll(LoadAsync(), LoadPackagesAsync(), LoadEnvVarsAsync(), LoadSecretsAsync());
+        await Task.WhenAll(LoadAsync(), LoadPackagesAsync(), LoadEnvVarsAsync(), LoadSecretsAsync(), LoadNodesAsync());
     }
 
     private async Task LoadPackagesAsync()
@@ -693,6 +773,55 @@
         {
             _busyNode = null;
         }
+    }
+
+    private async Task LoadNodesAsync()
+    {
+        _nodesLoading = true;
+        try
+        {
+            _nodesList = [.. await NodeService.GetNodesAsync()];
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to load nodes: {ex.Message}";
+        }
+        finally
+        {
+            _nodesLoading = false;
+        }
+    }
+
+    private async Task RemoveNodeAsync(string name)
+    {
+        _nodesTabBusy = name;
+        _error = null;
+        try
+        {
+            await NodeService.RemoveNodeAsync(name);
+            _nodesList.RemoveAll(n => n.Name == name);
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to remove node '{name}': {ex.Message}";
+        }
+        finally
+        {
+            _nodesTabBusy = null;
+        }
+    }
+
+    private static string FormatDuration(TimeSpan? ts)
+    {
+        if (ts is null) return "—";
+        var t = ts.Value;
+        if (t.TotalHours >= 1)
+        {
+            var h = (int)t.TotalHours;
+            var m = t.Minutes;
+            return m > 0 ? $"{h} h {m} min" : $"{h} h";
+        }
+        return $"{(int)t.TotalMinutes} min";
     }
 
     private static string NodeStateTagColor(NodeState state) => state switch
