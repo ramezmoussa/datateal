@@ -38,6 +38,8 @@ builder.Services.AddScoped<IClaimsTransformation, AppClaimsTransformation>();
 builder.Services.AddApplicationServices();
 builder.Services.AddInfrastructureServices(builder.Configuration);
 
+builder.Services.AddSignalR();
+
 builder.Services.Configure<CatalogSettings>(builder.Configuration.GetSection("Catalogs"));
 
 builder.Services.AddDataProtection()
@@ -88,5 +90,6 @@ app.MapRazorComponents<App>()
 	.AddAdditionalAssemblies(typeof(DuckHouse.Ui.Client._Imports).Assembly);
 
 app.MapDefaultEndpoints();
+app.MapHub<DuckHouse.Ui.Server.Hubs.AiAssistantHub>("/ai/hub");
 
 app.Run();

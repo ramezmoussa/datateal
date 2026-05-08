@@ -32,5 +32,8 @@ builder.Services.AddHttpClient<IUserService, UserService>(
 
 builder.Services.AddScoped<IThemeService, ThemeService>();
 builder.Services.AddScoped<IRecentItemsService, RecentItemsService>();
+builder.Services.AddScoped<IAiAssistantService, AiAssistantService>();
+builder.Services.AddScoped<IAiCredentialService, AiCredentialService>();
+builder.Services.AddScoped<IAiSettingsService, AiSettingsService>();
 
 await builder.Build().RunAsync();

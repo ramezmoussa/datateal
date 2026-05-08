@@ -18,6 +18,7 @@
         <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Authentication" />
         <PackageReference Include="AntDesign" />
         <PackageReference Include="Microsoft.Extensions.Http" />
+        <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" />
         <PackageReference Include="Quartz" />
     </ItemGroup>
 

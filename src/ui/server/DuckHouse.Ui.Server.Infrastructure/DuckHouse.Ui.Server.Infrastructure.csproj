@@ -10,11 +10,16 @@
     <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
     <PackageReference Include="Microsoft.Extensions.Http" />
+    <PackageReference Include="Microsoft.Extensions.AI" />
+    <PackageReference Include="Microsoft.Extensions.AI.OpenAI" />
+    <PackageReference Include="Azure.AI.OpenAI" />
     <PackageReference Include="Npgsql" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\DuckHouse.Ui.Server.Core\DuckHouse.Ui.Server.Core.csproj" />
+    <ProjectReference Include="..\DuckHouse.Ui.Server.Application\DuckHouse.Ui.Server.Application.csproj" />
+    <ProjectReference Include="..\..\DuckHouse.Ui.Shared\DuckHouse.Ui.Shared.csproj" />
     <ProjectReference Include="..\..\..\shared\DuckHouse.Auth\DuckHouse.Auth.csproj" />
     <ProjectReference Include="..\..\..\shared\DuckHouse.Data\DuckHouse.Data.csproj" />
   </ItemGroup>

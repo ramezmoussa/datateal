@@ -138,6 +138,14 @@
                     </Button>
                 </SpaceItem>
                 <SpaceItem>
+                    <Tooltip Title="Open AI assistant for this notebook">
+                        <Button Icon="@IconType.Outline.Robot"
+                                OnClick="OpenNotebookAiPanel">
+                            AI
+                        </Button>
+                    </Tooltip>
+                </SpaceItem>
+                <SpaceItem>
                     <AuthorizeView Policy="@AuthPolicy.NodePoolOperate">
                         <NodePoolSelector Pools="@_pools"
                                           PoolName="@_poolName"
@@ -210,7 +218,8 @@
                             AlwaysConsumeMouseWheel="false"
                             OnToggleParameters="@(() => ToggleParameterCell(cell))"
                             OnInsertPythonCellBelow="@(() => AddCell(index + 1, NotebookCellType.Code, NotebookCellLanguage.Python, "display(_sqldf)"))"
-                            OnInsertSqlCellBelow="@(() => AddCell(index + 1, NotebookCellType.Code, NotebookCellLanguage.Sql, "FROM _sqldf"))" />
+                            OnInsertSqlCellBelow="@(() => AddCell(index + 1, NotebookCellType.Code, NotebookCellLanguage.Sql, "FROM _sqldf"))"
+                            OnOpenCellAi="@(() => OpenCellAiPanel(index, cell))" />
             </div>
             <AddCellBar @key="@($"add-{cell.Id}")" OnAddPython="() => AddCell(index + 1, NotebookCellType.Code, NotebookCellLanguage.Python)"
                         OnAddSql="() => AddCell(index + 1, NotebookCellType.Code, NotebookCellLanguage.Sql)"
@@ -234,6 +243,15 @@
                         OkText="@("Save here")"
                         OnConfirm="ConfirmSaveToFolderAsync"
                         OnCancel="@(() => _showFolderPicker = false)" />
+
+        <AiChatPanel Visible="_aiPanelVisible"
+                     VisibleChanged="@(v => _aiPanelVisible = v)"
+                     ContextType="_aiContextType"
+                     ContextLabel="_aiContextLabel"
+                     CatalogIds="@AiCatalogIds"
+                     GetNotebookJson="@(() => NotebookSerializer.Serialize(_notebook))"
+                     GetFocusedCellIndex="@(() => _aiFocusedCellIndex)"
+                     OnApplyCode="ApplyAiCodeAsync" />
 
         }@* end else (not loading) *@
 
@@ -271,6 +289,15 @@
     private IReadOnlyList<CatalogDto> _allCatalogs = [];
     private IEnumerable<string> _selectedCatalogNames = [];
     private CatalogSession _catalog = default!;
+
+    // AI assistant
+    private bool _aiPanelVisible;
+    private AiContextType _aiContextType = AiContextType.NotebookCell;
+    private string? _aiContextLabel;
+    private int _aiFocusedCellIndex = -1;
+    private NotebookCell? _aiFocusedCell;
+    private IReadOnlyList<Guid> AiCatalogIds =>
+        _allCatalogs.Where(c => _selectedCatalogNames.Contains(c.Name)).Select(c => c.Id).ToList();
 
     private bool _isLoading;
     private bool HasKernel => !string.IsNullOrEmpty(_kernelId);
@@ -743,6 +770,40 @@
         if (target < 0 || target >= _notebook.Cells.Count) return;
         (_notebook.Cells[index], _notebook.Cells[target]) = (_notebook.Cells[target], _notebook.Cells[index]);
         _notebook.IsDirty = true;
+    }
+
+    // ── AI assistant ───────────────────────────────────────────────────
+
+    private void OpenNotebookAiPanel()
+    {
+        _aiContextType = AiContextType.Notebook;
+        _aiFocusedCellIndex = -1;
+        _aiFocusedCell = null;
+        _aiContextLabel = "Notebook";
+        _aiPanelVisible = true;
+    }
+
+    private void OpenCellAiPanel(int index, NotebookCell cell)
+    {
+        _aiContextType = AiContextType.NotebookCell;
+        _aiFocusedCellIndex = index;
+        _aiFocusedCell = cell;
+        var langLabel = cell.CellType == NotebookCellType.Markdown
+            ? "Markdown"
+            : cell.Language == NotebookCellLanguage.Sql ? "SQL" : "Python";
+        _aiContextLabel = $"Cell {index + 1} ({langLabel})";
+        _aiPanelVisible = true;
+    }
+
+    private Task ApplyAiCodeAsync(string code)
+    {
+        if (_aiFocusedCell is not null)
+        {
+            _aiFocusedCell.Source = code;
+            _notebook.IsDirty = true;
+            StateHasChanged();
+        }
+        return Task.CompletedTask;
     }
 
     private async Task<string> PriorContextForAsync(int cellIndex)

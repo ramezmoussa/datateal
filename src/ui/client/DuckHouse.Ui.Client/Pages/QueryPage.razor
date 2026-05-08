@@ -175,6 +175,15 @@
                                     </Tooltip>
                                 </AuthorizeView>
                             </SpaceItem>
+                            <SpaceItem>
+                                <Tooltip Title="Ask AI about this query">
+                                    <Button Size="ButtonSize.Small"
+                                            Icon="@IconType.Outline.Robot"
+                                            OnClick="@(() => _aiPanelVisible = true)">
+                                        AI
+                                    </Button>
+                                </Tooltip>
+                            </SpaceItem>
                         }
                     </Space>
                 </Flex>
@@ -251,6 +260,14 @@
                    OnConfirm="ConfirmSaveToFolderAsync"
                    OnCancel="@(() => _showFolderPicker = false)" />
 
+<AiChatPanel Visible="_aiPanelVisible"
+             VisibleChanged="@(v => _aiPanelVisible = v)"
+             ContextType="AiContextType.Query"
+             ContextLabel="SQL Query"
+             CatalogIds="@AiCatalogIds"
+             GetQueryContent="@(() => _sql)"
+             OnApplyCode="@(code => { _sql = code; _isDirty = true; StateHasChanged(); return Task.CompletedTask; })" />
+
 @code {
     [Parameter] public Guid Id { get; set; }
     [CascadingParameter] private Task<AuthenticationState>? AuthenticationStateTask { get; set; }
@@ -296,6 +313,11 @@
     private IReadOnlyList<CatalogDto> _allCatalogs = [];
     private IEnumerable<string> _selectedCatalogNames = [];
     private CatalogSession _catalog = default!;
+
+    // AI assistant
+    private bool _aiPanelVisible;
+    private IReadOnlyList<Guid> AiCatalogIds =>
+        _allCatalogs.Where(c => _selectedCatalogNames.Contains(c.Name)).Select(c => c.Id).ToList();
 
     private bool _isLoading;
     private bool _splitterInitialized;

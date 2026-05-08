@@ -189,6 +189,13 @@
                             OnClick="OnDelete" />
                 </Tooltip>
             </SpaceItem>
+            <SpaceItem>
+                <Tooltip Title="Ask AI about this cell">
+                    <Button Size="ButtonSize.Small"
+                            Icon="@IconType.Outline.Robot"
+                            OnClick="OnOpenCellAi" />
+                </Tooltip>
+            </SpaceItem>
         </Space>
     </div>
 
@@ -377,6 +384,7 @@
     [Parameter] public EventCallback OnToggleParameters { get; set; }
     [Parameter] public EventCallback OnInsertPythonCellBelow { get; set; }
     [Parameter] public EventCallback OnInsertSqlCellBelow { get; set; }
+    [Parameter] public EventCallback OnOpenCellAi { get; set; }
     [Parameter] public bool AlwaysConsumeMouseWheel { get; set; } = true;
 
     // Change-tracking fields for ShouldRender

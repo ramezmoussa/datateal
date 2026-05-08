@@ -17,6 +17,8 @@
         <ProjectReference Include="..\..\..\shared\DuckHouse.Auth.EntraId\DuckHouse.Auth.EntraId.csproj" />
         <ProjectReference Include="..\..\..\shared\DuckHouse.Data\DuckHouse.Data.csproj" />
         <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" />
+        <PackageReference Include="Microsoft.Extensions.AI" />
+        <PackageReference Include="Microsoft.Extensions.AI.OpenAI" />
         <PackageReference Include="Aspire.Npgsql.EntityFrameworkCore.PostgreSQL" />
         <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>

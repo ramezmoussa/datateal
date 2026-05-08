@@ -1,6 +1,8 @@
 using DuckHouse.Auth.ApiKey;
+using DuckHouse.Ui.Server.Application.Ai;
 using DuckHouse.Ui.Server.Core.Catalogs;
 using DuckHouse.Ui.Server.Core.Repositories;
+using DuckHouse.Ui.Server.Infrastructure.Ai;
 using DuckHouse.Ui.Server.Infrastructure.Catalogs;
 using DuckHouse.Ui.Server.Infrastructure.Data;
 using DuckHouse.Ui.Server.Infrastructure.Repositories;
@@ -38,5 +40,6 @@ public static class ServiceExtensions
         services.AddScoped<ICatalogMetadataService, CatalogMetadataService>();
         services.AddScoped<IInteractivePoolRepository, InteractivePoolRepository>();
         services.AddScoped<IUserRepository, UserRepository>();
+        services.AddSingleton<IAiProviderFactory, AiProviderFactory>();
     }
 }
