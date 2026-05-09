@@ -483,6 +483,14 @@
     private static readonly int KernelCreateMaxRetries = 6;
     private static readonly TimeSpan KernelCreateRetryInterval = TimeSpan.FromSeconds(5);
 
+    private static TimeSpan GetPollDelay(int attempt) => attempt switch
+    {
+        0 => TimeSpan.FromMilliseconds(100),
+        1 => TimeSpan.FromMilliseconds(300),
+        2 => TimeSpan.FromMilliseconds(600),
+        _ => TimeSpan.FromMilliseconds(1000),
+    };
+
     private async Task<KernelInfo> CreateKernelWithRetryAsync(string nodeName, CancellationToken ct = default)
     {
         HttpRequestException? lastEx = null;
@@ -618,9 +626,10 @@
             cell.ExecutionId = handle.ExecutionId;
 
             PollExecutionResponse poll;
+            var pollAttempt = 0;
             do
             {
-                await Task.Delay(1000);
+                await Task.Delay(GetPollDelay(pollAttempt++));
                 poll = await KernelService.PollExecutionAsync(_nodeName, _kernelId!, handle.ExecutionId);
                 StateHasChanged();
             } while (!poll.IsComplete);

@@ -335,9 +335,9 @@ public class TaskExecutor(
     {
         var handle = await controlPlane.StartExecuteAsync(nodeName, kernelId, code, ct: ct);
 
-        while (true)
+        for (var attempt = 0; ; attempt++)
         {
-            await Task.Delay(TimeSpan.FromSeconds(1), ct);
+            await Task.Delay(GetPollDelay(attempt), ct);
             var poll = await controlPlane.PollExecutionAsync(nodeName, kernelId, handle.ExecutionId, ct);
             if (poll.IsComplete)
                 return poll.Result!;
@@ -345,6 +345,14 @@ public class TaskExecutor(
     }
 
     // ── Notebook parsing ────────────────────────────────────────────
+
+    private static TimeSpan GetPollDelay(int attempt) => attempt switch
+    {
+        0 => TimeSpan.FromMilliseconds(100),
+        1 => TimeSpan.FromMilliseconds(300),
+        2 => TimeSpan.FromMilliseconds(600),
+        _ => TimeSpan.FromMilliseconds(1000),
+    };
 
     internal record CellInfo(string Source, string Type, string Language, IReadOnlyList<string> Tags);
 
