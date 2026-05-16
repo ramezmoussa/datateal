@@ -101,9 +101,8 @@ public class ContextAssembler(
 
     private static string? BuildContextPreamble(AiChatRequest request)
     {
-        if (request.Messages.Count > 0)
-            return null; // Preamble already included in first turn — don't repeat
-
+        // Always prepend context so the AI has the latest notebook/query content,
+        // even on subsequent turns as edits are made during the conversation.
         return request.ContextType switch
         {
             AiContextType.NotebookCell => BuildNotebookCellPreamble(request),

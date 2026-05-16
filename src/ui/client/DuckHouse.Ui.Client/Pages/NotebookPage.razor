@@ -247,7 +247,7 @@
         <AiChatPanel Visible="_aiPanelVisible"
                      VisibleChanged="@(v => _aiPanelVisible = v)"
                      ContextType="_aiContextType"
-                     ContextLabel="_aiContextLabel"
+                     ContextLabel="@_aiContextLabel"
                      CatalogIds="@AiCatalogIds"
                      GetNotebookJson="@(() => NotebookSerializer.Serialize(_notebook))"
                      GetFocusedCellIndex="@(() => _aiFocusedCellIndex)"
