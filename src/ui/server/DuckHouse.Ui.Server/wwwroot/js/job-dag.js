@@ -4,10 +4,28 @@
 (function () {
     var _instances = {};
 
+    function escSvg(str) {
+        return String(str || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    function truncEnd(str, max) {
+        if (!str || str.length <= max) return str || '';
+        return str.slice(0, max - 1) + '\u2026';
+    }
+
+    function truncStart(str, max) {
+        if (!str || str.length <= max) return str || '';
+        return '\u2026' + str.slice(-(max - 1));
+    }
+
     function getTypeLabel(taskType) {
         if (taskType === 'SqlQuery') return 'SQL Query';
         if (taskType === 'SubJob') return 'Sub-Job';
-        return taskType;
+        return taskType || '';
     }
 
     function getConditionLabel(condition) {
@@ -18,24 +36,42 @@
         return condition;
     }
 
-    function buildNodeLabel(name, taskType, itemName) {
-        var typeStr = getTypeLabel(taskType);
-        var maxLen = 28;
-        var item = itemName || '';
-        if (item.length > maxLen) {
-            item = '\u2026' + item.slice(-(maxLen - 1));
+    // Builds an SVG data URI used as the node background image.
+    // Three lines when an item path is present (name · path · type),
+    // two lines otherwise (name · type). Text colors vary by theme.
+    function buildNodeBgImage(name, taskType, itemName, isDark) {
+        var nameColor = isDark ? 'rgba(255,255,255,0.85)' : '#262626';
+        var pathColor = isDark ? 'rgba(255,255,255,0.65)' : '#595959';
+        var typeColor = isDark ? 'rgba(255,255,255,0.45)' : '#8c8c8c';
+        var font = 'system-ui,-apple-system,sans-serif';
+
+        var nameText = escSvg(truncEnd(name, 28));
+        var typeText = escSvg(getTypeLabel(taskType));
+        var pathText = itemName ? escSvg(truncStart(itemName, 32)) : '';
+
+        var svg;
+        if (pathText) {
+            svg = '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="62">' +
+                '<text x="10" y="19" text-anchor="start" font-family="' + font + '" font-size="13" font-weight="600" fill="' + nameColor + '">' + nameText + '</text>' +
+                '<text x="10" y="36" text-anchor="start" font-family="' + font + '" font-size="11" fill="' + pathColor + '">' + pathText + '</text>' +
+                '<text x="10" y="52" text-anchor="start" font-family="' + font + '" font-size="10" fill="' + typeColor + '">' + typeText + '</text>' +
+                '</svg>';
+        } else {
+            svg = '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="62">' +
+                '<text x="10" y="23" text-anchor="start" font-family="' + font + '" font-size="13" font-weight="600" fill="' + nameColor + '">' + nameText + '</text>' +
+                '<text x="10" y="43" text-anchor="start" font-family="' + font + '" font-size="10" fill="' + typeColor + '">' + typeText + '</text>' +
+                '</svg>';
         }
-        return item ? name + '\n' + typeStr + ' \u00b7 ' + item : name + '\n' + typeStr;
+        return 'data:image/svg+xml,' + encodeURIComponent(svg);
     }
 
     function getStyle(isDark) {
-        var nodeBg    = isDark ? '#1a1a1a' : '#ffffff';
-        var border    = isDark ? '#434343' : '#d9d9d9';
-        var text      = isDark ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.85)';
-        var subText   = isDark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.55)';
-        var edgeLine  = isDark ? '#595959' : '#bfbfbf';
-        var hoverBg   = isDark ? '#2a2a2a' : '#f0f7ff';
-        var labelBg   = isDark ? '#1a1a1a' : '#ffffff';
+        var nodeBg   = isDark ? '#1a1a1a' : '#ffffff';
+        var border   = isDark ? '#434343' : '#d9d9d9';
+        var subText  = isDark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.55)';
+        var edgeLine = isDark ? '#595959' : '#bfbfbf';
+        var hoverBg  = isDark ? '#2a2a2a' : '#f0f7ff';
+        var labelBg  = isDark ? '#1a1a1a' : '#ffffff';
 
         return [
             {
@@ -47,14 +83,13 @@
                     'background-color': nodeBg,
                     'border-width': 2,
                     'border-color': border,
-                    'label': 'data(label)',
-                    'text-valign': 'center',
-                    'text-halign': 'center',
-                    'font-size': 12,
-                    'color': text,
-                    'text-wrap': 'wrap',
-                    'text-max-width': 180,
-                    'line-height': 1.5,
+                    'label': '',
+                    'background-image': 'data(bgImage)',
+                    'background-fit': 'none',
+                    'background-width': '100%',
+                    'background-height': '100%',
+                    'background-clip': 'node',
+                    'background-image-opacity': 1,
                     'cursor': 'pointer',
                 },
             },
@@ -97,31 +132,19 @@
             },
             {
                 selector: 'edge[condition="OnSuccess"]',
-                style: {
-                    'line-color': '#52c41a',
-                    'target-arrow-color': '#52c41a',
-                },
+                style: { 'line-color': '#52c41a', 'target-arrow-color': '#52c41a' },
             },
             {
                 selector: 'edge[condition="OnFailure"]',
-                style: {
-                    'line-color': '#ff4d4f',
-                    'target-arrow-color': '#ff4d4f',
-                },
+                style: { 'line-color': '#ff4d4f', 'target-arrow-color': '#ff4d4f' },
             },
             {
                 selector: 'edge[condition="OnCompletion"]',
-                style: {
-                    'line-color': edgeLine,
-                    'target-arrow-color': edgeLine,
-                },
+                style: { 'line-color': edgeLine, 'target-arrow-color': edgeLine },
             },
             {
                 selector: 'edge[condition="OnSkip"]',
-                style: {
-                    'line-color': '#fa8c16',
-                    'target-arrow-color': '#fa8c16',
-                },
+                style: { 'line-color': '#fa8c16', 'target-arrow-color': '#fa8c16' },
             },
         ];
     }
@@ -153,22 +176,23 @@
                 }
             });
 
-            _instances[containerId] = { cy: cy, dotNetRef: dotNetRef };
+            _instances[containerId] = { cy: cy, dotNetRef: dotNetRef, isDark: isDark };
         },
 
         update: function (containerId, nodes, edges) {
             var inst = _instances[containerId];
             if (!inst) return;
             var cy = inst.cy;
+            var isDark = inst.isDark || false;
 
-            // Build elements with labels
             var nodeElements = nodes.map(function (n) {
                 return {
                     data: {
                         id: n.name,
                         name: n.name,
                         taskType: n.taskType,
-                        label: buildNodeLabel(n.name, n.taskType, n.itemName),
+                        itemName: n.itemName || '',
+                        bgImage: buildNodeBgImage(n.name, n.taskType, n.itemName, isDark),
                     },
                 };
             });
@@ -205,6 +229,16 @@
         setTheme: function (containerId, isDark) {
             var inst = _instances[containerId];
             if (!inst) return;
+            inst.isDark = isDark;
+            // Regenerate SVG background images for the new color scheme
+            inst.cy.nodes().forEach(function (node) {
+                node.data('bgImage', buildNodeBgImage(
+                    node.data('name'),
+                    node.data('taskType'),
+                    node.data('itemName'),
+                    isDark
+                ));
+            });
             inst.cy.style(getStyle(isDark)).update();
         },
 
