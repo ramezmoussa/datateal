@@ -40,10 +40,26 @@ public interface IWorkspaceRepository
 
     // Queries
     Task<Query?> GetQueryAsync(Guid id, CancellationToken cancellationToken = default);
-    Task<Query> CreateQueryAsync(string title, string content, Guid? folderId, CancellationToken cancellationToken = default);
-    Task<Query?> UpdateQueryAsync(Guid id, string title, string content, Guid? folderId, CancellationToken cancellationToken = default);
+    Task<Query> CreateQueryAsync(
+        string title,
+        string content,
+        Guid? folderId,
+        string? lastResultStatus,
+        double? lastDurationMs,
+        DateTime? lastExecutedAt,
+        string? lastResultJson,
+        CancellationToken cancellationToken = default);
+    Task<Query?> UpdateQueryAsync(
+        Guid id,
+        string title,
+        string content,
+        Guid? folderId,
+        string? lastResultStatus,
+        double? lastDurationMs,
+        DateTime? lastExecutedAt,
+        string? lastResultJson,
+        CancellationToken cancellationToken = default);
     Task<bool> DeleteQueryAsync(Guid id, CancellationToken cancellationToken = default);
-    Task<bool> SaveQueryResultAsync(Guid id, string status, double durationMs, DateTime executedAt, string? resultJson, CancellationToken cancellationToken = default);
 
     // Catalog associations
     Task<bool> UpdateItemCatalogNamesAsync(Guid itemId, List<string>? catalogNames, CancellationToken cancellationToken = default);

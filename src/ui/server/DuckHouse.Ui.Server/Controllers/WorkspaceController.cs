@@ -144,7 +144,7 @@ public class WorkspaceController(IMediator mediator) : ControllerBase
     {
         try
         {
-            var query = await mediator.SendAsync(new Cmd.CreateQueryRequest(body.Title, body.Content, body.FolderId), ct);
+            var query = await mediator.SendAsync(new Cmd.CreateQueryRequest(body.Title, body.Content, body.FolderId, body.LastResult), ct);
             return CreatedAtAction(nameof(GetQuery), new { id = query.Id }, query);
         }
         catch (WorkspaceNameValidationException ex)
@@ -163,7 +163,7 @@ public class WorkspaceController(IMediator mediator) : ControllerBase
     {
         try
         {
-            var query = await mediator.SendAsync(new Cmd.UpdateQueryRequest(id, body.Title, body.Content, body.FolderId), ct);
+            var query = await mediator.SendAsync(new Cmd.UpdateQueryRequest(id, body.Title, body.Content, body.FolderId, body.LastResult), ct);
             return query is null ? NotFound() : Ok(query);
         }
         catch (WorkspaceNameValidationException ex)
@@ -181,15 +181,6 @@ public class WorkspaceController(IMediator mediator) : ControllerBase
     public async Task<IActionResult> DeleteQuery(Guid id, CancellationToken ct)
     {
         var found = await mediator.SendAsync(new Cmd.DeleteQueryRequest(id), ct);
-        return found ? NoContent() : NotFound();
-    }
-
-    [HttpPost("queries/{id:guid}/result")]
-    [Authorize(Policy = AuthPolicy.WorkspaceManage)]
-    public async Task<IActionResult> SaveQueryResult(Guid id, SharedWorkspace.SaveQueryResultRequest body, CancellationToken ct)
-    {
-        var found = await mediator.SendAsync(
-            new Cmd.SaveQueryResultRequest(id, body.Status, body.DurationMs, body.DataFrame, body.Text, body.Error), ct);
         return found ? NoContent() : NotFound();
     }
 

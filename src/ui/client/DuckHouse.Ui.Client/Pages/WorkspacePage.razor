@@ -563,7 +563,7 @@ else
                 var detail = await WorkspaceService.GetQueryAsync(_renameItemTarget.Id);
                 if (detail is not null)
                     await WorkspaceService.UpdateQueryAsync(_renameItemTarget.Id,
-                        new UpdateQueryRequest(title, detail.Content, _renameItemTarget.FolderId));
+                        new UpdateQueryRequest(title, detail.Content, _renameItemTarget.FolderId, detail.LastResult));
             }
             _ = RecentItemsService.UpdateNameAsync(_renameItemTarget.Id, title);
             _renameItemTarget = null;
@@ -597,7 +597,7 @@ else
                 var detail = await WorkspaceService.GetQueryAsync(target.Id);
                 if (detail is not null)
                     await WorkspaceService.UpdateQueryAsync(target.Id,
-                        new UpdateQueryRequest(target.Title, detail.Content, folderId));
+                        new UpdateQueryRequest(target.Title, detail.Content, folderId, detail.LastResult));
             }
             await LoadAsync();
         }
@@ -622,7 +622,7 @@ else
                 var detail = await WorkspaceService.GetQueryAsync(item.Id);
                 if (detail is not null)
                     await WorkspaceService.CreateQueryAsync(
-                        new CreateQueryRequest($"{item.Title} - Copy", detail.Content, item.FolderId));
+                        new CreateQueryRequest($"{item.Title} - Copy", detail.Content, item.FolderId, null));
             }
             await LoadAsync();
         }

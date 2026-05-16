@@ -181,7 +181,15 @@ internal class WorkspaceRepository(DuckHouseDbContext db) : IWorkspaceRepository
     public Task<Query?> GetQueryAsync(Guid id, CancellationToken cancellationToken = default) =>
         db.WorkspaceItems.OfType<Query>().FirstOrDefaultAsync(q => q.Id == id, cancellationToken);
 
-    public async Task<Query> CreateQueryAsync(string title, string content, Guid? folderId, CancellationToken cancellationToken = default)
+    public async Task<Query> CreateQueryAsync(
+        string title,
+        string content,
+        Guid? folderId,
+        string? lastResultStatus,
+        double? lastDurationMs,
+        DateTime? lastExecutedAt,
+        string? lastResultJson,
+        CancellationToken cancellationToken = default)
     {
         var now = DateTime.UtcNow;
         var query = new Query
@@ -192,13 +200,26 @@ internal class WorkspaceRepository(DuckHouseDbContext db) : IWorkspaceRepository
             FolderId = folderId,
             CreatedAt = now,
             UpdatedAt = now,
+            LastResultStatus = lastResultStatus,
+            LastDurationMs = lastDurationMs,
+            LastExecutedAt = lastExecutedAt,
+            LastResultJson = lastResultJson,
         };
         db.WorkspaceItems.Add(query);
         await db.SaveChangesAsync(cancellationToken);
         return query;
     }
 
-    public async Task<Query?> UpdateQueryAsync(Guid id, string title, string content, Guid? folderId, CancellationToken cancellationToken = default)
+    public async Task<Query?> UpdateQueryAsync(
+        Guid id,
+        string title,
+        string content,
+        Guid? folderId,
+        string? lastResultStatus,
+        double? lastDurationMs,
+        DateTime? lastExecutedAt,
+        string? lastResultJson,
+        CancellationToken cancellationToken = default)
     {
         var query = await db.WorkspaceItems.OfType<Query>().FirstOrDefaultAsync(q => q.Id == id, cancellationToken);
         if (query is null) return null;
@@ -207,6 +228,13 @@ internal class WorkspaceRepository(DuckHouseDbContext db) : IWorkspaceRepository
         query.Content = content;
         query.FolderId = folderId;
         query.UpdatedAt = DateTime.UtcNow;
+        if (lastExecutedAt.HasValue)
+        {
+            query.LastResultStatus = lastResultStatus;
+            query.LastDurationMs = lastDurationMs;
+            query.LastExecutedAt = lastExecutedAt;
+            query.LastResultJson = lastResultJson;
+        }
         await db.SaveChangesAsync(cancellationToken);
         return query;
     }
@@ -217,19 +245,6 @@ internal class WorkspaceRepository(DuckHouseDbContext db) : IWorkspaceRepository
         if (query is null) return false;
 
         db.WorkspaceItems.Remove(query);
-        await db.SaveChangesAsync(cancellationToken);
-        return true;
-    }
-
-    public async Task<bool> SaveQueryResultAsync(Guid id, string status, double durationMs, DateTime executedAt, string? resultJson, CancellationToken cancellationToken = default)
-    {
-        var query = await db.WorkspaceItems.OfType<Query>().FirstOrDefaultAsync(q => q.Id == id, cancellationToken);
-        if (query is null) return false;
-
-        query.LastResultStatus = status;
-        query.LastDurationMs = durationMs;
-        query.LastExecutedAt = executedAt;
-        query.LastResultJson = resultJson;
         await db.SaveChangesAsync(cancellationToken);
         return true;
     }

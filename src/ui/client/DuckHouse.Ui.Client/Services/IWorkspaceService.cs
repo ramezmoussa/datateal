@@ -25,5 +25,4 @@ public interface IWorkspaceService
     Task<WorkspaceItemSummary> CreateQueryAsync(CreateQueryRequest request, CancellationToken cancellationToken = default);
     Task<WorkspaceItemSummary?> UpdateQueryAsync(Guid id, UpdateQueryRequest request, CancellationToken cancellationToken = default);
     Task DeleteQueryAsync(Guid id, CancellationToken cancellationToken = default);
-    Task SaveQueryResultAsync(Guid id, SaveQueryResultRequest request, CancellationToken cancellationToken = default);
 }

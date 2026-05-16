@@ -506,7 +506,7 @@
         _showFolderPicker = false;
         try
         {
-            var summary = await WorkspaceService.CreateQueryAsync(new CreateQueryRequest(_title, _sql, folderId));
+            var summary = await WorkspaceService.CreateQueryAsync(new CreateQueryRequest(_title, _sql, folderId, BuildLastResult()));
             _workspaceQueryId = summary.Id;
             _workspaceQueryFolderId = folderId;
 
@@ -541,13 +541,22 @@
         try
         {
             await WorkspaceService.UpdateQueryAsync(_workspaceQueryId.Value,
-                new UpdateQueryRequest(_title, _sql, _workspaceQueryFolderId));
+                new UpdateQueryRequest(_title, _sql, _workspaceQueryFolderId, BuildLastResult()));
             try { await CatalogService.UpdateWorkspaceItemCatalogsAsync(_workspaceQueryId.Value, _selectedCatalogNames.ToList()); }
             catch (Exception ex) { _error = $"Query saved but failed to save catalog selection: {ex.Message}"; }
             _ = RecentItemsService.UpdateNameAsync(_workspaceQueryId.Value, _title);
             _isDirty = false;
         }
         catch (Exception ex) { _error = $"Failed to save query: {ex.Message}"; }
+    }
+
+    private QueryLastResult? BuildLastResult()
+    {
+        if (!_lastExecutedAt.HasValue) return null;
+        var status = _resultError is not null ? "Error"
+            : _resultDf is not null || _resultText is not null ? "Success"
+            : "Empty";
+        return new QueryLastResult(status, _lastExecutedAt.Value, _lastDurationMs ?? 0, _resultDf, _resultText, _resultError);
     }
 
     private void NavigateToWorkspace(Guid? folderId) =>
@@ -776,26 +785,15 @@
             }
 
             _kernel = await KernelService.GetKernelAsync(_nodeName, _kernelId!);
-
-            // Auto-save result to workspace if this query is persisted
-            if (_workspaceQueryId.HasValue)
-            {
-                var status = _resultError is not null ? "Error"
-                    : _resultDf is not null || _resultText is not null ? "Success"
-                    : "Empty";
-                try
-                {
-                    await WorkspaceService.SaveQueryResultAsync(
-                        _workspaceQueryId.Value,
-                        new SaveQueryResultRequest(status, _lastDurationMs ?? 0, _resultDf, _resultText, _resultError));
-                }
-                catch (Exception ex) { _error = $"Result saved locally but failed to persist: {ex.Message}"; }
-            }
         }
-        catch (Exception ex) { _error = $"Execution failed: {ex.Message}"; }
+        catch (Exception ex)
+        {
+            _error = $"Execution failed: {ex.Message}";
+        }
         finally
         {
             _isExecuting = false;
+            _isDirty = true;
             StateHasChanged();
         }
     }

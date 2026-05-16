@@ -125,12 +125,6 @@ internal class WorkspaceService(HttpClient httpClient) : IWorkspaceService
         response.EnsureSuccessStatusCode();
     }
 
-    public async Task SaveQueryResultAsync(Guid id, SaveQueryResultRequest request, CancellationToken cancellationToken = default)
-    {
-        var response = await httpClient.PostAsJsonAsync($"api/workspace/queries/{id}/result", request, JsonOptions, cancellationToken);
-        response.EnsureSuccessStatusCode();
-    }
-
     private static async Task EnsureNotConflictAsync(HttpResponseMessage response, CancellationToken cancellationToken)
     {
         if (response.StatusCode != HttpStatusCode.Conflict) return;
