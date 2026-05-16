@@ -673,3 +673,18 @@ html.ant-dark .ai-sidebar-config {
 html.ant-dark .ai-sidebar-input {
     border-top-color: #434343;
 }
+
+.ai-user-bubble {
+    max-width: 85%;
+    background: #e6f4ff;
+    border-radius: 12px 12px 2px 12px;
+    padding: 8px 12px;
+    font-size: 0.875rem;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+html.ant-dark .ai-user-bubble {
+    background: #111d2c;
+    color: rgba(255, 255, 255, 0.85);
+}
