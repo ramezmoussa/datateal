@@ -161,6 +161,53 @@
         {
             <Alert Type="AlertType.Error" Message="@_error" Closable OnClose="@(() => _error = null)" />
         }
+
+        @* ── Agent proposals panel ── *@
+        @if (_pendingProposals is { Count: > 0 })
+        {
+            var acceptedCount = _pendingProposals.Count(p => p.Accepted);
+            <div class="ai-proposals-panel">
+                <div class="ai-proposals-header">
+                    <span>Proposed Changes (@_pendingProposals.Count cell@(_pendingProposals.Count == 1 ? "" : "s"))</span>
+                    <Space Size="SpaceSize.Small">
+                        <SpaceItem>
+                            <button class="cp-collapse-btn" @onclick="@(() => { foreach (var p in _pendingProposals) p.Accepted = true; })" title="Select all">All</button>
+                        </SpaceItem>
+                        <SpaceItem>
+                            <button class="cp-collapse-btn" @onclick="@(() => { foreach (var p in _pendingProposals) p.Accepted = false; })" title="Deselect all">None</button>
+                        </SpaceItem>
+                    </Space>
+                </div>
+                <div class="ai-proposals-items">
+                @foreach (var entry in _pendingProposals)
+                {
+                    <div class="ai-proposal-item">
+                        <div class="ai-proposal-item-header" @onclick="@(() => entry.Expanded = !entry.Expanded)">
+                            <Checkbox Value="@entry.Accepted" ValueChanged="@(v => entry.Accepted = v)" @onclick:stopPropagation />
+                            <span class="ai-proposal-cell-label">Cell @(entry.Proposal.CellIndex + 1)</span>
+                            <span class="ai-proposal-explanation">@entry.Proposal.Explanation</span>
+                            <Icon Type="@(entry.Expanded ? IconType.Outline.Up : IconType.Outline.Down)" Style="flex-shrink:0; color:#8c8c8c;" />
+                        </div>
+                        @if (entry.Expanded)
+                        {
+                            <div class="ai-proposal-preview">
+                                <pre><code>@entry.Proposal.NewContent</code></pre>
+                            </div>
+                        }
+                    </div>
+                }
+                </div>
+                <div class="ai-proposals-footer">
+                    <Button Size="ButtonSize.Small" OnClick="@(() => _pendingProposals = null)">Discard</Button>
+                    <Button Type="ButtonType.Primary"
+                            Size="ButtonSize.Small"
+                            Disabled="@(acceptedCount == 0)"
+                            OnClick="ApplyProposalsAsync">
+                        Apply @(acceptedCount > 0 ? acceptedCount : "") Accepted
+                    </Button>
+                </div>
+            </div>
+        }
     </div>
 
     @* ── Input area ── *@
@@ -175,7 +222,26 @@
                       OnPressEnter="@OnTextAreaKeyDown"
                       Style="resize: none; margin-bottom: 8px;" />
         </div>
-        <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 8px;">
+            @if (ContextType == AiContextType.Notebook)
+            {
+                <div style="display: flex; align-items: center; gap: 6px;">
+                    <span style="font-size: 0.75rem; color: #8c8c8c; flex-shrink: 0;">Mode:</span>
+                    <Select TItem="string" TItemValue="string"
+                            Value="@(_agentMode ? "Agent" : "Ask")"
+                            ValueChanged="@(v => { _agentMode = v == "Agent"; _pendingProposals = null; })"
+                            Style="width: 90px; font-size: 0.75rem;">
+                        <SelectOptions>
+                            <SelectOption TItemValue="string" TItem="string" Value="@("Ask")" Label="Ask" />
+                            <SelectOption TItemValue="string" TItem="string" Value="@("Agent")" Label="Agent" />
+                        </SelectOptions>
+                    </Select>
+                </div>
+            }
+            else
+            {
+                <span></span>
+            }
             @if (_isStreaming)
             {
                 <Button Icon="@IconType.Outline.Stop" OnClick="CancelAsync">Cancel</Button>
@@ -210,6 +276,8 @@
     [Parameter] public Func<string?>? GetQueryContent { get; set; }
     /// <summary>Called when the user clicks the Apply button on a code block. Receives the code text.</summary>
     [Parameter] public EventCallback<string> OnApplyCode { get; set; }
+    /// <summary>Called in Agent mode when the user accepts proposals. Receives the list of accepted proposals.</summary>
+    [Parameter] public EventCallback<IReadOnlyList<CellProposal>> OnApplyCellChanges { get; set; }
 
     private readonly List<AiChatMessage> _messages = [];
     private string _input = "";
@@ -217,6 +285,17 @@
     private string _streamingText = "";
     private CancellationTokenSource? _streamCts;
     private string? _error;
+
+    // Agent mode state
+    private bool _agentMode;
+    private List<ProposalEntry>? _pendingProposals;
+
+    private sealed class ProposalEntry
+    {
+        public required CellProposal Proposal { get; init; }
+        public bool Accepted { get; set; } = true;
+        public bool Expanded { get; set; }
+    }
 
     private AiProviderType _provider = AiProviderType.AzureOpenAI;
     private string _model = "";
@@ -268,6 +347,7 @@
         _isStreaming = true;
         _streamingText = "";
         _error = null;
+        _pendingProposals = null;
         StateHasChanged();
 
         var apiKey = await AiCredentialService.GetApiKeyAsync(_provider.ToString()) ?? "";
@@ -290,39 +370,81 @@
             NotebookJson: GetNotebookJson?.Invoke(),
             FocusedCellIndex: GetFocusedCellIndex?.Invoke() ?? -1,
             QueryContent: GetQueryContent?.Invoke(),
-            CatalogIds: CatalogIds
+            CatalogIds: CatalogIds,
+            Mode: _agentMode ? AiMode.Agent : AiMode.Ask
         );
 
         _streamCts = new CancellationTokenSource();
 
         try
         {
-            await AiAssistantService.StreamChatAsync(
-                request,
-                onChunk: chunk =>
-                {
-                    _streamingText += chunk;
-                    StateHasChanged();
-                    return Task.CompletedTask;
-                },
-                onComplete: () =>
-                {
-                    _messages.Add(new AiChatMessage("assistant", _streamingText));
-                    _streamingText = "";
-                    _isStreaming = false;
-                    StateHasChanged();
-                    return Task.CompletedTask;
-                },
-                onError: err =>
-                {
-                    _error = err;
-                    _streamingText = "";
-                    _isStreaming = false;
-                    StateHasChanged();
-                    return Task.CompletedTask;
-                },
-                ct: _streamCts.Token
-            );
+            if (_agentMode)
+            {
+                await AiAssistantService.StreamAgentChatAsync(
+                    request,
+                    onChunk: chunk =>
+                    {
+                        _streamingText += chunk;
+                        StateHasChanged();
+                        return Task.CompletedTask;
+                    },
+                    onProposals: proposals =>
+                    {
+                        _pendingProposals = proposals
+                            .Select(p => new ProposalEntry { Proposal = p })
+                            .ToList();
+                        StateHasChanged();
+                        return Task.CompletedTask;
+                    },
+                    onComplete: () =>
+                    {
+                        if (!string.IsNullOrEmpty(_streamingText))
+                            _messages.Add(new AiChatMessage("assistant", _streamingText));
+                        _streamingText = "";
+                        _isStreaming = false;
+                        StateHasChanged();
+                        return Task.CompletedTask;
+                    },
+                    onError: err =>
+                    {
+                        _error = err;
+                        _streamingText = "";
+                        _isStreaming = false;
+                        StateHasChanged();
+                        return Task.CompletedTask;
+                    },
+                    ct: _streamCts.Token
+                );
+            }
+            else
+            {
+                await AiAssistantService.StreamChatAsync(
+                    request,
+                    onChunk: chunk =>
+                    {
+                        _streamingText += chunk;
+                        StateHasChanged();
+                        return Task.CompletedTask;
+                    },
+                    onComplete: () =>
+                    {
+                        _messages.Add(new AiChatMessage("assistant", _streamingText));
+                        _streamingText = "";
+                        _isStreaming = false;
+                        StateHasChanged();
+                        return Task.CompletedTask;
+                    },
+                    onError: err =>
+                    {
+                        _error = err;
+                        _streamingText = "";
+                        _isStreaming = false;
+                        StateHasChanged();
+                        return Task.CompletedTask;
+                    },
+                    ct: _streamCts.Token
+                );
+            }
         }
         catch (OperationCanceledException)
         {
@@ -346,6 +468,19 @@
         }
     }
 
+    private async Task ApplyProposalsAsync()
+    {
+        if (_pendingProposals is null) return;
+        var accepted = _pendingProposals
+            .Where(p => p.Accepted)
+            .Select(p => p.Proposal)
+            .ToList();
+        if (accepted.Count > 0 && OnApplyCellChanges.HasDelegate)
+            await OnApplyCellChanges.InvokeAsync(accepted);
+        _pendingProposals = null;
+        StateHasChanged();
+    }
+
     private async Task CancelAsync()
     {
         if (_streamCts is not null)
@@ -357,6 +492,7 @@
         _messages.Clear();
         _streamingText = "";
         _error = null;
+        _pendingProposals = null;
         return Task.CompletedTask;
     }
 

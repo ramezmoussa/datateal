@@ -133,6 +133,26 @@ public class ContextAssembler(
         if (string.IsNullOrWhiteSpace(request.NotebookJson))
             return null;
 
+        if (request.Mode == AiMode.Agent)
+        {
+            return $"""
+                I'm working in a DuckHouse notebook and need you to act as an agent making bulk edits.
+                Here is the current notebook content (cells are 0-indexed):
+
+                ```json
+                {request.NotebookJson}
+                ```
+
+                For EACH cell you want to modify, call the `propose_cell_edit` tool with:
+                - `cellIndex`: the 0-based index of the cell
+                - `newContent`: the complete replacement content for the cell (not a diff)
+                - `explanation`: a brief one-line description of what was changed
+
+                Do NOT describe changes in text — use the tool for every edit.
+                After all tool calls, write a short summary of what you changed and why.
+                """;
+        }
+
         return $"""
             I'm working in a DuckHouse notebook and would like help with the entire notebook.
             Here is the current notebook content:

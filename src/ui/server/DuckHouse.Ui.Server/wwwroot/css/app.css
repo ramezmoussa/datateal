@@ -743,3 +743,114 @@ html.ant-dark .ai-md-text blockquote {
     border-left-color: #434343;
     color: #8c8c8c;
 }
+
+/* Agent mode proposals panel */
+.ai-proposals-panel {
+    border: 1px solid #d9d9d9;
+    border-radius: 6px;
+    overflow: hidden;
+    margin-top: 8px;
+    display: flex;
+    flex-direction: column;
+    /* cap height so the panel itself scrolls rather than pushing the sidebar taller */
+    max-height: 60vh;
+}
+
+html.ant-dark .ai-proposals-panel {
+    border-color: #434343;
+}
+
+.ai-proposals-items {
+    overflow-y: auto;
+    flex: 1 1 0%;
+}
+
+.ai-proposals-header {    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    background: #fafafa;
+    border-bottom: 1px solid #d9d9d9;
+    font-size: 0.8125rem;
+    font-weight: 600;
+}
+
+html.ant-dark .ai-proposals-header {
+    background: #1f1f1f;
+    border-bottom-color: #434343;
+}
+
+.ai-proposal-item {
+    border-bottom: 1px solid #f0f0f0;
+    padding: 8px 12px;
+    font-size: 0.8125rem;
+}
+
+.ai-proposal-item:last-child {
+    border-bottom: none;
+}
+
+html.ant-dark .ai-proposal-item {
+    border-bottom-color: #2a2a2a;
+}
+
+.ai-proposal-item-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    cursor: pointer;
+    user-select: none;
+}
+
+.ai-proposal-cell-label {
+    font-weight: 600;
+    color: #1677ff;
+    flex-shrink: 0;
+}
+
+html.ant-dark .ai-proposal-cell-label {
+    color: #4096ff;
+}
+
+.ai-proposal-explanation {
+    flex: 1 1 0%;
+    color: #595959;
+    line-height: 1.4;
+}
+
+html.ant-dark .ai-proposal-explanation {
+    color: #8c8c8c;
+}
+
+.ai-proposal-preview {
+    margin-top: 6px;
+    margin-left: 24px;
+    background: #1d1d1d;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.ai-proposal-preview pre {
+    margin: 0;
+    padding: 8px 10px;
+    font-size: 0.75rem;
+    overflow-x: auto;
+    color: #d4d4d4;
+    white-space: pre;
+    word-break: normal;
+    max-height: 200px;
+}
+
+.ai-proposals-footer {
+    padding: 8px 12px;
+    background: #fafafa;
+    border-top: 1px solid #d9d9d9;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+html.ant-dark .ai-proposals-footer {
+    background: #1f1f1f;
+    border-top-color: #434343;
+}

@@ -12,6 +12,7 @@ public static class ServiceExtensions
         {
             services.AddMediator<ScanEntryPoint>();
             services.AddScoped<IAiChatService, AiChatService>();
+            services.AddScoped<IAiAgentService, AiAgentService>();
             services.AddScoped<IContextAssembler, ContextAssembler>();
             return services;
         }

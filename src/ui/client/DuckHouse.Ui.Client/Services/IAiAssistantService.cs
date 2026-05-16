@@ -9,15 +9,22 @@ namespace DuckHouse.Ui.Client.Services;
 public interface IAiAssistantService : IAsyncDisposable
 {
     /// <summary>
-    /// Sends a chat request and streams back tokens via the provided callbacks.
+    /// Sends a chat request (Ask mode) and streams back tokens via the provided callbacks.
     /// </summary>
-    /// <param name="request">The request including provider, API key, messages, and context.</param>
-    /// <param name="onChunk">Called with each streamed text token.</param>
-    /// <param name="onComplete">Called when streaming is complete.</param>
-    /// <param name="onError">Called with an error message if streaming fails.</param>
     Task StreamChatAsync(
         AiChatRequest request,
         Func<string, Task> onChunk,
+        Func<Task> onComplete,
+        Func<string, Task> onError,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// Sends a chat request (Agent mode) and streams back tokens and cell proposals via the provided callbacks.
+    /// </summary>
+    Task StreamAgentChatAsync(
+        AiChatRequest request,
+        Func<string, Task> onChunk,
+        Func<IReadOnlyList<CellProposal>, Task> onProposals,
         Func<Task> onComplete,
         Func<string, Task> onError,
         CancellationToken ct = default);

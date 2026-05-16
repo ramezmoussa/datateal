@@ -10,6 +10,7 @@
 @using DuckHouse.Ui.Shared.Workspace
 @using DuckHouse.Ui.Shared.Catalogs
 @using DuckHouse.Ui.Shared.Nodes
+@using DuckHouse.Ui.Shared.Ai
 @inject IKernelService KernelService
 @inject INodeService NodeService
 @inject IInteractivePoolService InteractivePoolService
@@ -256,7 +257,8 @@
                      CatalogIds="@AiCatalogIds"
                      GetNotebookJson="@(() => NotebookSerializer.Serialize(_notebook))"
                      GetFocusedCellIndex="@(() => _aiFocusedCellIndex)"
-                     OnApplyCode="ApplyAiCodeAsync" />
+                     OnApplyCode="ApplyAiCodeAsync"
+                     OnApplyCellChanges="ApplyAiCellChangesAsync" />
 
         </div>@* end flex row (main content + AI sidebar) *@
 
@@ -810,6 +812,18 @@
             _notebook.IsDirty = true;
             StateHasChanged();
         }
+        return Task.CompletedTask;
+    }
+
+    private Task ApplyAiCellChangesAsync(IReadOnlyList<CellProposal> proposals)
+    {
+        foreach (var proposal in proposals)
+        {
+            if (proposal.CellIndex >= 0 && proposal.CellIndex < _notebook.Cells.Count)
+                _notebook.Cells[proposal.CellIndex].Source = proposal.NewContent;
+        }
+        _notebook.IsDirty = true;
+        StateHasChanged();
         return Task.CompletedTask;
     }
 

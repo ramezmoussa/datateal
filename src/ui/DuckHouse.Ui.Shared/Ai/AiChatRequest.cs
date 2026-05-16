@@ -1,5 +1,14 @@
 namespace DuckHouse.Ui.Shared.Ai;
 
+/// <summary>The AI assistant interaction mode.</summary>
+public enum AiMode
+{
+    /// <summary>Conversational mode — AI suggests code, user applies manually.</summary>
+    Ask,
+    /// <summary>Agentic mode — AI proposes bulk cell edits via tool calls; user reviews before applying.</summary>
+    Agent,
+}
+
 /// <summary>Context type that determines what content the AI is operating on.</summary>
 public enum AiContextType
 {
@@ -13,6 +22,17 @@ public enum AiContextType
 
 /// <summary>A single message in the chat history.</summary>
 public record AiChatMessage(string Role, string Content);
+
+/// <summary>
+/// A proposed change to a notebook cell produced by the AI agent.
+/// </summary>
+public record CellProposal(
+    /// <summary>0-based index of the cell to modify.</summary>
+    int CellIndex,
+    /// <summary>The full new content for the cell (replacement, not diff).</summary>
+    string NewContent,
+    /// <summary>Human-readable explanation of the change.</summary>
+    string Explanation);
 
 /// <summary>
 /// Request to start an AI chat completion stream.
@@ -42,5 +62,7 @@ public record AiChatRequest(
     /// </summary>
     string? QueryContent,
     /// <summary>IDs of catalogs attached to the current workspace item.</summary>
-    IReadOnlyList<Guid> CatalogIds
+    IReadOnlyList<Guid> CatalogIds,
+    /// <summary>The interaction mode. Defaults to Ask.</summary>
+    AiMode Mode = AiMode.Ask
 );
