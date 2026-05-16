@@ -2,10 +2,12 @@
 @attribute [Authorize(Policy = AuthPolicy.JobRead)]
 
 @using DuckHouse.Ui.Shared.Orchestration
+@using DuckHouse.Ui.Shared.Workspace
 @using DuckHouse.Ui.Client.Validation
 @using DuckHouse.Core.Orchestration
 @using System.ComponentModel.DataAnnotations
 @inject IJobService JobService
+@inject IWorkspaceService WorkspaceService
 @inject IRecentItemsService RecentItemsService
 @inject NavigationManager Navigation
 @inject IJSRuntime JS
@@ -94,6 +96,9 @@
 
             <TabPane Key="tasks" Tab="@($"Tasks ({_editTasks.Count})")">
                 <div style="margin-top: 16px;">
+                    <JobDagView Tasks="_editTasks"
+                                ItemNameLookup="_itemNameLookup"
+                                OnEditTaskName="StartEditTaskByName" />
                     <div style="margin-bottom: 8px;">
                         <AuthorizeView Policy="@AuthPolicy.JobManage">
                             <Button Size="@ButtonSize.Small" OnClick="StartAddTask">
@@ -413,6 +418,7 @@
     // Task & parameter mutable state
     private List<EditableTask> _editTasks = [];
     private List<EditableParameter> _editParams = [];
+    private Dictionary<Guid, string> _itemNameLookup = [];
 
     // Task editor state
     private bool _showTaskDrawer;
@@ -489,6 +495,8 @@
                 }).ToList();
 
                 _isDirty = false;
+
+                _itemNameLookup = await BuildItemNameLookupAsync();
 
                 await RefreshRunsAsync();
             }
@@ -706,6 +714,14 @@
         _taskBeingEdited = task;
         _otherTaskNames = _editTasks.Where(t => t != task).Select(t => t.Name).ToList();
         _showTaskDrawer = true;
+    }
+
+    private void StartEditTaskByName(string taskName)
+    {
+        var task = _editTasks.FirstOrDefault(t =>
+            string.Equals(t.Name, taskName, StringComparison.OrdinalIgnoreCase));
+        if (task is not null)
+            StartEditTask(task);
     }
 
     private async Task OnTaskSaved(EditableTask task)
@@ -962,5 +978,46 @@
         var confirmed = await JS.InvokeAsync<bool>("confirm", "You have unsaved changes. Are you sure you want to leave?");
         if (!confirmed)
             ctx.PreventNavigation();
+    }
+
+    // --- Item name lookup for DAG ---
+
+    private async Task<Dictionary<Guid, string>> BuildItemNameLookupAsync()
+    {
+        var lookup = new Dictionary<Guid, string>();
+        try
+        {
+            await LoadWorkspaceItemsAsync(null, "", lookup);
+        }
+        catch { /* Non-critical — DAG falls back to showing no item name */ }
+
+        try
+        {
+            var jobs = await JobService.GetJobsAsync();
+            foreach (var job in jobs)
+                lookup.TryAdd(job.Id, job.Name);
+        }
+        catch { /* Non-critical */ }
+
+        return lookup;
+    }
+
+    private async Task LoadWorkspaceItemsAsync(Guid? folderId, string parentPath, Dictionary<Guid, string> lookup)
+    {
+        var listing = folderId.HasValue
+            ? await WorkspaceService.GetFolderAsync(folderId.Value)
+            : await WorkspaceService.GetRootAsync();
+
+        foreach (var folder in listing.Folders)
+        {
+            var folderPath = string.IsNullOrEmpty(parentPath) ? folder.Name : $"{parentPath}/{folder.Name}";
+            await LoadWorkspaceItemsAsync(folder.Id, folderPath, lookup);
+        }
+
+        foreach (var item in listing.Items)
+        {
+            var itemPath = string.IsNullOrEmpty(parentPath) ? item.Title : $"{parentPath}/{item.Title}";
+            lookup.TryAdd(item.Id, itemPath);
+        }
     }
 }

@@ -1,0 +1,105 @@
+@inject IJSRuntime JS
+@inject IThemeService ThemeService
+@implements IAsyncDisposable
+
+<div style="position: relative;">
+    <div id="@_containerId" class="job-dag-container"></div>
+    @if (Tasks.Count == 0)
+    {
+        <div class="job-dag-empty">No tasks yet</div>
+    }
+</div>
+
+@code {
+    [Parameter] public List<EditableTask> Tasks { get; set; } = [];
+    [Parameter] public Dictionary<Guid, string> ItemNameLookup { get; set; } = [];
+    [Parameter] public EventCallback<string> OnEditTaskName { get; set; }
+
+    private readonly string _containerId = $"dag-{Guid.NewGuid():N}";
+    private DotNetObjectReference<JobDagView>? _selfRef;
+    private bool _initialized;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+
+        _selfRef = DotNetObjectReference.Create(this);
+        var isDark = await JS.InvokeAsync<bool>("dagGraph.isDark");
+        await JS.InvokeVoidAsync("dagGraph.init", _containerId, _selfRef, isDark);
+        _initialized = true;
+        ThemeService.ThemeChanged += OnThemeChanged;
+        await UpdateGraphAsync();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_initialized)
+            await UpdateGraphAsync();
+    }
+
+    [JSInvokable]
+    public async Task OnDagNodeClicked(string taskName)
+    {
+        await OnEditTaskName.InvokeAsync(taskName);
+    }
+
+    private async Task UpdateGraphAsync()
+    {
+        var taskNames = new HashSet<string>(Tasks.Select(t => t.Name), StringComparer.OrdinalIgnoreCase);
+
+        var nodes = Tasks.Select(t => new
+        {
+            name = t.Name,
+            taskType = t.TaskType.ToString(),
+            itemName = ResolveItemName(t),
+        }).ToArray();
+
+        var edges = Tasks
+            .SelectMany(t => t.Dependencies
+                .Where(d => !string.IsNullOrEmpty(d.TaskName) && taskNames.Contains(d.TaskName))
+                .Select(d => new
+                {
+                    source = d.TaskName,
+                    target = t.Name,
+                    condition = d.Condition,
+                }))
+            .ToArray();
+
+        await JS.InvokeVoidAsync("dagGraph.update", _containerId, (object)nodes, (object)edges);
+    }
+
+    private string ResolveItemName(EditableTask task)
+    {
+        if (task.NotebookId.HasValue && ItemNameLookup.TryGetValue(task.NotebookId.Value, out var nb))
+            return nb;
+        if (task.QueryId.HasValue && ItemNameLookup.TryGetValue(task.QueryId.Value, out var q))
+            return q;
+        if (task.SubJobId.HasValue && ItemNameLookup.TryGetValue(task.SubJobId.Value, out var sj))
+            return sj;
+        return "";
+    }
+
+    private void OnThemeChanged()
+    {
+        _ = InvokeAsync(async () =>
+        {
+            try
+            {
+                var isDark = await JS.InvokeAsync<bool>("dagGraph.isDark");
+                await JS.InvokeVoidAsync("dagGraph.setTheme", _containerId, isDark);
+            }
+            catch { /* Component or JS may be disposed */ }
+        });
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        ThemeService.ThemeChanged -= OnThemeChanged;
+        if (_initialized)
+        {
+            try { await JS.InvokeVoidAsync("dagGraph.dispose", _containerId); }
+            catch { /* JS runtime may already be gone */ }
+        }
+        _selfRef?.Dispose();
+    }
+}
