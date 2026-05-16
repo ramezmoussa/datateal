@@ -143,12 +143,12 @@ public class ContextAssembler(
                 {request.NotebookJson}
                 ```
 
-                For EACH cell you want to modify, call the `propose_cell_edit` tool with:
-                - `cellIndex`: the 0-based index of the cell
-                - `newContent`: the complete replacement content for the cell (not a diff)
-                - `explanation`: a brief one-line description of what was changed
+                For EACH change you want to make, call the appropriate tool:
+                - `propose_cell_edit(cellIndex, newContent, explanation)` — replace the full content of an existing cell
+                - `propose_cell_insert(afterCellIndex, language, content, explanation)` — insert a new cell; use afterCellIndex=-1 to insert before the first cell; language must be "python", "sql", or "markdown"; ALL indices refer to the ORIGINAL notebook before any of your proposed changes
+                - `propose_cell_remove(cellIndex, explanation)` — remove an existing cell
 
-                Do NOT describe changes in text — use the tool for every edit.
+                Do NOT describe changes in text — use the tools for every change.
                 After all tool calls, write a short summary of what you changed and why.
                 """;
         }

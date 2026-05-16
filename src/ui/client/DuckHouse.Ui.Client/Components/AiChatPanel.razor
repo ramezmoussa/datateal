@@ -168,7 +168,7 @@
             var acceptedCount = _pendingProposals.Count(p => p.Accepted);
             <div class="ai-proposals-panel">
                 <div class="ai-proposals-header">
-                    <span>Proposed Changes (@_pendingProposals.Count cell@(_pendingProposals.Count == 1 ? "" : "s"))</span>
+                    <span>Proposed Changes (@_pendingProposals.Count change@(_pendingProposals.Count == 1 ? "" : "s"))</span>
                     <Space Size="SpaceSize.Small">
                         <SpaceItem>
                             <button class="cp-collapse-btn" @onclick="@(() => { foreach (var p in _pendingProposals) p.Accepted = true; })" title="Select all">All</button>
@@ -184,11 +184,14 @@
                     <div class="ai-proposal-item">
                         <div class="ai-proposal-item-header" @onclick="@(() => entry.Expanded = !entry.Expanded)">
                             <Checkbox Value="@entry.Accepted" ValueChanged="@(v => entry.Accepted = v)" @onclick:stopPropagation />
-                            <span class="ai-proposal-cell-label">Cell @(entry.Proposal.CellIndex + 1)</span>
+                            <span class="ai-proposal-cell-label">@ProposalLabel(entry.Proposal)</span>
                             <span class="ai-proposal-explanation">@entry.Proposal.Explanation</span>
-                            <Icon Type="@(entry.Expanded ? IconType.Outline.Up : IconType.Outline.Down)" Style="flex-shrink:0; color:#8c8c8c;" />
+                            @if (entry.Proposal.Operation != CellProposalOperation.Remove)
+                            {
+                                <Icon Type="@(entry.Expanded ? IconType.Outline.Up : IconType.Outline.Down)" Style="flex-shrink:0; color:#8c8c8c;" />
+                            }
                         </div>
-                        @if (entry.Expanded)
+                        @if (entry.Expanded && entry.Proposal.Operation != CellProposalOperation.Remove)
                         {
                             <div class="ai-proposal-preview">
                                 <pre><code>@entry.Proposal.NewContent</code></pre>
@@ -506,6 +509,14 @@
         if (e.Key == "Enter" && !e.ShiftKey)
             await SendAsync();
     }
+
+    private static string ProposalLabel(CellProposal p) => p.Operation switch
+    {
+        CellProposalOperation.Insert when p.CellIndex == -1 => $"Insert at start ({p.Language ?? "python"})",
+        CellProposalOperation.Insert => $"Insert after Cell {p.CellIndex + 1} ({p.Language ?? "python"})",
+        CellProposalOperation.Remove => $"Remove Cell {p.CellIndex + 1}",
+        _ => $"Edit Cell {p.CellIndex + 1}",
+    };
 
     private static readonly Regex CodeBlockRegex = new(
         @"```(\w*)\n?([\s\S]*?)```",

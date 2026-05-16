@@ -23,16 +23,35 @@ public enum AiContextType
 /// <summary>A single message in the chat history.</summary>
 public record AiChatMessage(string Role, string Content);
 
+/// <summary>The type of operation the AI agent is proposing for a notebook cell.</summary>
+public enum CellProposalOperation
+{
+    /// <summary>Replace the entire content of an existing cell.</summary>
+    Edit,
+    /// <summary>Insert a new cell after the specified index (-1 = before the first cell).</summary>
+    Insert,
+    /// <summary>Remove the cell at the specified index.</summary>
+    Remove,
+}
+
 /// <summary>
 /// A proposed change to a notebook cell produced by the AI agent.
 /// </summary>
 public record CellProposal(
-    /// <summary>0-based index of the cell to modify.</summary>
+    /// <summary>The type of operation.</summary>
+    CellProposalOperation Operation,
+    /// <summary>
+    /// 0-based cell index.
+    /// For Edit/Remove: the target cell.
+    /// For Insert: the new cell is placed AFTER this index; use -1 to insert before the first cell.
+    /// </summary>
     int CellIndex,
-    /// <summary>The full new content for the cell (replacement, not diff).</summary>
-    string NewContent,
+    /// <summary>Full content for the cell. Used by Edit and Insert; null for Remove.</summary>
+    string? NewContent,
     /// <summary>Human-readable explanation of the change.</summary>
-    string Explanation);
+    string Explanation,
+    /// <summary>Cell language for Insert operations: "python", "sql", or "markdown". Null for Edit/Remove.</summary>
+    string? Language = null);
 
 /// <summary>
 /// Request to start an AI chat completion stream.

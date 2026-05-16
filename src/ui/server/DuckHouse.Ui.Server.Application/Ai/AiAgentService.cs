@@ -23,11 +23,29 @@ public class AiAgentService(IContextAssembler contextAssembler, IAiProviderFacto
         var proposeCellEdit = AIFunctionFactory.Create(
             (int cellIndex, string newContent, string explanation) =>
             {
-                proposals.Add(new CellProposal(cellIndex, newContent, explanation));
-                return $"Proposal for cell {cellIndex} recorded.";
+                proposals.Add(new CellProposal(CellProposalOperation.Edit, cellIndex, newContent, explanation));
+                return $"Edit proposal for cell {cellIndex} recorded.";
             },
             name: "propose_cell_edit",
-            description: "Propose replacing the entire content of a notebook cell. Call this once per cell that needs to be modified.");
+            description: "Propose replacing the entire content of an existing notebook cell. Call once per cell to modify.");
+
+        var proposeCellInsert = AIFunctionFactory.Create(
+            (int afterCellIndex, string language, string content, string explanation) =>
+            {
+                proposals.Add(new CellProposal(CellProposalOperation.Insert, afterCellIndex, content, explanation, language));
+                return $"Insert proposal after cell {afterCellIndex} recorded.";
+            },
+            name: "propose_cell_insert",
+            description: "Propose inserting a new cell into the notebook. afterCellIndex is the 0-based index of the cell the new cell should follow; use -1 to insert before the first cell. language must be 'python', 'sql', or 'markdown'.");
+
+        var proposeCellRemove = AIFunctionFactory.Create(
+            (int cellIndex, string explanation) =>
+            {
+                proposals.Add(new CellProposal(CellProposalOperation.Remove, cellIndex, null, explanation));
+                return $"Remove proposal for cell {cellIndex} recorded.";
+            },
+            name: "propose_cell_remove",
+            description: "Propose removing an existing notebook cell entirely.");
 
         var messages = await contextAssembler.AssembleAsync(request, cancellationToken);
         var baseClient = providerFactory.Create(request.Provider, request.ApiKey, request.Endpoint, request.Model);
@@ -36,7 +54,7 @@ public class AiAgentService(IContextAssembler contextAssembler, IAiProviderFacto
         var options = new ChatOptions
         {
             ModelId = request.Model,
-            Tools = [proposeCellEdit],
+            Tools = [proposeCellEdit, proposeCellInsert, proposeCellRemove],
         };
 
         var responseText = new StringBuilder();

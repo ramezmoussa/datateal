@@ -817,14 +817,66 @@
 
     private Task ApplyAiCellChangesAsync(IReadOnlyList<CellProposal> proposals)
     {
-        foreach (var proposal in proposals)
+        var removed = proposals
+            .Where(p => p.Operation == CellProposalOperation.Remove)
+            .Select(p => p.CellIndex)
+            .ToHashSet();
+
+        var inserts = proposals
+            .Where(p => p.Operation == CellProposalOperation.Insert)
+            .GroupBy(p => p.CellIndex)
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        // Apply edits in-place before rebuilding the list
+        foreach (var p in proposals.Where(p => p.Operation == CellProposalOperation.Edit))
         {
-            if (proposal.CellIndex >= 0 && proposal.CellIndex < _notebook.Cells.Count)
-                _notebook.Cells[proposal.CellIndex].Source = proposal.NewContent;
+            if (p.CellIndex >= 0 && p.CellIndex < _notebook.Cells.Count && p.NewContent is not null)
+                _notebook.Cells[p.CellIndex].Source = p.NewContent;
         }
+
+        // Rebuild the cell list — handles removals and insertions relative to original indices
+        var newCells = new List<NotebookCell>();
+
+        // Inserts before all cells (afterCellIndex == -1)
+        if (inserts.TryGetValue(-1, out var beforeAll))
+            foreach (var p in beforeAll)
+                newCells.Add(CreateCellFromProposal(p));
+
+        for (int i = 0; i < _notebook.Cells.Count; i++)
+        {
+            if (!removed.Contains(i))
+                newCells.Add(_notebook.Cells[i]);
+
+            if (inserts.TryGetValue(i, out var afterThis))
+                foreach (var p in afterThis)
+                    newCells.Add(CreateCellFromProposal(p));
+        }
+
+        // Append any inserts that reference indices beyond the original notebook length
+        // (the AI may use sequential indices when proposing multiple consecutive inserts)
+        foreach (var key in inserts.Keys.Where(k => k >= _notebook.Cells.Count).OrderBy(k => k))
+            foreach (var p in inserts[key])
+                newCells.Add(CreateCellFromProposal(p));
+
+        _notebook.Cells.Clear();
+        _notebook.Cells.AddRange(newCells);
         _notebook.IsDirty = true;
         StateHasChanged();
         return Task.CompletedTask;
+    }
+
+    private static NotebookCell CreateCellFromProposal(CellProposal p)
+    {
+        var (cellType, lang) = p.Language?.ToLowerInvariant() switch
+        {
+            "sql" => (NotebookCellType.Code, NotebookCellLanguage.Sql),
+            "markdown" or "md" => (NotebookCellType.Markdown, NotebookCellLanguage.Python),
+            _ => (NotebookCellType.Code, NotebookCellLanguage.Python),
+        };
+        var cell = new NotebookCell { CellType = cellType, Language = lang, Source = p.NewContent ?? "" };
+        if (cellType == NotebookCellType.Markdown)
+            cell.IsEditingMarkdown = true;
+        return cell;
     }
 
     private async Task<string> PriorContextForAsync(int cellIndex)
