@@ -9,6 +9,7 @@ public record CatalogMetadataEntryDto(
     long? ScopeId);
 
 public record CatalogMetadataDto(
+    string Name,
     IReadOnlyList<SchemaDto> Schemas);
 
 public record SchemaDto(

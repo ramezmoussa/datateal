@@ -63,7 +63,7 @@ public class ContextAssembler(
                 if (metadata is null)
                     continue;
 
-                sb.AppendLine($"### Catalog ID: {catalogId}");
+                sb.AppendLine($"### Catalog name: {metadata.Name}");
                 foreach (var schema in metadata.Schemas)
                 {
                     sb.AppendLine($"#### Schema: {schema.Name}");
@@ -72,7 +72,7 @@ public class ContextAssembler(
                         var tableComment = string.IsNullOrEmpty(table.Comment)
                             ? string.Empty
                             : $" -- {table.Comment}";
-                        sb.AppendLine($"- **{table.Type}** `{schema.Name}.{table.Name}`{tableComment}");
+                        sb.AppendLine($"- **{table.Type}** `{metadata.Name}.{schema.Name}.{table.Name}`{tableComment}");
                         foreach (var col in table.Columns.OrderBy(c => c.OrdinalPosition))
                         {
                             var nullable = col.IsNullable ? "?" : string.Empty;

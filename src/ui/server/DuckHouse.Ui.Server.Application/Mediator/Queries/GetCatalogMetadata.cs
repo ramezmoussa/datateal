@@ -58,6 +58,7 @@ internal class GetCatalogMetadataHandler(
             cancellationToken);
 
         return new CatalogMetadataDto(
+            catalog.Name,
             result.Schemas.Select(s => new SchemaDto(
                 s.Name,
                 s.Tables.Select(t => new TableDto(
