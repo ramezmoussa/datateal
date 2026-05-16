@@ -133,7 +133,7 @@ public class ContextAssembler(
         if (string.IsNullOrWhiteSpace(request.NotebookJson))
             return null;
 
-        if (request.Mode == AiMode.Agent)
+        if (request.Mode == AiMode.Edit)
         {
             return $"""
                 I'm working in a DuckHouse notebook and need you to act as an agent making bulk edits.

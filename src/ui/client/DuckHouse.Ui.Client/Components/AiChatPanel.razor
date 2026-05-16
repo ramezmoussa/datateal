@@ -231,12 +231,12 @@
                 <div style="display: flex; align-items: center; gap: 6px;">
                     <span style="font-size: 0.75rem; color: #8c8c8c; flex-shrink: 0;">Mode:</span>
                     <Select TItem="string" TItemValue="string"
-                            Value="@(_agentMode ? "Agent" : "Ask")"
-                            ValueChanged="@(v => { _agentMode = v == "Agent"; _pendingProposals = null; })"
+                            Value="@(_agentMode ? "Edit" : "Chat")"
+                            ValueChanged="@(v => { _agentMode = v == "Edit"; _pendingProposals = null; })"
                             Style="width: 90px; font-size: 0.75rem;">
                         <SelectOptions>
-                            <SelectOption TItemValue="string" TItem="string" Value="@("Ask")" Label="Ask" />
-                            <SelectOption TItemValue="string" TItem="string" Value="@("Agent")" Label="Agent" />
+                            <SelectOption TItemValue="string" TItem="string" Value="@("Chat")" Label="Chat" />
+                                    <SelectOption TItemValue="string" TItem="string" Value="@("Edit")" Label="Edit" />
                         </SelectOptions>
                     </Select>
                 </div>
@@ -374,7 +374,7 @@
             FocusedCellIndex: GetFocusedCellIndex?.Invoke() ?? -1,
             QueryContent: GetQueryContent?.Invoke(),
             CatalogIds: CatalogIds,
-            Mode: _agentMode ? AiMode.Agent : AiMode.Ask
+            Mode: _agentMode ? AiMode.Edit : AiMode.Chat
         );
 
         _streamCts = new CancellationTokenSource();
