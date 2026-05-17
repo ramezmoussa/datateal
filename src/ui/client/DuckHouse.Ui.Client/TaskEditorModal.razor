@@ -214,8 +214,9 @@
                     var idx = index;
                     <div style="display: flex; gap: 8px; margin-bottom: 8px; align-items: center;">
                         <Select TItem="string" TItemValue="string"
-                                DataSource="@OtherTaskNames"
+                                DataSource="@SortedOtherTaskNames"
                                 @bind-Value="dep.TaskName"
+                                EnableSearch
                                 Style="flex: 1;"
                                 Placeholder="Depends on..." />
                         <Select TItem="string" TItemValue="string" @bind-Value="dep.Condition" Style="width: 140px;">
@@ -249,6 +250,9 @@
     [Parameter] public EventCallback<EditableTask> OnSave { get; set; }
     [Parameter] public List<string> OtherTaskNames { get; set; } = [];
     [Parameter] public Guid CurrentJobId { get; set; }
+
+    private IEnumerable<string> SortedOtherTaskNames =>
+        OtherTaskNames.Order(NaturalSortComparer.OrdinalIgnoreCase);
 
     private bool _isEdit;
     private bool _prevVisible;
@@ -286,6 +290,7 @@
             _jobOptions = jobs
                 .Where(j => j.Id != CurrentJobId)
                 .Select(j => new JobOption(j.Id, j.Name))
+                .OrderBy(j => j.Label, NaturalSortComparer.OrdinalIgnoreCase)
                 .ToList();
         }
         catch { /* Jobs may fail to load */ }

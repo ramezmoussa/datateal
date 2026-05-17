@@ -30,6 +30,7 @@
         try
         {
             await LoadItemsRecursive(null, "");
+            _items.Sort((a, b) => NaturalSortComparer.OrdinalIgnoreCase.Compare(a.Path, b.Path));
         }
         finally
         {
