@@ -171,10 +171,11 @@ html.ant-dark .df-table td {
 }
 
 /* Catalog browser layout (inside Tabs — accounts for tab bar + page header) */
+/* 56px header + 24px content top + ~29px page title row + ~46px tabs nav + 24px content bottom */
 .cb-layout {
     display: flex;
     flex-direction: row;
-    height: calc(100vh - 160px);
+    height: calc(100vh - 200px);
     overflow: hidden;
 }
 
