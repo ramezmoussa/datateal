@@ -1,0 +1,204 @@
+@page "/nodes/{Name}/kernels"
+@attribute [Authorize(Policy = AuthPolicy.NodePoolOperate)]
+
+@using Datateal.Core.Kernels
+@inject IKernelService KernelService
+
+<PageTitle>Kernels — Datateal</PageTitle>
+
+<Breadcrumb Style="margin-bottom: 12px;">
+    <BreadcrumbItem Href="/node-pools">Node pools</BreadcrumbItem>
+    <BreadcrumbItem>@Name — Kernels</BreadcrumbItem>
+</Breadcrumb>
+
+<Flex Justify="FlexJustify.SpaceBetween" Align="FlexAlign.Center" Style="margin-bottom: 24px;">
+    <Space Align="SpaceAlign.End" Size="SpaceSize.Middle">
+        <SpaceItem>
+            <Icon Height="24px" Width="24px" Type="@IconType.Outline.Code" />
+        </SpaceItem>
+        <SpaceItem>
+            <h2 style="margin: 0;">Kernels</h2>
+        </SpaceItem>
+    </Space>
+    <Space>
+        <SpaceItem>
+            <Button OnClick="LoadKernelsAsync" Disabled="@(_loading || _busy is not null)"
+                    Icon="@IconType.Outline.Reload">
+                Refresh
+            </Button>
+        </SpaceItem>
+        <SpaceItem>
+            <Button Type="ButtonType.Primary" Loading="_creating" Disabled="_creating"
+                    Icon="@IconType.Outline.Plus"
+                    OnClick="CreateKernelAsync">
+                New kernel
+            </Button>
+        </SpaceItem>
+    </Space>
+</Flex>
+
+@if (_error is not null)
+{
+    <Alert Type="AlertType.Error" Message="@_error" Closable ShowIcon="true"
+           OnClose="@(() => _error = null)" Style="margin-bottom: 16px;" />
+}
+
+@if (_loading)
+{
+    <Flex Justify="@("center")" Style="padding: 40px 0;">
+        <Spin />
+    </Flex>
+}
+else if (_kernels.Count == 0)
+{
+    <p><Text Type="TextElementType.Secondary">No kernels running on <strong>@Name</strong>. Create one to get started.</Text></p>
+}
+else
+{
+    <Table TItem="KernelInfo" DataSource="@_kernels" Bordered PageSize="int.MaxValue" PaginationPosition="none">
+        <PropertyColumn Property="k => k.Id" Title="ID">
+            <span style="font-family: monospace; font-size: 0.875rem;">@context.Id</span>
+        </PropertyColumn>
+        <PropertyColumn Property="k => k.Status" Title="Status">
+            <Tag Color="@StatusTagColor(context.Status)">@context.Status</Tag>
+        </PropertyColumn>
+        <PropertyColumn Property="k => k.CreatedAt" Title="Created">
+            <Text Type="TextElementType.Secondary" Style="font-size: 0.875rem;">@context.CreatedAt.LocalDateTime.ToString("g")</Text>
+        </PropertyColumn>
+        <PropertyColumn Property="k => k.LastActivity" Title="Last Activity">
+            <Text Type="TextElementType.Secondary" Style="font-size: 0.875rem;">@context.LastActivity.LocalDateTime.ToString("g")</Text>
+        </PropertyColumn>
+        <ActionColumn Title="Actions">
+            @{
+                var id = context.Id;
+                var busy = _busy == id;
+                var isDead = context.Status == KernelStatus.Dead;
+            }
+            <Space>
+                @if (!isDead)
+                {
+                    <SpaceItem>
+                        <Button Size="ButtonSize.Small" Type="ButtonType.Primary"
+                                Loading="@busy" Disabled="@busy"
+                                Icon="@IconType.Outline.Sync"
+                                OnClick="@(() => RestartKernelAsync(id))">
+                            Restart
+                        </Button>
+                    </SpaceItem>
+                }
+                @if (context.Status == KernelStatus.Busy)
+                {
+                    <SpaceItem>
+                        <Button Size="ButtonSize.Small"
+                                Loading="@busy" Disabled="@busy"
+                                Icon="@IconType.Outline.PauseCircle"
+                                OnClick="@(() => InterruptKernelAsync(id))">
+                            Interrupt
+                        </Button>
+                    </SpaceItem>
+                }
+                <SpaceItem>
+                    <Popconfirm Title="@($"Are you sure you want to delete kernel '{id}'?")"
+                                OkText="Delete"
+                                CancelText="Cancel"
+                                OkType="ButtonType.Primary"
+                                OkButtonProps="new ButtonProps { Danger = true }"
+                                OnConfirm="@(() => DeleteKernelAsync(id))">
+                        <Button Size="ButtonSize.Small" Danger Type="ButtonType.Primary"
+                                Loading="@busy" Disabled="@(busy || (_busy is not null && _busy != id))"
+                                Icon="@IconType.Outline.Delete">
+                            Delete...
+                        </Button>
+                    </Popconfirm>
+                </SpaceItem>
+            </Space>
+        </ActionColumn>
+    </Table>
+}
+
+@code {
+    [Parameter] public string Name { get; set; } = "";
+
+    private List<KernelInfo> _kernels = [];
+    private bool _loading = true;
+    private string? _error;
+    private string? _busy;
+    private bool _creating;
+
+    protected override async Task OnInitializedAsync() => await LoadKernelsAsync();
+
+    private async Task LoadKernelsAsync()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            _kernels = [.. await KernelService.GetKernelsAsync(Name)];
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to load kernels: {ex.Message}";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task CreateKernelAsync()
+    {
+        _creating = true;
+        _error = null;
+        try
+        {
+            var kernel = await KernelService.CreateKernelAsync(Name);
+            _kernels.Add(kernel);
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to create kernel: {ex.Message}";
+        }
+        finally
+        {
+            _creating = false;
+        }
+    }
+
+    private async Task RestartKernelAsync(string kernelId) =>
+        await RunActionAsync(kernelId, async (n, k, ct) => await KernelService.RestartKernelAsync(n, k, ct), "restart");
+
+    private async Task InterruptKernelAsync(string kernelId) =>
+        await RunActionAsync(kernelId, KernelService.InterruptKernelAsync, "interrupt");
+
+    private async Task DeleteKernelAsync(string kernelId) =>
+        await RunActionAsync(kernelId, KernelService.DeleteKernelAsync, "delete");
+
+    private async Task RunActionAsync(string kernelId, Func<string, string, CancellationToken, Task> action, string verb)
+    {
+        _busy = kernelId;
+        _error = null;
+        try
+        {
+            await action(Name, kernelId, CancellationToken.None);
+            await LoadKernelsAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to {verb} kernel '{kernelId}': {ex.Message}";
+        }
+        finally
+        {
+            _busy = null;
+        }
+    }
+
+    private static string StatusTagColor(KernelStatus status) => status switch
+    {
+        KernelStatus.Idle                                     => "success",
+        KernelStatus.Busy                                     => "warning",
+        KernelStatus.Starting or KernelStatus.Restarting     => "processing",
+        KernelStatus.Dead                                     => "error",
+        _                                                     => "default"
+    };
+}
+

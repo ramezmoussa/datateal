@@ -1,0 +1,881 @@
+@page "/query"
+@attribute [Authorize(Policy = AuthPolicy.WorkspaceRead)]
+@page "/query/{Id:guid}"
+
+@using Datateal.Core.Catalogs
+@using Datateal.Core.Kernels
+@using Datateal.Core.Nodes
+@using Datateal.Ui.Shared.Kernels
+@using Datateal.Ui.Shared.Workspace
+@using Datateal.Ui.Shared.Catalogs
+@using Datateal.Ui.Shared.Nodes
+@inject IKernelService KernelService
+@inject INodeService NodeService
+@inject IInteractivePoolService InteractivePoolService
+@inject IWorkspaceService WorkspaceService
+@inject ICatalogService CatalogService
+@inject IRecentItemsService RecentItemsService
+@inject NavigationManager Navigation
+@inject IAuthorizationService AuthorizationService
+@implements IAsyncDisposable
+
+@inject IJSRuntime JS
+
+<PageTitle>Query — Datateal</PageTitle>
+<NavigationLock ConfirmExternalNavigation="@_isDirty"
+                OnBeforeInternalNavigation="ConfirmInternalNavigationAsync" />
+
+<div class="cp-layout">
+    <CatalogSidePanel AllCatalogs="@_allCatalogs"
+                    SelectedCatalogNames="@_selectedCatalogNames"
+                    SelectedCatalogNamesChanged="@(v => _selectedCatalogNames = v)"
+                    OnCatalogSelectionChanged="OnCatalogSelectionChanged"
+                    CatalogSetupRunning="@_catalog.SetupRunning" />
+    <div class="qp-page" style="margin-left: 24px;">
+
+        @if (_isLoading)
+        {
+            <div style="display: flex; align-items: center; justify-content: center; height: 300px;">
+                <Spin Size="SpinSize.Large" />
+            </div>
+        }
+        else
+        {
+
+        @* flex row: [main query content] [AI sidebar] *@
+        <div style="display:flex; flex-direction:row; flex:1 1 0%; min-height:0; overflow:hidden;">
+        <div style="flex:1 1 0%; min-width:0; display:flex; flex-direction:column; overflow:hidden;">
+
+        @* ── Title row ── *@
+        <Flex Justify="FlexJustify.SpaceBetween" Align="FlexAlign.Center" Style="margin-bottom: 12px; flex-wrap: wrap; gap: 8px; flex-shrink: 0;">
+            <Space Align="SpaceAlign.End" Size="SpaceSize.Middle">
+                <SpaceItem>
+                    <Icon Height="24px" Width="24px" Type="@IconType.Outline.Code" />
+                </SpaceItem>
+                <SpaceItem>
+                    <h2 style="margin: 0;">
+                        @if (_editingTitle)
+                        {
+                            <Input Style="width: 32ch; font-size: inherit;"
+                                @bind-Value="_editingTitleValue"
+                                OnPressEnter="@(_ => CommitTitleEdit())"
+                                OnBlur="@(_ => CommitTitleEdit())" />
+                        }
+                        else
+                        {
+                            <span style="cursor: pointer;" @onclick="StartEditTitle">
+                                @_title@(_isDirty ? " *" : "")
+                            </span>
+                        }
+                    </h2>
+                </SpaceItem>
+            </Space>
+
+            @* File toolbar *@
+            <Space Size="SpaceSize.Small" Style="flex-wrap: wrap;">
+                @if (_workspaceQueryId.HasValue)
+                {
+                    <AuthorizeView Policy="@AuthPolicy.WorkspaceManage">
+                        <SpaceItem>
+                            <Button Disabled="@(!_isDirty)" Icon="@IconType.Outline.Save" OnClick="SaveToWorkspaceAsync">
+                                Save
+                            </Button>
+                        </SpaceItem>
+                    </AuthorizeView>
+                }
+                else
+                {
+                    <AuthorizeView Policy="@AuthPolicy.WorkspaceManage">
+                        <SpaceItem>
+                            <Button Disabled="@(!_isDirty)" Icon="@IconType.Outline.CloudUpload" OnClick="OpenFolderPickerAsync">
+                                Save to workspace
+                            </Button>
+                        </SpaceItem>
+                    </AuthorizeView>
+                }
+                <AuthorizeView Policy="@AuthPolicy.NodePoolOperate">
+                    <SpaceItem>
+                        <NodePoolSelector Pools="@_pools"
+                                          PoolName="@_poolName"
+                                          PoolNameChanged="@(v => _poolName = v)"
+                                          Kernel="@_kernel"
+                                          HasKernel="@HasKernel"
+                                          Connecting="@_connecting"
+                                          Disconnecting="@_disconnecting"
+                                          LoadingPools="@_loadingPools"
+                                          OnConnect="ConnectAsync"
+                                          OnDisconnect="DisconnectAsync" />
+                    </SpaceItem>
+                </AuthorizeView>
+            </Space>
+        </Flex>
+
+        @* Workspace breadcrumb *@
+        @if (_workspaceQueryId.HasValue && _breadcrumbs.Count > 0)
+        {
+            <Breadcrumb Style="margin-bottom: 8px;">
+                @foreach (var crumb in _breadcrumbs)
+                {
+                    <BreadcrumbItem>
+                        <a @onclick="() => NavigateToWorkspace(crumb.Id)" @onclick:preventDefault style="cursor: pointer;">
+                            @crumb.Name
+                        </a>
+                    </BreadcrumbItem>
+                }
+                <BreadcrumbItem>@_title</BreadcrumbItem>
+            </Breadcrumb>
+        }
+
+        @* Catalog selector moved to the side panel *@
+
+        @if (_error is not null)
+        {
+            <Alert Type="AlertType.Error" Message="@_error" Closable ShowIcon="true"
+                OnClose="@(() => _error = null)" Style="margin-bottom: 12px;" />
+        }
+
+        @* ── Split layout ── *@
+        <div class="qp-split">
+
+            @* Top pane: editor + run toolbar *@
+            <div id="qp-top-pane" class="qp-top-pane" style="height: @(_topHeightPx)px;">
+                <Flex Justify="FlexJustify.SpaceBetween" Align="FlexAlign.Center" Style="margin-bottom: 8px; flex-shrink: 0;">
+                    <Text Type="TextElementType.Secondary" Strong Style="font-size: 0.875rem;">SQL</Text>
+                    <Space Size="SpaceSize.Small">
+                        @if (_isExecuting)
+                        {
+                            <SpaceItem>
+                                <ExecutionTimer IsRunning="true" DurationMs="null" />
+                            </SpaceItem>
+                            <SpaceItem>
+                                <AuthorizeView Policy="@AuthPolicy.NodePoolOperate">
+                                    <Button Size="ButtonSize.Small"
+                                            Icon="@IconType.Outline.Loading"
+                                            OnClick="InterruptAsync">
+                                        Interrupt
+                                    </Button>
+                                </AuthorizeView>
+                            </SpaceItem>
+                        }
+                        else
+                        {
+                            @if (_lastDurationMs.HasValue)
+                            {
+                                <SpaceItem>
+                                    <Text Type="TextElementType.Secondary" Style="font-size: 0.875rem;">
+                                        <ExecutionTimer IsRunning="false" DurationMs="_lastDurationMs" />
+                                    </Text>
+                                </SpaceItem>
+                            }
+                            <SpaceItem>
+                                <AuthorizeView Policy="@AuthPolicy.NodePoolOperate">
+                                    <Tooltip Title="@("Ctrl+Enter")">
+                                        <Button Type="ButtonType.Primary" Size="ButtonSize.Small"
+                                                Disabled="@(!HasKernel || string.IsNullOrWhiteSpace(_sql))"
+                                                Icon="@IconType.Outline.PlayCircle"
+                                                OnClick="RunAsync">
+                                            @(string.IsNullOrWhiteSpace(_selectedSql) ? "Run all" : "Run selected")
+                                        </Button>
+                                    </Tooltip>
+                                </AuthorizeView>
+                            </SpaceItem>
+                            <SpaceItem>
+                                <Tooltip Title="Ask AI about this query">
+                                    <Button Size="ButtonSize.Small"
+                                            Icon="@IconType.Outline.Robot"
+                                            OnClick="@(() => _aiPanelVisible = true)">
+                                        AI
+                                    </Button>
+                                </Tooltip>
+                            </SpaceItem>
+                        }
+                    </Space>
+                </Flex>
+                <div style="flex: 1 1 0%; overflow: hidden;">
+                    <CodeCell Value="@_sql"
+                            ValueChanged="OnSqlChanged"
+                            OnSelectionChanged="OnSqlSelectionChanged"
+                            Language="duckdb-sql"
+                            Height="@_editorHeight"
+                            OnExecute="RunAsync" />
+                </div>
+            </div>
+
+            @* Drag handle *@
+            <div id="qp-drag-handle" class="qp-drag-handle">
+                <div class="qp-drag-handle-inner"></div>
+            </div>
+
+            @* Bottom pane: results *@
+            <div class="qp-bottom-pane">
+                @if (_isExecuting)
+                {
+                    <Flex Justify="@("center")" Style="padding: 40px 0;"><Spin /></Flex>
+                }
+                else if (_resultDf is not null)
+                {
+                    <div style="flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <Text Type="TextElementType.Secondary" Style="font-size: 0.875rem;">
+                            @_resultDf.TotalRows.ToString("N0")@(_resultDf.TotalRows == DataFrameOutput.RowCap ? "+" : "") rows
+                        </Text>
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            @if (_lastExecutedAt.HasValue)
+                            {
+                                <span style="font-size: 0.75rem; opacity: 0.6;">Last run @_lastExecutedAt.Value.ToLocalTime().ToString("HH:mm:ss")</span>
+                            }
+                            <Dropdown Trigger="@(new Trigger[] { Trigger.Click })">
+                                <Overlay>
+                                    <Menu>
+                                        <MenuItem OnClick="@(() => _dataFrameView!.ExportCsvAsync())">
+                                            <Icon Type="@IconType.Outline.FileText" /> CSV (.csv)
+                                        </MenuItem>
+                                        <MenuItem OnClick="@(() => _dataFrameView!.ExportExcelAsync())">
+                                            <Icon Type="@IconType.Outline.FileExcel" /> Excel (.xlsx)
+                                        </MenuItem>
+                                    </Menu>
+                                </Overlay>
+                                <ChildContent>
+                                    <Button Size="ButtonSize.Small" Icon="@IconType.Outline.Download">
+                                        Export <Icon Type="@IconType.Outline.Down" />
+                                    </Button>
+                                </ChildContent>
+                            </Dropdown>
+                        </div>
+                    </div>
+                    <div style="flex: 1 1 0%; overflow: auto;">
+                        <DataFrameView @ref="_dataFrameView" Data="_resultDf" Fill="true" ShowExportButton="false" ExportFileName="@_title" />
+                    </div>
+                }
+                else if (_resultError is not null)
+                {
+                    <div style="flex: 1 1 0%; overflow: auto;">
+                        <div class="qp-error-bar">
+                            <Text Type="TextElementType.Danger" Strong Style="display: block; font-size: 0.875rem; margin-bottom: 4px;">@_resultError.Ename: @_resultError.Evalue</Text>
+                            <pre style="font-family: monospace; font-size: 0.875rem; margin: 0; white-space: pre-wrap;"><Text Type="TextElementType.Danger">@string.Join("\n", _resultError.Traceback.Select(StripAnsi))</Text></pre>
+                        </div>
+                    </div>
+                }
+                else if (_resultText is not null)
+                {
+                    <div style="flex: 1 1 0%; overflow: auto;">
+                        <pre style="font-family: monospace; font-size: 0.875rem; margin: 0;">@_resultText</pre>
+                    </div>
+                }
+                else
+                {
+                    <div style="flex: 1 1 0%; display: flex; align-items: center; justify-content: center; flex-direction: column;">
+                        <Icon Type="@IconType.Outline.Table" Style="font-size: 40px; opacity: 0.25;" />
+                        <p style="margin-top: 12px;"><Text Type="TextElementType.Secondary">Run a query to see results here.</Text></p>
+                    </div>
+                }
+            </div>
+        </div>
+
+        </div>@* end main content column *@
+
+        <AiChatPanel Visible="_aiPanelVisible"
+                     VisibleChanged="@(v => _aiPanelVisible = v)"
+                     ContextType="AiContextType.Query"
+                     ContextLabel="SQL Query"
+                     CatalogIds="@AiCatalogIds"
+                     GetQueryContent="@(() => _sql)"
+                     OnApplyCode="@(code => { _sql = code; _isDirty = true; StateHasChanged(); return Task.CompletedTask; })" />
+
+        </div>@* end flex row (main content + AI sidebar) *@
+
+        }@* end else (not loading) *@
+
+    </div>@* end .qp-page *@
+</div>@* end .cp-layout *@
+
+@* Folder picker modal *@
+<FolderPickerModal Visible="_showFolderPicker"
+                   Title="@("Choose folder to save in")"
+                   OkText="@("Save here")"
+                   OnConfirm="ConfirmSaveToFolderAsync"
+                   OnCancel="@(() => _showFolderPicker = false)" />
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+    [CascadingParameter] private Task<AuthenticationState>? AuthenticationStateTask { get; set; }
+
+    private DataFrameView? _dataFrameView;
+
+    private string _title = "Untitled Query";
+    private string _sql = "";
+    private bool _isDirty;
+    private bool _editingTitle;
+    private string _editingTitleValue = "";
+
+    private Guid? _workspaceQueryId;
+    private Guid? _workspaceQueryFolderId;
+    private List<(Guid? Id, string Name)> _breadcrumbs = [];
+    private bool _showFolderPicker;
+
+    private string? _poolName;
+    private string? _nodeName;
+    private string? _kernelId;
+    private KernelInfo? _kernel;
+    private IReadOnlyList<InteractivePoolDto> _pools = [];
+    private bool _loadingPools;
+    private bool _connecting;
+    private bool _disconnecting;
+    private string? _error;
+    private CancellationTokenSource? _kernelPollingCts;
+    private CancellationTokenSource? _connectCts;
+    private bool _canNodePoolOperate;
+
+    private bool _isExecuting;
+    private double? _lastDurationMs;
+    private DateTime? _lastExecutedAt;
+    private DataFrameOutput? _resultDf;
+    private ErrorInfo? _resultError;
+    private string? _resultText;
+    private string _selectedSql = "";
+
+    private int _topHeightPx = 300;
+    private int _editorHeight => Math.Max(40, _topHeightPx - 56);
+
+    private DotNetObjectReference<QueryPage>? _dotNetRef;
+
+    // Catalogs
+    private IReadOnlyList<CatalogDto> _allCatalogs = [];
+    private IEnumerable<string> _selectedCatalogNames = [];
+    private CatalogSession _catalog = default!;
+
+    // AI assistant
+    private bool _aiPanelVisible;
+    private IReadOnlyList<Guid> AiCatalogIds =>
+        _allCatalogs.Where(c => _selectedCatalogNames.Contains(c.Name)).Select(c => c.Id).ToList();
+
+    private bool _isLoading;
+    private bool _splitterInitialized;
+    private bool HasKernel => !string.IsNullOrEmpty(_kernelId);
+
+    protected override async Task OnInitializedAsync()
+    {
+        _catalog = new CatalogSession(
+            KernelService, CatalogService,
+            () => _nodeName, () => _kernelId, () => _allCatalogs,
+            StateHasChanged, msg => _error = msg);
+
+        if (Id != Guid.Empty)
+        {
+            _isLoading = true;
+            try
+            {
+                var detail = await WorkspaceService.GetQueryAsync(Id);
+                if (detail is not null)
+                {
+                    _title = detail.Title;
+                    _sql = detail.Content;
+                    _isDirty = false;
+                    _workspaceQueryId = detail.Id;
+                    _workspaceQueryFolderId = detail.FolderId;
+                    _ = RecentItemsService.RecordVisitAsync(detail.Id, detail.Title, "Query");
+
+                    // Restore last execution result if present
+                    if (detail.LastResult is { } lr)
+                    {
+                        _lastDurationMs = lr.DurationMs;
+                        _lastExecutedAt = lr.ExecutedAt;
+                        _resultDf = lr.DataFrame;
+                        _resultText = lr.Text;
+                        _resultError = lr.Error;
+                    }
+
+                    if (detail.FolderId is not null)
+                    {
+                        var ancestors = await WorkspaceService.GetFolderAncestorsAsync(detail.FolderId.Value);
+                        _breadcrumbs = [(null, "Workspace"), ..ancestors.Select(f => ((Guid?)f.Id, f.Name))];
+                    }
+                    else
+                    {
+                        _breadcrumbs = [(null, "Workspace")];
+                    }
+                }
+                else
+                {
+                    _error = "Query not found in workspace.";
+                }
+            }
+            catch (Exception ex)
+            {
+                _error = $"Failed to load query: {ex.Message}";
+            }
+            finally
+            {
+                _isLoading = false;
+            }
+        }
+        else
+        {
+            _title = $"Untitled Query {DateTime.Now:yyyy-MM-dd HH:mm:ss}";
+            _isDirty = true;
+        }
+
+        // Check NodePoolOperate permission and gate all kernel/pool operations
+        var authState = await AuthenticationStateTask!;
+        var authResult = await AuthorizationService.AuthorizeAsync(authState.User, null, AuthPolicy.NodePoolOperate);
+        _canNodePoolOperate = authResult.Succeeded;
+
+        if (_canNodePoolOperate)
+        {
+        _loadingPools = true;
+        try { _pools = await InteractivePoolService.GetInteractivePoolsAsync(); }
+        catch (Exception ex) { _error = $"Failed to load pools: {ex.Message}"; }
+        finally { _loadingPools = false; }
+        }
+
+        // Load available catalogs
+        try { _allCatalogs = await CatalogService.GetCatalogsAsync(); }
+        catch { /* non-fatal */ }
+
+        // Restore saved catalog selections
+        if (_workspaceQueryId.HasValue)
+        {
+            try
+            {
+                var savedNames = await CatalogService.GetWorkspaceItemCatalogsAsync(_workspaceQueryId.Value);
+                _selectedCatalogNames = savedNames;
+            }
+            catch { /* non-fatal */ }
+        }
+
+        // Restore last-used pool preference
+        if (_canNodePoolOperate && _workspaceQueryId.HasValue)
+        {
+            try
+            {
+                var storedPool = await JS.InvokeAsync<string>("getItemNodePref", _workspaceQueryId.Value.ToString());
+                if (!string.IsNullOrEmpty(storedPool))
+                {
+                    var match = _pools.FirstOrDefault(p => p.Name == storedPool);
+                    if (match is not null)
+                    {
+                        _poolName = match.Name;
+                        if (match.Status == InteractivePoolStatus.Running)
+                            _ = ConnectAsync();
+                    }
+                }
+            }
+            catch { /* JS interop failure is non-fatal */ }
+        }
+    }
+
+    // ── Title editing ─────────────────────────────────────────────────
+
+    private void StartEditTitle()
+    {
+        _editingTitleValue = _title;
+        _editingTitle = true;
+    }
+
+    private void CommitTitleEdit()
+    {
+        var value = string.IsNullOrWhiteSpace(_editingTitleValue) ? "Untitled Query" : _editingTitleValue;
+        if (value.Contains('/'))
+        {
+            _error = "Query title cannot contain '/'.";
+            return;
+        }
+        _title = value;
+        _isDirty = true;
+        _editingTitle = false;
+    }
+
+    private void OnSqlChanged(string value)
+    {
+        _sql = value;
+        _isDirty = true;
+    }
+
+    private void OnSqlSelectionChanged(string selected)
+    {
+        if (_selectedSql == selected) return;
+        _selectedSql = selected;
+        StateHasChanged();
+    }
+
+    // ── Workspace persistence ─────────────────────────────────────────
+
+    private void OpenFolderPickerAsync() => _showFolderPicker = true;
+
+    private async Task ConfirmSaveToFolderAsync(Guid? folderId)
+    {
+        _showFolderPicker = false;
+        try
+        {
+            var summary = await WorkspaceService.CreateQueryAsync(new CreateQueryRequest(_title, _sql, folderId, BuildLastResult()));
+            _workspaceQueryId = summary.Id;
+            _workspaceQueryFolderId = folderId;
+
+            _ = RecentItemsService.RecordVisitAsync(summary.Id, _title, "Query");
+
+            if (_selectedCatalogNames.Any())
+            {
+                try { await CatalogService.UpdateWorkspaceItemCatalogsAsync(summary.Id, _selectedCatalogNames.ToList()); }
+                catch (Exception ex) { _error = $"Query saved but failed to save catalog selection: {ex.Message}"; }
+            }
+
+            _isDirty = false;
+
+            if (folderId is not null)
+            {
+                var ancestors = await WorkspaceService.GetFolderAncestorsAsync(folderId.Value);
+                _breadcrumbs = [(null, "Workspace"), ..ancestors.Select(f => ((Guid?)f.Id, f.Name))];
+            }
+            else
+            {
+                _breadcrumbs = [(null, "Workspace")];
+            }
+
+            Navigation.NavigateTo($"/query/{summary.Id}", replace: true);
+        }
+        catch (Exception ex) { _error = $"Failed to save query: {ex.Message}"; }
+    }
+
+    private async Task SaveToWorkspaceAsync()
+    {
+        if (!_workspaceQueryId.HasValue) return;
+        try
+        {
+            await WorkspaceService.UpdateQueryAsync(_workspaceQueryId.Value,
+                new UpdateQueryRequest(_title, _sql, _workspaceQueryFolderId, BuildLastResult()));
+            try { await CatalogService.UpdateWorkspaceItemCatalogsAsync(_workspaceQueryId.Value, _selectedCatalogNames.ToList()); }
+            catch (Exception ex) { _error = $"Query saved but failed to save catalog selection: {ex.Message}"; }
+            _ = RecentItemsService.UpdateNameAsync(_workspaceQueryId.Value, _title);
+            _isDirty = false;
+        }
+        catch (Exception ex) { _error = $"Failed to save query: {ex.Message}"; }
+    }
+
+    private QueryLastResult? BuildLastResult()
+    {
+        if (!_lastExecutedAt.HasValue) return null;
+        var status = _resultError is not null ? "Error"
+            : _resultDf is not null || _resultText is not null ? "Success"
+            : "Empty";
+        return new QueryLastResult(status, _lastExecutedAt.Value, _lastDurationMs ?? 0, _resultDf, _resultText, _resultError);
+    }
+
+    private void NavigateToWorkspace(Guid? folderId) =>
+        Navigation.NavigateTo(folderId is null ? "/workspace" : $"/workspace?folder={folderId}");
+
+    // ── Kernel connection ─────────────────────────────────────────────
+
+    private InteractivePoolDto? SelectedPool => _pools.FirstOrDefault(p => p.Name == _poolName);
+
+    private async Task ConnectAsync()
+    {
+        if (string.IsNullOrEmpty(_poolName)) return;
+        _connecting = true;
+        _error = null;
+        _connectCts = new CancellationTokenSource();
+        var ct = _connectCts.Token;
+        try
+        {
+            // Ensure the interactive pool's node exists (creates it if needed)
+            var nodeInfo = await InteractivePoolService.EnsureNodeAsync(_poolName, ct);
+            if (nodeInfo is null) throw new Exception("Interactive pool not found.");
+
+            var nodeName = nodeInfo.Name;
+
+            // Poll until running if the node is still being provisioned
+            if (nodeInfo.State != NodeState.Running)
+            {
+                var deadline = DateTime.UtcNow.AddMinutes(15);
+                while (DateTime.UtcNow < deadline)
+                {
+                    await Task.Delay(3000, ct);
+                    var updated = await NodeService.GetNodeAsync(nodeName, ct);
+                    if (updated is null) throw new Exception("Node not found.");
+                    _pools = _pools.Select(p => p.NodeName == nodeName ? p with { Status = updated.State.ToInteractivePoolStatus() } : p).ToList();
+                    StateHasChanged();
+                    if (updated.State == NodeState.Running) break;
+                    if (updated.State == NodeState.Failure) throw new Exception("Node failed to start.");
+                }
+                var finalNode = await NodeService.GetNodeAsync(nodeName, ct);
+                if (finalNode?.State != NodeState.Running)
+                    throw new Exception("Node did not reach Running state in time.");
+            }
+
+            _nodeName = nodeName;
+            var kernel = await CreateKernelWithRetryAsync(nodeName, ct);
+            _kernelId = kernel.Id;
+            _kernel = kernel;
+            _kernelPollingCts = new CancellationTokenSource();
+            _ = PollKernelStatusAsync(_kernelPollingCts.Token);
+            if (_workspaceQueryId.HasValue)
+                await JS.InvokeVoidAsync("setItemNodePref", _workspaceQueryId.Value.ToString(), _poolName);
+
+            // Attach catalogs if any are selected
+            await _catalog.SetupAllAsync(_selectedCatalogNames);
+        }
+        catch (OperationCanceledException)
+        {
+            // Page was disposed while waiting — discard silently
+        }
+        catch (Exception ex) { _error = $"Failed to connect: {ex.Message}"; }
+        finally
+        {
+            _connecting = false;
+            _connectCts.Dispose();
+            _connectCts = null;
+        }
+        StateHasChanged();
+    }
+
+    private static readonly int KernelCreateMaxRetries = 18;
+    private static readonly TimeSpan KernelCreateRetryInterval = TimeSpan.FromSeconds(5);
+
+    private static TimeSpan GetPollDelay(int attempt) => attempt switch
+    {
+        0 => TimeSpan.FromMilliseconds(100),
+        1 => TimeSpan.FromMilliseconds(300),
+        2 => TimeSpan.FromMilliseconds(600),
+        _ => TimeSpan.FromMilliseconds(1000),
+    };
+
+    private async Task<KernelInfo> CreateKernelWithRetryAsync(string nodeName, CancellationToken ct = default)
+    {
+        HttpRequestException? lastEx = null;
+        for (var attempt = 0; attempt <= KernelCreateMaxRetries; attempt++)
+        {
+            if (attempt > 0)
+                await Task.Delay(KernelCreateRetryInterval, ct);
+            try
+            {
+                return await KernelService.CreateKernelAsync(nodeName, ct);
+            }
+            catch (HttpRequestException ex) when (IsTransientRuntimeError(ex.StatusCode))
+            {
+                lastEx = ex;
+            }
+        }
+        throw lastEx!;
+    }
+
+    private static bool IsTransientRuntimeError(System.Net.HttpStatusCode? statusCode) =>
+        statusCode is
+            System.Net.HttpStatusCode.BadRequest            // 400 — runtime not fully initialised
+            or System.Net.HttpStatusCode.InternalServerError // 500 — unexpected startup error
+            or System.Net.HttpStatusCode.BadGateway          // 502 — pod not yet reachable
+            or System.Net.HttpStatusCode.ServiceUnavailable  // 503 — pod not ready
+            or System.Net.HttpStatusCode.GatewayTimeout;     // 504 — pod responded too slowly
+
+    private async Task DisconnectAsync()
+    {
+        if (!HasKernel || string.IsNullOrEmpty(_nodeName)) return;
+        _disconnecting = true;
+        _error = null;
+        try
+        {
+            await StopKernelPollingAsync();
+            await KernelService.DeleteKernelAsync(_nodeName, _kernelId!);
+            _kernelId = null;
+            _kernel = null;
+            _catalog.Clear();
+        }
+        catch (Exception ex) { _error = $"Failed to disconnect: {ex.Message}"; }
+        finally { _disconnecting = false; }
+    }
+
+    private async Task PollKernelStatusAsync(CancellationToken cancellationToken)
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(30));
+        try
+        {
+            while (await timer.WaitForNextTickAsync(cancellationToken))
+            {
+                if (_isExecuting || string.IsNullOrEmpty(_kernelId) || string.IsNullOrEmpty(_nodeName))
+                    continue;
+                try
+                {
+                    _kernel = await KernelService.GetKernelAsync(_nodeName, _kernelId, cancellationToken);
+                    await InvokeAsync(StateHasChanged);
+                }
+                catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+                {
+                    _kernelId = null;
+                    _kernel = null;
+                    _error = "The kernel was evicted, likely due to inactivity. Please reconnect.";
+                    await InvokeAsync(StateHasChanged);
+                    break;
+                }
+                catch (OperationCanceledException) { break; }
+                catch { /* ignore transient errors */ }
+            }
+        }
+        catch (OperationCanceledException) { }
+    }
+
+    private async Task StopKernelPollingAsync()
+    {
+        if (_kernelPollingCts is not null)
+        {
+            await _kernelPollingCts.CancelAsync();
+            _kernelPollingCts.Dispose();
+            _kernelPollingCts = null;
+        }
+    }
+
+    // ── Execution ─────────────────────────────────────────────────────
+
+    private async Task RunAsync()
+    {
+        if (!HasKernel || string.IsNullOrEmpty(_nodeName) || _isExecuting || string.IsNullOrWhiteSpace(_sql)) return;
+
+        var sqlToRun = !string.IsNullOrWhiteSpace(_selectedSql) ? _selectedSql : _sql;
+
+        _isExecuting = true;
+        _resultDf = null;
+        _resultError = null;
+        _resultText = null;
+        _lastDurationMs = null;
+        _lastExecutedAt = null;
+        _error = null;
+
+        if (_kernel is not null)
+            _kernel = _kernel with { Status = KernelStatus.Busy };
+
+        // DuckDB's EXPLAIN output can be very wide and doesn't fit well in the DataFrame view,
+        // so we print it as text instead if the expected columns are present.
+        var codeToRun = SqlCodeGenerator.WrapSql(sqlToRun);
+
+        try
+        {
+            var handle = await KernelService.StartExecuteAsync(_nodeName, _kernelId!, new ExecuteKernelRequest(codeToRun));
+
+            PollExecutionResponse poll;
+            var pollAttempt = 0;
+            do
+            {
+                await Task.Delay(GetPollDelay(pollAttempt++));
+                poll = await KernelService.PollExecutionAsync(_nodeName, _kernelId!, handle.ExecutionId);
+                StateHasChanged();
+            } while (!poll.IsComplete);
+
+            var result = poll.Result!;
+            _lastDurationMs = result.DurationMs;
+            _lastExecutedAt = DateTime.UtcNow;
+            _resultError = result.Error;
+
+            // Find the most relevant output
+            foreach (var output in result.Outputs)
+            {
+                if (output.Type is "execute_result" or "display_data" && output.Data is not null)
+                {
+                    if (output.Data.TryGetValue(DataFrameOutput.MimeType, out var dfRaw)
+                        && DataFrameOutput.TryParse(dfRaw) is { } df)
+                    {
+                        _resultDf = df;
+                        break;
+                    }
+                    if (output.Data.TryGetValue("text/plain", out var plain))
+                    {
+                        _resultText = plain?.ToString();
+                        break;
+                    }
+                }
+                else if (output.Type == "stream" && output.Text is not null)
+                {
+                    _resultText = (_resultText ?? "") + output.Text;
+                }
+            }
+
+            _kernel = await KernelService.GetKernelAsync(_nodeName, _kernelId!);
+        }
+        catch (Exception ex)
+        {
+            _error = $"Execution failed: {ex.Message}";
+        }
+        finally
+        {
+            _isExecuting = false;
+            _isDirty = true;
+            StateHasChanged();
+        }
+    }
+
+    private async Task InterruptAsync()
+    {
+        if (!HasKernel || string.IsNullOrEmpty(_nodeName)) return;
+        try { await KernelService.InterruptKernelAsync(_nodeName, _kernelId!); }
+        catch (Exception ex) { _error = $"Interrupt failed: {ex.Message}"; }
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────
+
+    private static string StatusTagColor(KernelStatus status) => status switch
+    {
+        KernelStatus.Idle => "green",
+        KernelStatus.Busy => "blue",
+        KernelStatus.Starting => "orange",
+        KernelStatus.Dead => "red",
+        _ => "default",
+    };
+
+    private static string NodeStateTagColor(NodeState state) => state switch
+    {
+        NodeState.Running => "success",
+        NodeState.Failure => "error",
+        _ => "warning",
+    };
+
+    private static string StripAnsi(string text) =>
+        System.Text.RegularExpressions.Regex.Replace(text, @"\x1B\[[0-9;]*[a-zA-Z]", "");
+
+    // ── Catalog management ───────────────────────────────────────────
+
+    private Task OnCatalogSelectionChanged(IEnumerable<CatalogDto> selectedItems)
+    {
+        _isDirty = true;
+        return _catalog.OnSelectionChangedAsync(selectedItems);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // Cannot use `firstRender` here: when a query is loaded by ID, _isLoading is set to true
+        // before the first await in OnInitializedAsync, so the first render shows the spinner and
+        // the split-pane elements don't exist in the DOM yet. We initialize on the first render
+        // where _isLoading is false (i.e. the split pane is actually rendered).
+        if (!_splitterInitialized && !_isLoading)
+        {
+            _splitterInitialized = true;
+            _dotNetRef = DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("initQueryPageSplitter", "qp-top-pane", "qp-drag-handle", _dotNetRef);
+        }
+    }
+
+    [JSInvokable]
+    public void OnSplitterDragEnd(double height)
+    {
+        _topHeightPx = Math.Max(80, (int)height);
+        StateHasChanged();
+    }
+
+    private async Task ConfirmInternalNavigationAsync(LocationChangingContext ctx)
+    {
+        if (!_isDirty) return;
+        var confirmed = await JS.InvokeAsync<bool>("confirm", "You have unsaved changes. Are you sure you want to leave?");
+        if (!confirmed)
+            ctx.PreventNavigation();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _dotNetRef?.Dispose();
+        if (_connectCts is not null)
+        {
+            await _connectCts.CancelAsync();
+            // _connectCts is disposed by ConnectAsync's finally block
+        }
+        await StopKernelPollingAsync();
+        if (HasKernel && !string.IsNullOrEmpty(_nodeName))
+        {
+            try { await KernelService.DeleteKernelAsync(_nodeName, _kernelId!); }
+            catch { /* best effort */ }
+        }
+    }
+}

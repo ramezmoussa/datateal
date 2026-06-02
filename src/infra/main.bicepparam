@@ -1,11 +1,11 @@
 using './main.bicep'
 
 param location = 'swedencentral'
-param clusterName = 'aks-duckhouse-dev'
-param acrName = 'acrduckhousedev' // Must be globally unique; change if the name is already taken
-param psqlName = 'psql-aks-duckhouse-dev'
-param storageAccountName = 'stduckhousedev' // Must be globally unique; change if the name is already taken
-param nodeResourceGroupName = 'mrg-duckhouse-dev'
+param clusterName = 'aks-datateal-dev'
+param acrName = 'acrdatatealdev' // Must be globally unique; change if the name is already taken
+param psqlName = 'psql-aks-datateal-dev'
+param storageAccountName = 'stdatatealdev' // Must be globally unique; change if the name is already taken
+param nodeResourceGroupName = 'mrg-datateal-dev'
 param systemNodePoolVmSize = 'Standard_D2as_v5'
 param firewallWhitelistIp = ''
 param postgresAdminPassword = ''

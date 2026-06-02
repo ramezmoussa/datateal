@@ -268,7 +268,7 @@ resource postgresFirewallWhitelist 'Microsoft.DBforPostgreSQL/flexibleServers/fi
 
 resource postgresUiDatabaseResource 'Microsoft.DBforPostgreSQL/flexibleServers/databases@2023-06-01-preview' = {
   parent: postgresServerResource
-  name: 'duckhouse_ui'
+  name: 'datateal_ui'
   properties: {
     charset: 'UTF8'
     collation: 'en_US.utf8'
@@ -277,7 +277,7 @@ resource postgresUiDatabaseResource 'Microsoft.DBforPostgreSQL/flexibleServers/d
 
 resource postgresControlPlaneDatabaseResource 'Microsoft.DBforPostgreSQL/flexibleServers/databases@2023-06-01-preview' = {
   parent: postgresServerResource
-  name: 'duckhouse_control_plane'
+  name: 'datateal_control_plane'
   properties: {
     charset: 'UTF8'
     collation: 'en_US.utf8'
@@ -323,7 +323,7 @@ resource storageBlobService 'Microsoft.Storage/storageAccounts/blobServices@2023
 
 resource storageContainerBasinData 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-05-01' = {
   parent: storageBlobService
-  name: 'duckhouse-data'
+  name: 'datateal-data'
   properties: {
     publicAccess: 'None'
   }

@@ -1,4 +1,4 @@
-# DuckHouse Orchestrator
+# Datateal Orchestrator
 
 ASP.NET Core service that schedules, dispatches, and monitors multi-task jobs against compute nodes managed by the Control Plane. Jobs are defined as DAGs of typed tasks; each run is executed asynchronously with full retry, skip-propagation, and crash-recovery support.
 
@@ -8,7 +8,7 @@ ASP.NET Core service that schedules, dispatches, and monitors multi-task jobs ag
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
-│  DuckHouse UI (browser / API)                                        │
+│  Datateal UI (browser / API)                                        │
 │  • Defines jobs, schedules, and node pool configs                    │
 │  • Triggers runs via POST /api/jobs/{id}/trigger                     │
 │  • Polls run and task-run status                                     │
@@ -70,10 +70,10 @@ The orchestrator never executes code directly. It translates job tasks into kern
 
 | Project                                 | Layer          | Role                                                                    |
 | --------------------------------------- | -------------- | ----------------------------------------------------------------------- |
-| `DuckHouse.Orchestrator`                | Host           | ASP.NET Core entry point; minimal API endpoints; Aspire wiring          |
-| `DuckHouse.Orchestrator.Application`    | Application    | Engine services, mediator handlers, YAML import/export, DAG validation  |
-| `DuckHouse.Orchestrator.Core`           | Domain         | Entity classes, enums, repository interfaces, infrastructure interfaces |
-| `DuckHouse.Orchestrator.Infrastructure` | Infrastructure | `ControlPlaneClient` HTTP client; EF Core repositories                  |
+| `Datateal.Orchestrator`                | Host           | ASP.NET Core entry point; minimal API endpoints; Aspire wiring          |
+| `Datateal.Orchestrator.Application`    | Application    | Engine services, mediator handlers, YAML import/export, DAG validation  |
+| `Datateal.Orchestrator.Core`           | Domain         | Entity classes, enums, repository interfaces, infrastructure interfaces |
+| `Datateal.Orchestrator.Infrastructure` | Infrastructure | `ControlPlaneClient` HTTP client; EF Core repositories                  |
 
 ---
 
@@ -429,7 +429,7 @@ Valid dependency conditions: `onSuccess`, `onFailure`, `onCompletion`, `onSkip`.
 | `History:RetentionDays`                | `30`                   | Age (in days) at which completed runs are purged; `≤ 0` disables |
 | `History:PurgeIntervalHours`           | `1`                    | How often `HistoryRetentionService` runs the purge               |
 
-The shared PostgreSQL connection is registered under the Aspire resource name `duckhouse-ui` (same database used by the UI server).
+The shared PostgreSQL connection is registered under the Aspire resource name `datateal-ui` (same database used by the UI server).
 
 ---
 

@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.DataProtection.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+    <PackageReference Include="Microsoft.Extensions.Http" />
+    <PackageReference Include="Microsoft.Extensions.Options" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Datateal.Orchestrator.Core\Datateal.Orchestrator.Core.csproj" />
+    <ProjectReference Include="..\..\shared\Datateal.Auth\Datateal.Auth.csproj" />
+    <ProjectReference Include="..\..\shared\Datateal.Data\Datateal.Data.csproj" />
+  </ItemGroup>
+
+</Project>

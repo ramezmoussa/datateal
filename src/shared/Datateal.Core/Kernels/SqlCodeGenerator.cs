@@ -1,0 +1,38 @@
+namespace Datateal.Core.Kernels;
+
+/// <summary>
+/// Generates Python code for executing SQL queries in the Datateal kernel environment.
+/// The kernel runs Python; SQL is executed via the DuckDB Python API.
+/// </summary>
+public static class SqlCodeGenerator
+{
+    /// <summary>
+    /// Wraps a SQL string as executable Python code that runs it via DuckDB and returns
+    /// the result as a DataFrame. EXPLAIN queries are printed as text instead, because
+    /// DuckDB's EXPLAIN output can be very wide and doesn't fit well in the DataFrame view.
+    /// </summary>
+    public static string WrapSql(string sql)
+    {
+        var escaped = EscapeForPythonTripleQuote(sql);
+        return $""""
+            import duckdb
+            _sqldf = duckdb.execute("""{escaped}""").df()
+            __result = None
+            if all(value in _sqldf.columns for value in ['explain_key', 'explain_value']):
+                print('\\n'.join(str(v) for v in _sqldf['explain_value']))
+            else:
+                __result = _sqldf
+            __result
+            """";
+    }
+
+    /// <summary>
+    /// Escapes a string so it can be safely embedded inside a Python triple-quoted string
+    /// (<c>"""..."""</c>). Backslashes are escaped first to avoid corrupting existing escape
+    /// sequences, then any triple-quote sequences are escaped.
+    /// </summary>
+    private static string EscapeForPythonTripleQuote(string value) =>
+        value
+            .Replace(@"\", @"\\")
+            .Replace(@"""""""", @"\""\""\""");
+}

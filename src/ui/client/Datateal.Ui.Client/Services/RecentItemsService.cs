@@ -1,0 +1,75 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using Microsoft.JSInterop;
+
+namespace Datateal.Ui.Client.Services;
+
+public sealed class RecentItemsService(IJSRuntime js) : IRecentItemsService
+{
+    private const string StorageKey = "datateal-recent-items";
+    private const int MaxItems = 10;
+
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
+    {
+        Converters = { new JsonStringEnumConverter() }
+    };
+
+    public async Task<IReadOnlyList<RecentItem>> GetRecentItemsAsync()
+    {
+        try
+        {
+            var json = await js.InvokeAsync<string?>("localStorage.getItem", StorageKey);
+            if (string.IsNullOrEmpty(json)) return [];
+            return JsonSerializer.Deserialize<List<RecentItem>>(json, JsonOptions) ?? [];
+        }
+        catch
+        {
+            return [];
+        }
+    }
+
+    public async Task RecordVisitAsync(Guid id, string name, string type)
+    {
+        try
+        {
+            var items = (await GetRecentItemsAsync()).ToList();
+            items.RemoveAll(i => i.Id == id);
+            items.Insert(0, new RecentItem(id, name, type, DateTime.UtcNow));
+            if (items.Count > MaxItems)
+                items = items[..MaxItems];
+
+            var json = JsonSerializer.Serialize(items, JsonOptions);
+            await js.InvokeVoidAsync("localStorage.setItem", StorageKey, json);
+        }
+        catch
+        {
+            // localStorage unavailable — silently ignore
+        }
+    }
+
+    public async Task RemoveAsync(Guid id)
+    {
+        try
+        {
+            var items = (await GetRecentItemsAsync()).ToList();
+            items.RemoveAll(i => i.Id == id);
+            var json = JsonSerializer.Serialize(items, JsonOptions);
+            await js.InvokeVoidAsync("localStorage.setItem", StorageKey, json);
+        }
+        catch { }
+    }
+
+    public async Task UpdateNameAsync(Guid id, string newName)
+    {
+        try
+        {
+            var items = (await GetRecentItemsAsync()).ToList();
+            var idx = items.FindIndex(i => i.Id == id);
+            if (idx < 0) return;
+            items[idx] = items[idx] with { Name = newName };
+            var json = JsonSerializer.Serialize(items, JsonOptions);
+            await js.InvokeVoidAsync("localStorage.setItem", StorageKey, json);
+        }
+        catch { }
+    }
+}

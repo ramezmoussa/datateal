@@ -1,4 +1,4 @@
-# DuckHouse Control Plane
+# Datateal Control Plane
 
 ASP.NET Core Web API that provisions and manages compute nodes and Jupyter kernels on demand. The Orchestrator and UI use it as the single gateway to all kernel execution. All kernel calls are tunnelled through the Kubernetes API server's HTTP proxy — no public IPs, Services, or VNet access are required.
 
@@ -24,7 +24,7 @@ ASP.NET Core Web API that provisions and manages compute nodes and Jupyter kerne
                        │ Kubernetes API + HTTP proxy
                        ▼
 ┌──────────────────────────────────────────────────────────────────────┐
-│  Runtime pods (duckhouse-runtime)                                    │
+│  Runtime pods (datateal-runtime)                                    │
 │  • FastAPI service managing Jupyter kernels                          │
 │  • Kernel venv: Python + DuckDB + optional extras                    │
 └──────────────────────────────────────────────────────────────────────┘
@@ -36,12 +36,12 @@ ASP.NET Core Web API that provisions and manages compute nodes and Jupyter kerne
 
 | Project                                 | Layer          | Role                                                            |
 | --------------------------------------- | -------------- | --------------------------------------------------------------- |
-| `DuckHouse.ControlPlane`                | Host           | ASP.NET Core entry point; minimal API endpoints; Aspire wiring  |
-| `DuckHouse.ControlPlane.Application`    | Application    | Mediator handlers; `InactivityEvictionService`                  |
-| `DuckHouse.ControlPlane.Core`           | Domain         | `INodeService`, `INodeRuntimeClient` interfaces                 |
-| `DuckHouse.ControlPlane.Infrastructure` | Infrastructure | `LocalNodeService`, `AksNodeService`, `KubernetesRuntimeClient` |
+| `Datateal.ControlPlane`                | Host           | ASP.NET Core entry point; minimal API endpoints; Aspire wiring  |
+| `Datateal.ControlPlane.Application`    | Application    | Mediator handlers; `InactivityEvictionService`                  |
+| `Datateal.ControlPlane.Core`           | Domain         | `INodeService`, `INodeRuntimeClient` interfaces                 |
+| `Datateal.ControlPlane.Infrastructure` | Infrastructure | `LocalNodeService`, `AksNodeService`, `KubernetesRuntimeClient` |
 
-Shared domain types (`NodeInfo`, `NodeState`, `KernelInfo`, kernel request/response models, mediator interfaces) live in `src/shared/DuckHouse.Core`.
+Shared domain types (`NodeInfo`, `NodeState`, `KernelInfo`, kernel request/response models, mediator interfaces) live in `src/shared/Datateal.Core`.
 
 ---
 
@@ -51,10 +51,10 @@ The active backend is selected by `NodeService:Backend` in configuration.
 
 ### `Local` — Docker Desktop
 
-`LocalNodeService` creates Kubernetes pods in the `default` namespace of the Docker Desktop cluster. All pods use the locally-built `duckhouse-runtime:latest` image with `ImagePullPolicy: Never`.
+`LocalNodeService` creates Kubernetes pods in the `default` namespace of the Docker Desktop cluster. All pods use the locally-built `datateal-runtime:latest` image with `ImagePullPolicy: Never`.
 
 - Node names are the pod names.
-- A `ManagedByLabel` (`app.kubernetes.io/managed-by=duckhouse-control-plane`) marks all managed pods so they can be listed and cleaned up.
+- A `ManagedByLabel` (`app.kubernetes.io/managed-by=datateal-control-plane`) marks all managed pods so they can be listed and cleaned up.
 
 **Wheel packages** are delivered as Kubernetes ConfigMaps mounted read-only into the pod. Each ConfigMap is given the pod as an owner reference so it is garbage-collected when the pod is deleted.
 
@@ -184,7 +184,7 @@ Execution is **async/poll**: `POST .../execute` returns HTTP 202 with an `{ exec
 | `NodeService:Aks:ResourceGroupName` | —                  | Resource group containing the AKS cluster                                   |
 | `NodeService:Aks:ClusterName`       | —                  | AKS cluster name                                                            |
 | `NodeService:Aks:DefaultVmSize`     | `Standard_D4as_v5` | VM size for new agent pools                                                 |
-| `NodeService:Aks:RuntimeImage`      | —                  | Full image reference, e.g. `myregistry.azurecr.io/duckhouse-runtime:latest` |
+| `NodeService:Aks:RuntimeImage`      | —                  | Full image reference, e.g. `myregistry.azurecr.io/datateal-runtime:latest` |
 | `NodeService:Aks:NodeSubnetId`      | —                  | Subnet resource ID for new agent pools                                      |
 | `NodeService:Aks:TenantId`          | _(none)_           | Entra ID tenant (service principal auth)                                    |
 | `NodeService:Aks:ClientId`          | _(none)_           | App registration client ID (service principal auth)                         |

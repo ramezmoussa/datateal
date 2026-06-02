@@ -1,0 +1,1103 @@
+@page "/notebook"
+@attribute [Authorize(Policy = AuthPolicy.WorkspaceRead)]
+@page "/notebook/{Id:guid}"
+
+@using Datateal.Core.Catalogs
+@using Datateal.Ui.Client.Notebook
+@using Datateal.Core.Kernels
+@using Datateal.Core.Nodes
+@using Datateal.Ui.Shared.Kernels
+@using Datateal.Ui.Shared.Workspace
+@using Datateal.Ui.Shared.Catalogs
+@using Datateal.Ui.Shared.Nodes
+@using Datateal.Ui.Shared.Ai
+@inject IKernelService KernelService
+@inject INodeService NodeService
+@inject IInteractivePoolService InteractivePoolService
+@inject IWorkspaceService WorkspaceService
+@inject ICatalogService CatalogService
+@inject IRecentItemsService RecentItemsService
+@inject IJSRuntime JS
+@inject NavigationManager Navigation
+@inject IAuthorizationService AuthorizationService
+@implements IAsyncDisposable
+
+<PageTitle>Notebook — Datateal</PageTitle>
+<NavigationLock ConfirmExternalNavigation="@_notebook.IsDirty"
+                OnBeforeInternalNavigation="ConfirmInternalNavigationAsync" />
+
+@* Negate the right side padding set in MainLayout.razor to have the scrollbar be flush with the edge. *@
+<div class="cp-layout" style="margin-right: -24px;">
+    <CatalogSidePanel AllCatalogs="@_allCatalogs"
+                    SelectedCatalogNames="@_selectedCatalogNames"
+                    SelectedCatalogNamesChanged="@(v => _selectedCatalogNames = v)"
+                    OnCatalogSelectionChanged="OnCatalogSelectionChanged"
+                    CatalogSetupRunning="@_catalog.SetupRunning" />
+    <div class="cp-main" style="margin-left: 24px;">
+
+        @if (_isLoading)
+        {
+            <div style="display: flex; align-items: center; justify-content: center; height: 300px;">
+                <Spin Size="SpinSize.Large" />
+            </div>
+        }
+        else
+        {
+
+        <FolderPickerModal Visible="_showFolderPicker"
+                        Title="@("Choose folder to save in")"
+                        OkText="@("Save here")"
+                        OnConfirm="ConfirmSaveToFolderAsync"
+                        OnCancel="@(() => _showFolderPicker = false)" />
+
+        @* flex row: [main notebook content] [AI sidebar] *@
+        <div style="display:flex; flex-direction:row; flex:1 1 0%; min-height:0; overflow:hidden;">
+        <div style="flex:1 1 0%; min-width:0; display:flex; flex-direction:column; overflow:hidden;">
+
+        <div class="nb-header">
+        <Flex Justify="FlexJustify.SpaceBetween" Align="FlexAlign.Center" Style="margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+            <Space Align="SpaceAlign.End" Size="SpaceSize.Middle">
+                <SpaceItem>
+                    <Icon Height="24px" Width="24px" Type="@IconType.Outline.FileText" />
+                </SpaceItem>
+                <SpaceItem>
+                    <h2 style="margin: 0;">
+                        @if (_editingTitle)
+                        {
+                            <Input Style="width: 30ch; font-size: inherit;"
+                                @bind-Value="_editingTitleValue"
+                                OnPressEnter="@(_ => CommitTitleEdit())"
+                                OnBlur="@(_ => CommitTitleEdit())" />
+                        }
+                        else
+                        {
+                            <span style="cursor: pointer;" @onclick="StartEditTitle">
+                                @_notebook.Title@(_notebook.IsDirty ? " *" : "")
+                            </span>
+                        }
+                    </h2>
+                </SpaceItem>
+            </Space>
+
+            @* File toolbar *@
+            <Space Size="SpaceSize.Small" Style="flex-wrap: wrap;">
+                <SpaceItem>
+                    <Dropdown Trigger="@(new Trigger[] { Trigger.Click })">
+                        <Overlay>
+                            <Menu>
+                                <MenuItem OnClick="OpenFileDialogAsync">
+                                    <Icon Type="@IconType.Outline.Upload" Style="margin-right: 6px;" />Open from file
+                                </MenuItem>
+                                <MenuItem OnClick="ExportFileAsync">
+                                    <Icon Type="@IconType.Outline.Download" Style="margin-right: 6px;" />Export
+                                </MenuItem>
+                            </Menu>
+                        </Overlay>
+                        <ChildContent>
+                            <Button Icon="@IconType.Outline.Ellipsis" />
+                        </ChildContent>
+                    </Dropdown>
+                    <InputFile @ref="_fileInput" style="display:none;" accept=".ipynb" OnChange="OnFileSelectedAsync" />
+                </SpaceItem>
+                @if (_workspaceNotebookId.HasValue)
+                {
+                    <SpaceItem>
+                        <AuthorizeView Policy="@AuthPolicy.WorkspaceManage">
+                                <Button Disabled="@(!_notebook.IsDirty)" Icon="@IconType.Outline.Save" OnClick="SaveToWorkspaceAsync">
+                                    Save
+                                </Button>
+                        </AuthorizeView>
+                    </SpaceItem>
+                }
+                else
+                {
+                    <AuthorizeView Policy="@AuthPolicy.WorkspaceManage">
+                        <SpaceItem>
+                            <Button Disabled="@(!_notebook.IsDirty)" Icon="@IconType.Outline.CloudUpload" OnClick="OpenFolderPickerAsync">
+                                Save to workspace
+                            </Button>
+                        </SpaceItem>
+                    </AuthorizeView>
+                }
+                <SpaceItem><Divider Type="DividerType.Vertical" /></SpaceItem>
+                <SpaceItem>
+                    <AuthorizeView Policy="@AuthPolicy.NodePoolOperate">
+                        @if (AnyExecuting)
+                        {
+                            <Button Disabled="@(!HasKernel || !AnyExecuting)"
+                                    Icon="@IconType.Outline.Loading"
+                                    OnClick="InterruptAsync">
+                                Interrupt
+                            </Button>
+                        }
+                        else
+                        {
+                            <Button Type="ButtonType.Primary"
+                                    Disabled="@(!HasKernel)"
+                                    Icon="@IconType.Outline.PlayCircle"
+                                    OnClick="RunAllAsync">
+                                Run all
+                            </Button>
+                        }
+                    </AuthorizeView>
+                </SpaceItem>
+                <SpaceItem>
+                    <Button Disabled="@(!_notebook.Cells.Any())"
+                            Icon="@IconType.Outline.Clear"
+                            OnClick="ClearAllOutputs">
+                        Clear outputs
+                    </Button>
+                </SpaceItem>
+                <SpaceItem>
+                    <Tooltip Title="Open AI assistant for this notebook">
+                        <Button Icon="@IconType.Outline.Robot"
+                                OnClick="OpenNotebookAiPanel">
+                            AI
+                        </Button>
+                    </Tooltip>
+                </SpaceItem>
+                <SpaceItem>
+                    <AuthorizeView Policy="@AuthPolicy.NodePoolOperate">
+                        <NodePoolSelector Pools="@_pools"
+                                          PoolName="@_poolName"
+                                          PoolNameChanged="@(v => _poolName = v)"
+                                          Kernel="@_kernel"
+                                          HasKernel="@HasKernel"
+                                          Connecting="@_connecting"
+                                          Disconnecting="@_disconnecting"
+                                          LoadingPools="@_loadingPools"
+                                          OnConnect="ConnectAsync"
+                                          OnDisconnect="DisconnectAsync" />
+                    </AuthorizeView>
+                </SpaceItem>
+            </Space>
+        </Flex>
+
+        @* Workspace breadcrumb — only visible when the notebook is saved in the workspace *@
+        @if (_workspaceNotebookId.HasValue && _breadcrumbs.Count > 0)
+        {
+            <Breadcrumb Style="margin-bottom: 8px;">
+                @foreach (var crumb in _breadcrumbs)
+                {
+                    <BreadcrumbItem>
+                        <a @onclick="() => NavigateToWorkspace(crumb.Id)" @onclick:preventDefault style="cursor: pointer;">
+                            @crumb.Name
+                        </a>
+                    </BreadcrumbItem>
+                }
+                <BreadcrumbItem>@_notebook.Title</BreadcrumbItem>
+            </Breadcrumb>
+        }
+
+        @* Catalog selector moved to the side panel *@
+
+        @if (_error is not null)
+        {
+            <Alert Type="AlertType.Error" Message="@_error" Closable ShowIcon="true"
+                OnClose="@(() => _error = null)" Style="margin-bottom: 16px;" />
+        }
+
+        </div>@* end .nb-header *@
+
+        <div class="nb-cells-wrapper">
+        <div class="nb-cells" id="nb-cells-scroll">
+        @* Cell list *@
+        <AddCellBar OnAddPython="() => AddCell(0, NotebookCellType.Code, NotebookCellLanguage.Python)"
+                    OnAddSql="() => AddCell(0, NotebookCellType.Code, NotebookCellLanguage.Sql)"
+                    OnAddMarkdown="() => AddCell(0, NotebookCellType.Markdown)" />
+
+        @for (int ci = 0; ci < _notebook.Cells.Count; ci++)
+        {
+            var cell = _notebook.Cells[ci];
+            var index = ci; // capture for closure
+            <div id="@($"nb-cell-{cell.Id}")">
+            <NotebookCellView @key="cell.Id" Cell="cell"
+                            NodeName="@_nodeName"
+                            KernelId="@_kernelId"
+                            CanMoveUp="@(index > 0)"
+                            CanMoveDown="@(index < _notebook.Cells.Count - 1)"
+                            PriorContext="@(() => PriorContextForAsync(index))"
+                            ProvideRunMagicCompletions="ProvideRunMagicCompletionsAsync"
+                            OnExecute="@(() => _ = ExecuteCellAsync(cell))"
+                            OnRunAbove="@(() => _ = RunAboveAsync(cell))"
+                            OnRunBelow="@(() => _ = RunBelowAsync(cell))"
+                            OnInterrupt="InterruptAsync"
+                            OnDelete="@(() => DeleteCell(cell))"
+                            OnMoveUp="@(() => MoveCell(index, -1))"
+                            OnMoveDown="@(() => MoveCell(index, 1))"
+                            OnCellChanged="MarkDirty"
+                            AlwaysConsumeMouseWheel="false"
+                            OnToggleParameters="@(() => ToggleParameterCell(cell))"
+                            OnInsertPythonCellBelow="@(() => AddCell(index + 1, NotebookCellType.Code, NotebookCellLanguage.Python, "display(_sqldf)"))"
+                            OnInsertSqlCellBelow="@(() => AddCell(index + 1, NotebookCellType.Code, NotebookCellLanguage.Sql, "FROM _sqldf"))"
+                            OnOpenCellAi="@(() => OpenCellAiPanel(index, cell))" />
+            </div>
+            <AddCellBar @key="@($"add-{cell.Id}")" OnAddPython="() => AddCell(index + 1, NotebookCellType.Code, NotebookCellLanguage.Python)"
+                        OnAddSql="() => AddCell(index + 1, NotebookCellType.Code, NotebookCellLanguage.Sql)"
+                        OnAddMarkdown="() => AddCell(index + 1, NotebookCellType.Markdown)" />
+        }
+
+        @if (_notebook.Cells.Count == 0)
+        {
+            <div style="font-style: italic; font-size: 0.875rem; text-align: center; padding: 32px 0;">
+                <Text Type="TextElementType.Secondary">No cells yet — use the <strong>+</strong> buttons above to add your first cell.</Text>
+            </div>
+        }
+
+        </div>@* end .nb-cells *@
+        <NotebookProgressGutter Cells="@_notebook.Cells" ScrollContainerId="nb-cells-scroll" />
+        </div>@* end .nb-cells-wrapper *@
+
+        </div>@* end main content column *@
+
+        <AiChatPanel Visible="_aiPanelVisible"
+                     VisibleChanged="@(v => _aiPanelVisible = v)"
+                     ContextType="_aiContextType"
+                     ContextLabel="@_aiContextLabel"
+                     CatalogIds="@AiCatalogIds"
+                     GetNotebookJson="@(() => NotebookSerializer.Serialize(_notebook))"
+                     GetFocusedCellIndex="@(() => _aiFocusedCellIndex)"
+                     OnApplyCode="ApplyAiCodeAsync"
+                     OnApplyCellChanges="ApplyAiCellChangesAsync" />
+
+        </div>@* end flex row (main content + AI sidebar) *@
+
+        }@* end else (not loading) *@
+
+    </div>@* end .cp-main *@
+</div>@* end .cp-layout *@
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+    [CascadingParameter] private Task<AuthenticationState>? AuthenticationStateTask { get; set; }
+
+    private NotebookDocument _notebook = new();
+    private Guid? _workspaceNotebookId;
+    private Guid? _workspaceNotebookFolderId;
+    private List<(Guid? Id, string Name)> _breadcrumbs = [];
+    private string? _poolName;
+    private string? _nodeName;
+    private string? _kernelId;
+    private KernelInfo? _kernel;
+    private IReadOnlyList<InteractivePoolDto> _pools = [];
+    private bool _loadingPools;
+    private bool _connecting;
+    private bool _disconnecting;
+    private string? _error;
+    private bool _editingTitle;
+    private string _editingTitleValue = "";
+    private InputFile _fileInput = default!;
+    private CancellationTokenSource? _kernelPollingCts;
+    private CancellationTokenSource? _connectCts;
+    private bool _canNodePoolOperate;
+
+    // Folder picker (first-time workspace save)
+    private bool _showFolderPicker;
+
+    // Catalogs
+    private IReadOnlyList<CatalogDto> _allCatalogs = [];
+    private IEnumerable<string> _selectedCatalogNames = [];
+    private CatalogSession _catalog = default!;
+
+    // AI assistant
+    private bool _aiPanelVisible;
+    private AiContextType _aiContextType = AiContextType.NotebookCell;
+    private string? _aiContextLabel;
+    private int _aiFocusedCellIndex = -1;
+    private NotebookCell? _aiFocusedCell;
+    private IReadOnlyList<Guid> AiCatalogIds =>
+        _allCatalogs.Where(c => _selectedCatalogNames.Contains(c.Name)).Select(c => c.Id).ToList();
+
+    private bool _isLoading;
+    private bool HasKernel => !string.IsNullOrEmpty(_kernelId);
+    private bool AnyExecuting => _notebook.Cells.Any(c => c.IsExecuting);
+    private InteractivePoolDto? SelectedPool => _pools.FirstOrDefault(p => p.Name == _poolName);
+
+    // NotebookCellView.OnCellChanged is Action? (not EventCallback) deliberately: EventCallback would call
+    // StateHasChanged() on NotebookPage after every single keystroke, forcing the entire
+    // page — including SetParametersAsync on every NotebookCellView — to reconcile on
+    // each character typed. On a large notebook this makes editing noticeably laggy.
+    //
+    // Instead, we call StateHasChanged() ourselves, but only on the false→true transition.
+    // The Save button needs to become active on the very first change; after that IsDirty
+    // stays true until the next save, so no further re-render is needed for this purpose.
+    private void MarkDirty()
+    {
+        if (_notebook.IsDirty) return; // already dirty — Save button already active
+        _notebook.IsDirty = true;
+        StateHasChanged(); // one re-render per save cycle, not one per keystroke
+    }
+
+    private void NavigateToWorkspace(Guid? folderId) =>
+        Navigation.NavigateTo(folderId is null ? "/workspace" : $"/workspace?folder={folderId}");
+
+    private void StartEditTitle()
+    {
+        _editingTitleValue = _notebook.Title;
+        _editingTitle = true;
+    }
+
+    private void CommitTitleEdit()
+    {
+        var value = string.IsNullOrWhiteSpace(_editingTitleValue) ? "Untitled" : _editingTitleValue;
+        if (value.Contains('/'))
+        {
+            _error = "Notebook title cannot contain '/'.";
+            return;
+        }
+        _notebook.Title = value;
+        _notebook.IsDirty = true;
+        _editingTitle = false;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        _catalog = new CatalogSession(
+            KernelService, CatalogService,
+            () => _nodeName, () => _kernelId, () => _allCatalogs,
+            StateHasChanged, msg => _error = msg);
+
+        // Load notebook from workspace if an Id was provided
+        if (Id != Guid.Empty)
+        {
+            _isLoading = true;
+            try
+            {
+                var detail = await WorkspaceService.GetNotebookAsync(Id);
+                if (detail is not null)
+                {
+                    _notebook = NotebookSerializer.Deserialize(detail.Content);
+                    _notebook.IsDirty = false;
+                    _workspaceNotebookId = detail.Id;
+                    _workspaceNotebookFolderId = detail.FolderId;
+                    _ = RecentItemsService.RecordVisitAsync(detail.Id, _notebook.Title, "Notebook");
+
+                    if (detail.FolderId is not null)
+                    {
+                        var ancestors = await WorkspaceService.GetFolderAncestorsAsync(detail.FolderId.Value);
+                        _breadcrumbs = [(null, "Workspace"), ..ancestors.Select(f => ((Guid?)f.Id, f.Name))];
+                    }
+                    else
+                    {
+                        _breadcrumbs = [(null, "Workspace")];
+                    }
+                }
+                else
+                {
+                    _error = "Notebook not found in workspace.";
+                }
+            }
+            catch (Exception ex)
+            {
+                _error = $"Failed to load notebook: {ex.Message}";
+            }
+            finally
+            {
+                _isLoading = false;
+            }
+        }
+
+        // Generate a timestamped placeholder title for new (unsaved) notebooks
+        if (Id == Guid.Empty)
+        {
+            _notebook.Title = $"Untitled {DateTime.Now:yyyy-MM-dd HH:mm:ss}";
+            _notebook.IsDirty = true;
+        }
+
+        // Check NodePoolOperate permission and gate all kernel/pool operations
+        var authState = await AuthenticationStateTask!;
+        var authResult = await AuthorizationService.AuthorizeAsync(authState.User, null, AuthPolicy.NodePoolOperate);
+        _canNodePoolOperate = authResult.Succeeded;
+
+        if (_canNodePoolOperate)
+        {
+        _loadingPools = true;
+        try { _pools = await InteractivePoolService.GetInteractivePoolsAsync(); }
+        catch (Exception ex) { _error = $"Failed to load pools: {ex.Message}"; }
+        finally { _loadingPools = false; }
+        }
+
+        // Load available catalogs
+        try { _allCatalogs = await CatalogService.GetCatalogsAsync(); }
+        catch { /* non-fatal — catalog list just stays empty */ }
+
+        // Restore saved catalog selections
+        if (_workspaceNotebookId.HasValue)
+        {
+            try
+            {
+                var savedNames = await CatalogService.GetWorkspaceItemCatalogsAsync(_workspaceNotebookId.Value);
+                _selectedCatalogNames = savedNames;
+            }
+            catch { /* non-fatal */ }
+        }
+
+        // Restore last-used pool preference
+        if (_canNodePoolOperate && _workspaceNotebookId.HasValue)
+        {
+            try
+            {
+                var storedPool = await JS.InvokeAsync<string>("getItemNodePref", _workspaceNotebookId.Value.ToString());
+                if (!string.IsNullOrEmpty(storedPool))
+                {
+                    var match = _pools.FirstOrDefault(p => p.Name == storedPool);
+                    if (match is not null)
+                    {
+                        _poolName = match.Name;
+                        if (match.Status == InteractivePoolStatus.Running)
+                            _ = ConnectAsync();
+                    }
+                }
+            }
+            catch { /* JS interop failure is non-fatal */ }
+        }
+    }
+
+    private async Task ConnectAsync()
+    {
+        if (string.IsNullOrEmpty(_poolName)) return;
+        _connecting = true;
+        _error = null;
+        _connectCts = new CancellationTokenSource();
+        var ct = _connectCts.Token;
+        try
+        {
+            // Ensure the interactive pool's node exists (creates it if needed)
+            var nodeInfo = await InteractivePoolService.EnsureNodeAsync(_poolName, ct);
+            if (nodeInfo is null) throw new Exception("Interactive pool not found.");
+
+            var nodeName = nodeInfo.Name;
+
+            // Poll until running if the node is still being provisioned
+            if (nodeInfo.State != NodeState.Running)
+            {
+                var deadline = DateTime.UtcNow.AddMinutes(15);
+                while (DateTime.UtcNow < deadline)
+                {
+                    await Task.Delay(3000, ct);
+                    var updated = await NodeService.GetNodeAsync(nodeName, ct);
+                    if (updated is null) throw new Exception("Node not found.");
+                    _pools = _pools.Select(p => p.NodeName == nodeName ? p with { Status = updated.State.ToInteractivePoolStatus() } : p).ToList();
+                    StateHasChanged();
+                    if (updated.State == NodeState.Running) break;
+                    if (updated.State == NodeState.Failure) throw new Exception("Node failed to start.");
+                }
+                var finalNode = await NodeService.GetNodeAsync(nodeName, ct);
+                if (finalNode?.State != NodeState.Running)
+                    throw new Exception("Node did not reach Running state in time.");
+            }
+
+            _nodeName = nodeName;
+            var kernel = await CreateKernelWithRetryAsync(nodeName, ct);
+            _kernelId = kernel.Id;
+            _kernel = kernel;
+            _kernelPollingCts = new CancellationTokenSource();
+            _ = PollKernelStatusAsync(_kernelPollingCts.Token);
+            if (_workspaceNotebookId.HasValue)
+                await JS.InvokeVoidAsync("setItemNodePref", _workspaceNotebookId.Value.ToString(), _poolName);
+
+            // Attach catalogs if any are selected
+            await _catalog.SetupAllAsync(_selectedCatalogNames);
+        }
+        catch (OperationCanceledException)
+        {
+            // Page was disposed while waiting — discard silently
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to connect: {ex.Message}";
+        }
+        finally
+        {
+            _connecting = false;
+            _connectCts.Dispose();
+            _connectCts = null;
+        }
+        StateHasChanged();
+    }
+
+    private static readonly int KernelCreateMaxRetries = 18;
+    private static readonly TimeSpan KernelCreateRetryInterval = TimeSpan.FromSeconds(5);
+
+    private static TimeSpan GetPollDelay(int attempt) => attempt switch
+    {
+        0 => TimeSpan.FromMilliseconds(100),
+        1 => TimeSpan.FromMilliseconds(300),
+        2 => TimeSpan.FromMilliseconds(600),
+        _ => TimeSpan.FromMilliseconds(1000),
+    };
+
+    private async Task<KernelInfo> CreateKernelWithRetryAsync(string nodeName, CancellationToken ct = default)
+    {
+        HttpRequestException? lastEx = null;
+        for (var attempt = 0; attempt <= KernelCreateMaxRetries; attempt++)
+        {
+            if (attempt > 0)
+                await Task.Delay(KernelCreateRetryInterval, ct);
+            try
+            {
+                return await KernelService.CreateKernelAsync(nodeName, ct);
+            }
+            catch (HttpRequestException ex) when (IsTransientRuntimeError(ex.StatusCode))
+            {
+                lastEx = ex;
+            }
+        }
+        throw lastEx!;
+    }
+
+    private static bool IsTransientRuntimeError(System.Net.HttpStatusCode? statusCode) =>
+        statusCode is
+            System.Net.HttpStatusCode.BadRequest            // 400 — runtime not fully initialised
+            or System.Net.HttpStatusCode.InternalServerError // 500 — unexpected startup error
+            or System.Net.HttpStatusCode.BadGateway          // 502 — pod not yet reachable
+            or System.Net.HttpStatusCode.ServiceUnavailable  // 503 — pod not ready
+            or System.Net.HttpStatusCode.GatewayTimeout;     // 504 — pod responded too slowly
+
+    private async Task DisconnectAsync()
+    {
+        if (!HasKernel || string.IsNullOrEmpty(_nodeName)) return;
+        _disconnecting = true;
+        _error = null;
+        try
+        {
+            await StopKernelPollingAsync();
+            await KernelService.DeleteKernelAsync(_nodeName, _kernelId!);
+            _kernelId = null;
+            _kernel = null;
+            _catalog.Clear();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to disconnect: {ex.Message}";
+        }
+        finally
+        {
+            _disconnecting = false;
+        }
+    }
+
+    private async Task PollKernelStatusAsync(CancellationToken cancellationToken)
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(30));
+        try
+        {
+            while (await timer.WaitForNextTickAsync(cancellationToken))
+            {
+                if (AnyExecuting || string.IsNullOrEmpty(_kernelId) || string.IsNullOrEmpty(_nodeName))
+                    continue;
+                try
+                {
+                    _kernel = await KernelService.GetKernelAsync(_nodeName, _kernelId, cancellationToken);
+                    await InvokeAsync(StateHasChanged);
+                }
+                catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+                {
+                    _kernelId = null;
+                    _kernel = null;
+                    _error = "The kernel was evicted, likely due to inactivity. Please reconnect.";
+                    await InvokeAsync(StateHasChanged);
+                    break;
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
+                catch { /* ignore transient errors — will retry on next tick */ }
+            }
+        }
+        catch (OperationCanceledException) { }
+    }
+
+    private async Task StopKernelPollingAsync()
+    {
+        if (_kernelPollingCts is not null)
+        {
+            await _kernelPollingCts.CancelAsync();
+            _kernelPollingCts.Dispose();
+            _kernelPollingCts = null;
+        }
+    }
+
+    private async Task ExecuteCellAsync(NotebookCell cell)
+    {
+        if (!HasKernel || string.IsNullOrEmpty(_nodeName) || cell.IsExecuting) return;
+
+        cell.ClearOutput();
+        cell.IsExecuting = true;
+        _error = null;
+        if (_kernel is not null)
+            _kernel = _kernel with { Status = KernelStatus.Busy };
+
+        string codeToRun;
+        if (cell.Language == NotebookCellLanguage.Sql)
+        {
+            codeToRun = SqlCodeGenerator.WrapSql(cell.Source);
+        }
+        else if (RunMagicHelper.HasRunLines(cell.Source))
+        {
+            try
+            {
+                codeToRun = await RunMagicHelper.ExpandAsync(
+                    cell.Source, _workspaceNotebookFolderId, WorkspaceService);
+                cell.CachedExpandedSource = codeToRun;
+            }
+            catch (RunMagicException ex)
+            {
+                cell.Error = new ErrorInfo("RunMagicError", ex.Message, []);
+                cell.IsExecuting = false;
+                return;
+            }
+        }
+        else
+        {
+            codeToRun = cell.Source;
+            cell.CachedExpandedSource = null;
+        }
+
+        try
+        {
+            var handle = await KernelService.StartExecuteAsync(
+                _nodeName, _kernelId!, new ExecuteKernelRequest(codeToRun));
+            cell.ExecutionId = handle.ExecutionId;
+
+            PollExecutionResponse poll;
+            var pollAttempt = 0;
+            do
+            {
+                await Task.Delay(GetPollDelay(pollAttempt++));
+                poll = await KernelService.PollExecutionAsync(_nodeName, _kernelId!, handle.ExecutionId);
+                StateHasChanged();
+            } while (!poll.IsComplete);
+
+            var result = poll.Result!;
+            cell.Outputs = result.Outputs.ToList();
+            cell.Error = result.Error;
+            cell.ExecutionCount = result.ExecutionCount;
+            cell.DurationMs = result.DurationMs;
+            _kernel = await KernelService.GetKernelAsync(_nodeName, _kernelId!);
+            _notebook.IsDirty = true;
+        }
+        catch (Exception ex)
+        {
+            _error = $"Execution failed: {ex.Message}";
+        }
+        finally
+        {
+            cell.IsExecuting = false;
+            cell.ExecutionId = null;
+        }
+    }
+
+    private async Task RunAllAsync()
+    {
+        var cells = _notebook.Cells.Where(c => c.CellType == NotebookCellType.Code).ToList();
+        foreach (var c in cells) c.ClearOutput();
+
+        foreach (var cell in cells)
+        {
+            await ExecuteCellAsync(cell);
+            if (cell.Error is not null) break;
+        }
+    }
+
+    private async Task RunAboveAsync(NotebookCell targetCell)
+    {
+        var cells = _notebook.Cells
+            .Take(_notebook.Cells.IndexOf(targetCell))
+            .Where(c => c.CellType == NotebookCellType.Code)
+            .ToList();
+
+        foreach (var c in cells) c.ClearOutput();
+
+        foreach (var c in cells)
+        {
+            await ExecuteCellAsync(c);
+            if (c.Error is not null) break;
+        }
+    }
+
+    private async Task RunBelowAsync(NotebookCell targetCell)
+    {
+        var cells = _notebook.Cells
+            .Skip(_notebook.Cells.IndexOf(targetCell))
+            .Where(c => c.CellType == NotebookCellType.Code)
+            .ToList();
+
+        foreach (var c in cells) c.ClearOutput();
+
+        foreach (var c in cells)
+        {
+            await ExecuteCellAsync(c);
+            if (c.Error is not null) break;
+        }
+    }
+
+    private async Task InterruptAsync()
+    {
+        if (!HasKernel || string.IsNullOrEmpty(_nodeName)) return;
+        try { await KernelService.InterruptKernelAsync(_nodeName, _kernelId!); }
+        catch (Exception ex) { _error = $"Interrupt failed: {ex.Message}"; }
+    }
+
+    private void ClearAllOutputs()
+    {
+        foreach (var cell in _notebook.Cells)
+            cell.ClearOutput();
+        _notebook.IsDirty = true;
+    }
+
+    private void AddCell(int index, NotebookCellType cellType, NotebookCellLanguage lang = NotebookCellLanguage.Python, string source = "")
+    {
+        var cell = new NotebookCell { CellType = cellType, Language = lang, Source = source };
+        if (cellType == NotebookCellType.Markdown)
+            cell.IsEditingMarkdown = true;
+        _notebook.Cells.Insert(index, cell);
+        _notebook.IsDirty = true;
+    }
+
+    private void DeleteCell(NotebookCell cell)
+    {
+        _notebook.Cells.Remove(cell);
+        _notebook.IsDirty = true;
+    }
+
+    private void ToggleParameterCell(NotebookCell cell)
+    {
+        bool wasSet = cell.IsParameterCell;
+        // Clear the flag on all cells first
+        foreach (var c in _notebook.Cells)
+            c.IsParameterCell = false;
+        // Toggle on the target cell (unless it was already set — then it's now cleared)
+        cell.IsParameterCell = !wasSet;
+        _notebook.IsDirty = true;
+    }
+
+    private void MoveCell(int index, int direction)
+    {
+        int target = index + direction;
+        if (target < 0 || target >= _notebook.Cells.Count) return;
+        (_notebook.Cells[index], _notebook.Cells[target]) = (_notebook.Cells[target], _notebook.Cells[index]);
+        _notebook.IsDirty = true;
+    }
+
+    // ── AI assistant ───────────────────────────────────────────────────
+
+    private void OpenNotebookAiPanel()
+    {
+        _aiContextType = AiContextType.Notebook;
+        _aiFocusedCellIndex = -1;
+        _aiFocusedCell = null;
+        _aiContextLabel = "Notebook";
+        _aiPanelVisible = true;
+    }
+
+    private void OpenCellAiPanel(int index, NotebookCell cell)
+    {
+        _aiContextType = AiContextType.NotebookCell;
+        _aiFocusedCellIndex = index;
+        _aiFocusedCell = cell;
+        var langLabel = cell.CellType == NotebookCellType.Markdown
+            ? "Markdown"
+            : cell.Language == NotebookCellLanguage.Sql ? "SQL" : "Python";
+        _aiContextLabel = $"Cell {index + 1} ({langLabel})";
+        _aiPanelVisible = true;
+    }
+
+    private Task ApplyAiCodeAsync(string code)
+    {
+        if (_aiFocusedCell is not null)
+        {
+            _aiFocusedCell.Source = code;
+            _notebook.IsDirty = true;
+            StateHasChanged();
+        }
+        return Task.CompletedTask;
+    }
+
+    private Task ApplyAiCellChangesAsync(IReadOnlyList<CellProposal> proposals)
+    {
+        var removed = proposals
+            .Where(p => p.Operation == CellProposalOperation.Remove)
+            .Select(p => p.CellIndex)
+            .ToHashSet();
+
+        var inserts = proposals
+            .Where(p => p.Operation == CellProposalOperation.Insert)
+            .GroupBy(p => p.CellIndex)
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        // Apply edits in-place before rebuilding the list
+        foreach (var p in proposals.Where(p => p.Operation == CellProposalOperation.Edit))
+        {
+            if (p.CellIndex >= 0 && p.CellIndex < _notebook.Cells.Count && p.NewContent is not null)
+                _notebook.Cells[p.CellIndex].Source = p.NewContent;
+        }
+
+        // Rebuild the cell list — handles removals and insertions relative to original indices
+        var newCells = new List<NotebookCell>();
+
+        // Inserts before all cells (afterCellIndex == -1)
+        if (inserts.TryGetValue(-1, out var beforeAll))
+            foreach (var p in beforeAll)
+                newCells.Add(CreateCellFromProposal(p));
+
+        for (int i = 0; i < _notebook.Cells.Count; i++)
+        {
+            if (!removed.Contains(i))
+                newCells.Add(_notebook.Cells[i]);
+
+            if (inserts.TryGetValue(i, out var afterThis))
+                foreach (var p in afterThis)
+                    newCells.Add(CreateCellFromProposal(p));
+        }
+
+        // Append any inserts that reference indices beyond the original notebook length
+        // (the AI may use sequential indices when proposing multiple consecutive inserts)
+        foreach (var key in inserts.Keys.Where(k => k >= _notebook.Cells.Count).OrderBy(k => k))
+            foreach (var p in inserts[key])
+                newCells.Add(CreateCellFromProposal(p));
+
+        _notebook.Cells.Clear();
+        _notebook.Cells.AddRange(newCells);
+        _notebook.IsDirty = true;
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    private static NotebookCell CreateCellFromProposal(CellProposal p)
+    {
+        var (cellType, lang) = p.Language?.ToLowerInvariant() switch
+        {
+            "sql" => (NotebookCellType.Code, NotebookCellLanguage.Sql),
+            "markdown" or "md" => (NotebookCellType.Markdown, NotebookCellLanguage.Python),
+            _ => (NotebookCellType.Code, NotebookCellLanguage.Python),
+        };
+        var cell = new NotebookCell { CellType = cellType, Language = lang, Source = p.NewContent ?? "" };
+        if (cellType == NotebookCellType.Markdown)
+            cell.IsEditingMarkdown = true;
+        return cell;
+    }
+
+    private async Task<string> PriorContextForAsync(int cellIndex)
+    {
+        var parts = new List<string>();
+        foreach (var c in _notebook.Cells.Take(cellIndex).Where(c => c.CellType == NotebookCellType.Code))
+        {
+            if (c.Language == NotebookCellLanguage.Sql)
+            {
+                // Use WrapSql so the context mirrors actual execution: _sqldf is assigned,
+                // the SQL is properly escaped, and Jedi can infer _sqldf as pd.DataFrame.
+                parts.Add(SqlCodeGenerator.WrapSql(c.Source));
+            }
+            else if (c.CachedExpandedSource is not null)
+            {
+                parts.Add(c.CachedExpandedSource);
+            }
+            else if (RunMagicHelper.HasRunLines(c.Source))
+            {
+                // Eagerly expand %run references so Jedi can see their definitions
+                try
+                {
+                    var expanded = await RunMagicHelper.ExpandAsync(
+                        c.Source, _workspaceNotebookFolderId, WorkspaceService);
+                    parts.Add(expanded);
+                }
+                catch
+                {
+                    parts.Add(RunMagicHelper.ReplaceRunLinesWithPass(c.Source));
+                }
+            }
+            else
+            {
+                parts.Add(RunMagicHelper.ReplaceRunLinesWithPass(c.Source));
+            }
+        }
+        return string.Join("\n", parts);
+    }
+
+    private async Task<IReadOnlyList<RunMagicCompletionItem>> ProvideRunMagicCompletionsAsync(string directoryPath)
+    {
+        try
+        {
+            var resolved = await WorkspaceService.ResolvePathAsync(
+                directoryPath.EndsWith('/') ? directoryPath : directoryPath + "/",
+                _workspaceNotebookFolderId);
+
+            if (resolved?.Listing is null) return [];
+
+            var items = new List<RunMagicCompletionItem>();
+            foreach (var f in resolved.Listing.Folders)
+                items.Add(new(f.Name + "/", "folder", f.Name + "/"));
+            foreach (var n in resolved.Listing.Items.Where(i => i.ItemType == Datateal.Core.Workspace.WorkspaceItemType.Notebook))
+                items.Add(new(n.Title, "notebook", n.Title));
+            foreach (var q in resolved.Listing.Items.Where(i => i.ItemType == Datateal.Core.Workspace.WorkspaceItemType.Query))
+                items.Add(new(q.Title, "query", q.Title));
+            return items;
+        }
+        catch
+        {
+            return [];
+        }
+    }
+
+    private async Task OpenFileDialogAsync()
+    {
+        await JS.InvokeVoidAsync("clickElement", _fileInput.Element);
+    }
+
+    private async Task OnFileSelectedAsync(InputFileChangeEventArgs args)
+    {
+        try
+        {
+            using var stream = args.File.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024);
+            using var reader = new StreamReader(stream);
+            var json = await reader.ReadToEndAsync();
+            _notebook = NotebookSerializer.Deserialize(json);
+            // Mark dirty so "Save to workspace" is enabled — a local file has never been saved to the workspace.
+            // Clear all workspace-bound state so the user is prompted to pick a location rather than
+            // silently overwriting whatever notebook was open before. Kernel connection is left intact
+            // because it is independent of which notebook is loaded.
+            _notebook.IsDirty = true;
+            _workspaceNotebookId = null;
+            _workspaceNotebookFolderId = null;
+            _breadcrumbs = [];
+            _selectedCatalogNames = [];
+            _error = null;
+            _editingTitle = false;
+            _editingTitleValue = "";
+            _showFolderPicker = false;
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to open file: {ex.Message}";
+        }
+    }
+
+    private async Task SaveToWorkspaceAsync()
+    {
+        if (!_workspaceNotebookId.HasValue) return;
+        try
+        {
+            var json = NotebookSerializer.Serialize(_notebook);
+            await WorkspaceService.UpdateNotebookAsync(_workspaceNotebookId.Value,
+                new UpdateNotebookRequest(_notebook.Title, json, _workspaceNotebookFolderId));
+            try { await CatalogService.UpdateWorkspaceItemCatalogsAsync(_workspaceNotebookId.Value, _selectedCatalogNames.ToList()); }
+            catch (Exception ex) { _error = $"Notebook saved but failed to save catalog selection: {ex.Message}"; }
+            _ = RecentItemsService.UpdateNameAsync(_workspaceNotebookId.Value, _notebook.Title);
+            _notebook.IsDirty = false;
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to save to workspace: {ex.Message}";
+        }
+    }
+
+    // ── Folder picker (first-time save) ───────────────────────────────
+
+    private Task OpenFolderPickerAsync()
+    {
+        _showFolderPicker = true;
+        return Task.CompletedTask;
+    }
+
+    private async Task ConfirmSaveToFolderAsync(Guid? folderId)
+    {
+        _showFolderPicker = false;
+        try
+        {
+            var json = NotebookSerializer.Serialize(_notebook);
+            var summary = await WorkspaceService.CreateNotebookAsync(
+                new CreateNotebookRequest(_notebook.Title, json, folderId));
+            _workspaceNotebookId = summary.Id;
+            _workspaceNotebookFolderId = folderId;
+
+            _ = RecentItemsService.RecordVisitAsync(summary.Id, _notebook.Title, "Notebook");
+
+            if (_selectedCatalogNames.Any())
+            {
+                try { await CatalogService.UpdateWorkspaceItemCatalogsAsync(summary.Id, _selectedCatalogNames.ToList()); }
+                catch (Exception ex) { _error = $"Notebook saved but failed to save catalog selection: {ex.Message}"; }
+            }
+
+            if (folderId is not null)
+            {
+                var ancestors = await WorkspaceService.GetFolderAncestorsAsync(folderId.Value);
+                _breadcrumbs = [(null, "Workspace"), ..ancestors.Select(f => ((Guid?)f.Id, f.Name))];
+            }
+            else
+            {
+                _breadcrumbs = [(null, "Workspace")];
+            }
+
+            _notebook.IsDirty = false;
+            Navigation.NavigateTo($"/notebook/{_workspaceNotebookId}", replace: true);
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to save to workspace: {ex.Message}";
+        }
+    }
+
+    private async Task ExportFileAsync()
+    {
+        try
+        {
+            var json = NotebookSerializer.Serialize(_notebook);
+            var filename = (_notebook.Title.Trim().Length > 0 ? _notebook.Title.Trim() : "notebook") + ".ipynb";
+            await JS.InvokeVoidAsync("downloadFile", filename, json);
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to export: {ex.Message}";
+        }
+    }
+
+    // ── Catalog management ───────────────────────────────────────────
+
+    private Task OnCatalogSelectionChanged(IEnumerable<CatalogDto> selectedItems)
+    {
+        _notebook.IsDirty = true;
+        return _catalog.OnSelectionChangedAsync(selectedItems);
+    }
+
+    private async Task ConfirmInternalNavigationAsync(LocationChangingContext ctx)
+    {
+        if (!_notebook.IsDirty) return;
+        var confirmed = await JS.InvokeAsync<bool>("confirm", "You have unsaved changes. Are you sure you want to leave?");
+        if (!confirmed)
+            ctx.PreventNavigation();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_connectCts is not null)
+        {
+            await _connectCts.CancelAsync();
+            // _connectCts is disposed by ConnectAsync's finally block
+        }
+        await StopKernelPollingAsync();
+        if (HasKernel && !string.IsNullOrEmpty(_nodeName))
+        {
+            try { await KernelService.DeleteKernelAsync(_nodeName, _kernelId!); }
+            catch { /* best effort */ }
+        }
+    }
+
+    private static string StatusTagColor(KernelStatus status) => status switch
+    {
+        KernelStatus.Idle                                 => "success",
+        KernelStatus.Busy                                 => "warning",
+        KernelStatus.Starting or KernelStatus.Restarting => "processing",
+        KernelStatus.Dead                                 => "error",
+        _                                                 => "default"
+    };
+
+    private static string NodeStateTagColor(NodeState state) => state switch
+    {
+        NodeState.Running => "success",
+        NodeState.Failure => "error",
+        _                 => "warning",
+    };
+}
+

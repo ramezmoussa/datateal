@@ -1,0 +1,234 @@
+@page "/"
+
+@using Datateal.Ui.Shared.Workspace
+@using Datateal.Ui.Shared.Orchestration
+@using Datateal.Core.Workspace
+@inject IWorkspaceService WorkspaceService
+@inject IJobService JobService
+@inject IRecentItemsService RecentItemsService
+@inject NavigationManager Navigation
+
+<PageTitle>Home — Datateal</PageTitle>
+
+<div style="max-width: 600px; margin: 10px auto 0; display: flex; flex-direction: column; gap: 32px;">
+
+    @* ── Search ── *@
+    <div>
+        <p style="text-align: center; margin-bottom: 8px; color: #8c8c8c; font-size: 14px;">
+            Open a notebook, query or job
+        </p>
+        @if (_errorMessage is not null)
+        {
+            <Alert Type="@AlertType.Error" Message="@_errorMessage" ShowIcon="true" Style="margin-bottom: 8px;" />
+        }
+        <AutoComplete TOption="string"
+                      OptionDataItems="@_searchOptions"
+                      OnSelectionChange="OnItemSelected"
+                      Style="width: 100%;">
+            <ChildContent>
+                <AutoCompleteSearch @bind-Value="_searchText"
+                                    Placeholder="Search…"
+                                    OnFocus="EnsureDataLoadedAsync"
+                                    OnInput="OnSearchInput"
+                                    Style="width: 100%;" />
+            </ChildContent>
+            <OptionTemplate>
+                <AutoCompleteOption Value="@context.Value" Label="@context.Label" Disabled="@context.IsDisabled">
+                    @{ var (optIcon, optColor) = GetIconForUrl(context.Value); }
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <Icon Type="@optIcon" Style="@($"color: {optColor}; width: 16px; text-align: center; flex-shrink: 0;")" />
+                        <span style="flex: 1;">@context.Label</span>
+                        <Tag Color="@("default")" Style="font-size: 11px; flex-shrink: 0;">@GetTypeFromUrl(context.Value)</Tag>
+                    </div>
+                </AutoCompleteOption>
+            </OptionTemplate>
+        </AutoComplete>
+    </div>
+
+    @* ── Recently viewed ── *@
+    <div>
+        <p style="font-weight: 500; margin-bottom: 8px;">Recently viewed</p>
+        @if (_recentItems.Count == 0)
+        {
+            <span style="color: #8c8c8c; font-size: 13px;">No recently viewed items.</span>
+        }
+        else
+        {
+            <AntList DataSource="@_recentItems" TItem="RecentItem" Size="@ListSize.Small">
+                <ListItem Style="cursor: pointer;" OnClick="@(() => NavigateToItem(context))">
+                    <ChildContent>
+                        <ListItemMeta>
+                            <AvatarTemplate>
+                                <Avatar Icon="@GetItemIcon(context.Type)" Style="@GetItemAvatarStyle(context.Type)" />
+                            </AvatarTemplate>
+                            <TitleTemplate>
+                                <span>@context.Name</span>
+                                <Tag Color="@("default")" Style="margin-left: 8px; font-size: 11px;">@context.Type</Tag>
+                            </TitleTemplate>
+                            <DescriptionTemplate>
+                                <span style="color: #8c8c8c; font-size: 12px;">@TimeAgo(context.AccessedAt)</span>
+                            </DescriptionTemplate>
+                        </ListItemMeta>
+                    </ChildContent>
+                    <Extra>
+                        <div @onclick:stopPropagation>
+                            <Button Size="ButtonSize.Small"
+                                    Type="@ButtonType.Text"
+                                    Icon="@IconType.Outline.Close"
+                                    OnClick="@(() => _ = RemoveRecentItemAsync(context))" />
+                        </div>
+                    </Extra>
+                </ListItem>
+            </AntList>
+        }
+    </div>
+
+</div>
+
+@code {
+    private string _searchText = "";
+
+    // Search data (loaded lazily)
+    private bool _dataLoaded;
+    private bool _loadingData;
+    private string? _errorMessage;
+    private List<WorkspaceItemSummary> _allItems = [];
+    private List<JobSummary> _allJobs = [];
+
+    // Flat option list fed to AutoComplete (drives dropdown visibility)
+    private List<AutoCompleteDataItem<string>> _searchOptions = [];
+
+    private List<RecentItem> _recentItems = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        _recentItems = (await RecentItemsService.GetRecentItemsAsync()).ToList();
+    }
+
+    private async Task RemoveRecentItemAsync(RecentItem item)
+    {
+        _recentItems.Remove(item);
+        await RecentItemsService.RemoveAsync(item.Id);
+    }
+
+    private async Task EnsureDataLoadedAsync()
+    {
+        if (_dataLoaded || _loadingData) return;
+        _loadingData = true;
+        try
+        {
+            var wsTask = WorkspaceService.SearchAsync("");
+            var jobsTask = JobService.GetJobsAsync();
+            await Task.WhenAll(wsTask, jobsTask);
+
+            _allItems = (await wsTask).Items.ToList();
+            _allJobs = (await jobsTask).ToList();
+            _dataLoaded = true;
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Failed to load search data: {ex.Message}";
+        }
+        finally
+        {
+            _loadingData = false;
+        }
+        FilterResults();
+    }
+
+    private async Task OnSearchInput(ChangeEventArgs e)
+    {
+        _searchText = e.Value?.ToString() ?? "";
+        if (!_dataLoaded)
+        {
+            await EnsureDataLoadedAsync();
+            return;
+        }
+        FilterResults();
+    }
+
+    private void FilterResults()
+    {
+        var q = _searchText.Trim();
+        if (string.IsNullOrEmpty(q))
+        {
+            _searchOptions = [];
+            return;
+        }
+
+        var opts = new List<AutoCompleteDataItem<string>>();
+
+        foreach (var item in _allItems.Where(i => i.Title.Contains(q, StringComparison.OrdinalIgnoreCase)).Take(16))
+        {
+            var url = item.ItemType == WorkspaceItemType.Notebook ? $"/notebook/{item.Id}" : $"/query/{item.Id}";
+            opts.Add(new AutoCompleteDataItem<string>(url, item.Title));
+        }
+
+        foreach (var j in _allJobs.Where(j => j.Name.Contains(q, StringComparison.OrdinalIgnoreCase)).Take(8))
+            opts.Add(new AutoCompleteDataItem<string>($"/jobs/{j.Id}", j.Name));
+
+        _searchOptions = opts;
+    }
+
+    private void OnItemSelected(AutoCompleteOption option)
+    {
+        var url = option.Value?.ToString();
+        if (!string.IsNullOrEmpty(url))
+            Navigation.NavigateTo(url);
+    }
+
+    private void NavigateToItem(RecentItem item)
+    {
+        var url = item.Type switch
+        {
+            "Notebook" => $"/notebook/{item.Id}",
+            "Query"    => $"/query/{item.Id}",
+            "Job"      => $"/jobs/{item.Id}",
+            _          => "/"
+        };
+        Navigation.NavigateTo(url);
+    }
+
+    private static (string Icon, string Color) GetIconForUrl(string url)
+    {
+        if (url.StartsWith("/notebook/")) return (IconType.Outline.FileText,    "#1677ff");
+        if (url.StartsWith("/query/"))    return (IconType.Outline.Code,         "#52c41a");
+        if (url.StartsWith("/jobs/"))     return (IconType.Outline.Partition,  "#faad14");
+        return (IconType.Outline.File, "#8c8c8c");
+    }
+
+    private static string GetTypeFromUrl(string url)
+    {
+        if (url.StartsWith("/notebook/")) return "Notebook";
+        if (url.StartsWith("/query/"))    return "Query";
+        if (url.StartsWith("/jobs/"))     return "Job";
+        return "";
+    }
+
+    private static string GetItemIcon(string type) => type switch
+    {
+        "Notebook" => IconType.Outline.FileText,
+        "Query"    => IconType.Outline.Code,
+        "Job"      => IconType.Outline.Partition,
+        _          => IconType.Outline.File,
+    };
+
+    private static string GetItemAvatarStyle(string type) => type switch
+    {
+        "Notebook" => "background-color: #1677ff;",
+        "Query"    => "background-color: #52c41a;",
+        "Job"      => "background-color: #faad14;",
+        _          => "",
+    };
+
+    private static string TimeAgo(DateTime utc)
+    {
+        var elapsed = DateTime.UtcNow - utc;
+        if (elapsed.TotalSeconds < 60)  return "just now";
+        if (elapsed.TotalMinutes < 60)  return $"{(int)elapsed.TotalMinutes} min ago";
+        if (elapsed.TotalHours < 24)    return $"{(int)elapsed.TotalHours} hour{((int)elapsed.TotalHours == 1 ? "" : "s")} ago";
+        if (elapsed.TotalDays < 7)      return $"{(int)elapsed.TotalDays} day{((int)elapsed.TotalDays == 1 ? "" : "s")} ago";
+        return utc.ToLocalTime().ToString("d MMM yyyy");
+    }
+}
+

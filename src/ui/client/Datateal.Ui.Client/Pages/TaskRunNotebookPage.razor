@@ -1,0 +1,548 @@
+@page "/runs/{RunId:guid}/tasks/{TaskRunId:guid}/notebook"
+@attribute [Authorize(Policy = AuthPolicy.JobRead)]
+
+@using Datateal.Ui.Shared.Orchestration
+@using Datateal.Core.Kernels
+@using Markdig
+@using System.Text
+@using System.Text.Json
+@using System.Text.RegularExpressions
+@inject IJobService JobService
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+
+<PageTitle>Notebook Output — Datateal</PageTitle>
+
+<div style="padding: 24px;">
+    <Flex Justify="FlexJustify.SpaceBetween" Align="FlexAlign.Center" Style="margin-bottom: 16px; flex-wrap: wrap; gap: 8px;">
+        <Space Align="SpaceAlign.Center" Size="SpaceSize.Small">
+            <SpaceItem>
+                <Button OnClick="@(() => Navigation.NavigateTo($"/runs/{RunId}"))">
+                    <Icon Type="@IconType.Outline.ArrowLeft" /> Back to run
+                </Button>
+            </SpaceItem>
+            <SpaceItem>
+                <h2 style="margin: 0;">@(_taskName ?? "Notebook output")</h2>
+            </SpaceItem>
+        </Space>
+        <Space Size="SpaceSize.Small">
+            @if (_cells.Count > 0)
+            {
+                <SpaceItem>
+                    <Button Icon="@IconType.Outline.Download" OnClick="ExportAsync">Export</Button>
+                </SpaceItem>
+            }
+            @if (_hasRunningCells)
+            {
+                <SpaceItem>
+                    <Button OnClick="RefreshAsync">
+                        <Icon Type="@IconType.Outline.Reload" /> Refresh
+                    </Button>
+                </SpaceItem>
+            }
+        </Space>
+    </Flex>
+
+    @if (!string.IsNullOrEmpty(_error))
+    {
+        <Alert Type="@AlertType.Error" Message="@_error" Closable OnClose="() => _error = null"
+               Style="margin-bottom: 16px;" />
+    }
+
+    <Spin Spinning="_loading">
+        @foreach (var cell in _cells)
+        {
+            <div style="margin-bottom: 16px; border: 1px solid #d9d9d9; border-radius: 4px; overflow: hidden;">
+                @* Cell header *@
+                <div style="display: flex; justify-content: space-between; align-items: center;
+                            padding: 4px 12px; background: #fafafa; border-bottom: 1px solid #d9d9d9; font-size: 12px;">
+                    <Space>
+                        @if (cell.CellType == "Markdown")
+                        {
+                            <SpaceItem>
+                                <span style="color: #888;">Markdown</span>
+                            </SpaceItem>
+                        }
+                        else
+                        {
+                            <SpaceItem>
+                                <Tag Color="@GetCellStatusColor(cell.Status)" Style="margin: 0;">@cell.Status</Tag>
+                            </SpaceItem>
+                            @if (cell.Language is not null)
+                            {
+                                <SpaceItem>
+                                    <span style="color: #888;">@cell.Language</span>
+                                </SpaceItem>
+                            }
+                        }
+                    </Space>
+                    <Space>
+                        @if (cell.ExecutionCount.HasValue)
+                        {
+                            <SpaceItem>
+                                <span style="color: #888;">[@cell.ExecutionCount]</span>
+                            </SpaceItem>
+                        }
+                        @if (cell.DurationMs.HasValue)
+                        {
+                            <SpaceItem>
+                                <span style="color: #888;"><ExecutionTimer IsRunning="false" DurationMs="@cell.DurationMs" /></span>
+                            </SpaceItem>
+                        }
+                    </Space>
+                </div>
+
+                @* Cell source *@
+                @if (cell.CellRole == "injected-parameters")
+                {
+                    <div style="display: flex; align-items: center; gap: 6px; padding: 2px 8px;
+                                background: #f9f0ff; border-top: 1px dashed #d3adf7; border-bottom: 1px dashed #d3adf7;
+                                font-size: 11px; color: #531dab;">
+                        <span>@@ Injected parameters</span>
+                    </div>
+                }
+                else if (cell.CellRole == "parameters")
+                {
+                    <div style="display: flex; align-items: center; gap: 6px; padding: 2px 8px;
+                                background: #e6f4ff; border-top: 1px dashed #91caff; border-bottom: 1px dashed #91caff;
+                                font-size: 11px; color: #0958d9;">
+                        <span>@@ Parameters</span>
+                    </div>
+                }
+                @if (cell.CellType == "Markdown")
+                {
+                    <div class="markdown-cell" style="padding: 12px;">
+                        @((MarkupString)HtmlSanitizeHelper.Sanitize(Markdig.Markdown.ToHtml(cell.CellSource, _mdPipeline)))
+                    </div>
+                }
+                else
+                {
+                    <pre style="margin: 0; padding: 12px; background: #f5f5f5; font-size: 13px;
+                                font-family: 'Cascadia Code', 'Consolas', monospace; overflow-x: auto; white-space: pre-wrap;">@cell.CellSource</pre>
+                }
+
+                @* Cell outputs *@
+                @if (cell.CellType == "Code")
+                {
+                    var outputs = ParseOutputs(cell.OutputsJson);
+                    var error = ParseError(cell.ErrorJson);
+
+                    @if (outputs is not null)
+                    {
+                        @foreach (var output in outputs)
+                        {
+                            @if (output.Type == "stream")
+                            {
+                                bool isStderr = output.Name == "stderr";
+                                <div style="padding: 8px 12px; border-top: 1px solid #f0f0f0;">
+                                    @if (isStderr)
+                                    {
+                                        <pre style="margin: 0; font-family: monospace; font-size: 13px; white-space: pre; overflow-x: auto;
+                                                    border-left: 3px solid #faad14; padding-left: 8px; color: #d46b08;">@output.Text</pre>
+                                    }
+                                    else
+                                    {
+                                        <pre style="margin: 0; font-family: monospace; font-size: 13px; white-space: pre; overflow-x: auto;
+                                                    border-left: 3px solid #d9d9d9; padding-left: 8px;">@output.Text</pre>
+                                    }
+                                </div>
+                            }
+                            else if (output.Type is "execute_result" or "display_data")
+                            {
+                                string outLabel = $"Out[{output.ExecutionCount ?? cell.ExecutionCount}]:";
+
+                                @if (output.Data is not null
+                                     && output.Data.TryGetValue(DataFrameOutput.MimeType, out var dfRaw)
+                                     && DataFrameOutput.TryParse(dfRaw) is { } dfOutput)
+                                {
+                                    <div style="padding: 8px 12px; border-top: 1px solid #f0f0f0; display: flex; gap: 8px; align-items: flex-start;">
+                                        <span style="font-family: monospace; font-size: 13px; white-space: nowrap; padding-top: 4px;">@outLabel</span>
+                                        <div style="flex: 1 1 0%; border-left: 3px solid #d9d9d9; padding-left: 8px; min-width: 0;">
+                                            <DataFrameView Data="dfOutput" />
+                                        </div>
+                                    </div>
+                                }
+                                else
+                                {
+                                    string? htmlText = GetDataText(output.Data, "text/html");
+                                    string? plainText = GetDataText(output.Data, "text/plain") ?? output.Text;
+
+                                    @if (htmlText is not null)
+                                    {
+                                        <div style="padding: 8px 12px; border-top: 1px solid #f0f0f0; display: flex; gap: 8px; align-items: flex-start;">
+                                            <span style="font-family: monospace; font-size: 13px; white-space: nowrap; padding-top: 4px;">@outLabel</span>
+                                            <div style="flex: 1 1 0%; border-left: 3px solid #d9d9d9; padding-left: 8px; font-size: 13px;">
+                                                @((MarkupString)HtmlSanitizeHelper.Sanitize(htmlText))
+                                            </div>
+                                        </div>
+                                    }
+                                    else if (plainText is not null)
+                                    {
+                                        <div style="padding: 8px 12px; border-top: 1px solid #f0f0f0; display: flex; gap: 8px; align-items: flex-start;">
+                                            <span style="font-family: monospace; font-size: 13px; white-space: nowrap; padding-top: 4px;">@outLabel</span>
+                                            <pre style="margin: 0; font-family: monospace; font-size: 13px; flex: 1 1 0%; min-width: 0;
+                                                        border-left: 3px solid #d9d9d9; padding-left: 8px; white-space: pre; overflow-x: auto;">@plainText</pre>
+                                        </div>
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    @if (error is not null)
+                    {
+                        <div style="padding: 8px 12px; border-top: 1px solid #f0f0f0; background: #fff2f0;">
+                            <div style="display: flex; gap: 8px; align-items: flex-start;">
+                                <span style="visibility: hidden; font-family: monospace; font-size: 13px; white-space: nowrap; padding-top: 4px;">Out[ ]:</span>
+                                <div style="flex: 1 1 0%; border-left: 3px solid #ff4d4f; padding-left: 8px;">
+                                    <strong style="display: block; font-size: 13px; color: #ff4d4f; margin-bottom: 4px;">@error.Ename: @error.Evalue</strong>
+                                    <pre style="margin: 0; font-family: monospace; font-size: 13px; color: #ff4d4f; white-space: pre; overflow-x: auto;">@string.Join("\n", error.Traceback.Select(StripAnsi))</pre>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                }
+            </div>
+        }
+
+        @if (_cells.Count == 0 && !_loading)
+        {
+            <Alert Type="@AlertType.Info" Message="No cell outputs available yet." />
+        }
+    </Spin>
+</div>
+
+@code {
+    private static readonly MarkdownPipeline _mdPipeline =
+        new MarkdownPipelineBuilder().UseAdvancedExtensions().Build();
+
+    private static readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web);
+
+    [Parameter] public Guid RunId { get; set; }
+    [Parameter] public Guid TaskRunId { get; set; }
+
+    private IReadOnlyList<CellOutputDto> _cells = [];
+    private bool _loading = true;
+    private bool _hasRunningCells;
+    private string? _taskName;
+    private string? _error;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            var cellsTask = JobService.GetCellOutputsAsync(RunId, TaskRunId);
+            var runTask = JobService.GetRunAsync(RunId);
+            await Task.WhenAll(cellsTask, runTask);
+
+            _cells = cellsTask.Result;
+            _hasRunningCells = _cells.Any(c => c.Status is "Running" or "Pending");
+            _taskName = runTask.Result?.TaskRuns.FirstOrDefault(t => t.Id == TaskRunId)?.TaskName;
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to load cell outputs: {ex.Message}";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task RefreshAsync() => await LoadAsync();
+
+    private async Task ExportAsync()
+    {
+        try
+        {
+            var json = BuildNotebookJson();
+            var title = _taskName?.Trim() is { Length: > 0 } t ? t : "notebook";
+            var filename = SanitizeFilename(title) + ".ipynb";
+            await JS.InvokeVoidAsync("downloadFile", filename, json);
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to export: {ex.Message}";
+        }
+    }
+
+    private string BuildNotebookJson()
+    {
+        using var ms = new MemoryStream();
+        using var writer = new Utf8JsonWriter(ms, new JsonWriterOptions { Indented = true });
+
+        writer.WriteStartObject();
+        writer.WriteNumber("nbformat", 4);
+        writer.WriteNumber("nbformat_minor", 5);
+
+        writer.WriteStartObject("metadata");
+        writer.WriteStartObject("kernelspec");
+        writer.WriteString("display_name", "Datateal");
+        writer.WriteString("language", "python");
+        writer.WriteString("name", "datateal");
+        writer.WriteEndObject();
+        writer.WriteStartObject("language_info");
+        writer.WriteString("name", "python");
+        writer.WriteEndObject();
+        writer.WriteStartObject("datateal");
+        writer.WriteString("version", "1");
+        writer.WriteString("title", _taskName ?? "Notebook");
+        writer.WriteEndObject();
+        writer.WriteEndObject(); // metadata
+
+        writer.WriteStartArray("cells");
+        foreach (var cell in _cells)
+            WriteExportCell(writer, cell);
+        writer.WriteEndArray();
+
+        writer.WriteEndObject();
+        writer.Flush();
+
+        return Encoding.UTF8.GetString(ms.ToArray());
+    }
+
+    private static void WriteExportCell(Utf8JsonWriter writer, CellOutputDto cell)
+    {
+        bool isMarkdown = cell.CellType == "Markdown";
+
+        writer.WriteStartObject();
+        writer.WriteString("id", cell.Id.ToString("N")[..8]);
+        writer.WriteString("cell_type", isMarkdown ? "markdown" : "code");
+        writer.WriteString("source", cell.CellSource);
+
+        if (isMarkdown)
+        {
+            writer.WriteStartObject("metadata");
+            writer.WriteEndObject();
+        }
+        else
+        {
+            if (cell.ExecutionCount.HasValue)
+                writer.WriteNumber("execution_count", cell.ExecutionCount.Value);
+            else
+                writer.WriteNull("execution_count");
+
+            writer.WriteStartObject("metadata");
+            writer.WriteString("language", cell.Language?.ToLower() ?? "python");
+
+            var tags = new List<string>();
+            if (cell.CellRole == "parameters") tags.Add("parameters");
+            else if (cell.CellRole == "injected-parameters") tags.Add("injected-parameters");
+            if (tags.Count > 0)
+            {
+                writer.WriteStartArray("tags");
+                foreach (var tag in tags) writer.WriteStringValue(tag);
+                writer.WriteEndArray();
+            }
+
+            writer.WriteStartObject("datateal");
+            if (cell.DurationMs.HasValue)
+                writer.WriteNumber("duration_ms", cell.DurationMs.Value);
+            else
+                writer.WriteNull("duration_ms");
+            writer.WriteString("status", cell.Status);
+            writer.WriteEndObject(); // datateal
+            writer.WriteEndObject(); // metadata
+
+            writer.WriteStartArray("outputs");
+            var outputs = ParseOutputs(cell.OutputsJson);
+            if (outputs is not null)
+                foreach (var output in outputs)
+                    WriteExportOutput(writer, output, cell.ExecutionCount);
+            var error = ParseError(cell.ErrorJson);
+            if (error is not null)
+                WriteExportError(writer, error);
+            writer.WriteEndArray();
+        }
+
+        writer.WriteEndObject();
+    }
+
+    private static void WriteExportOutput(Utf8JsonWriter writer, Output output, int? cellExecutionCount)
+    {
+        writer.WriteStartObject();
+        writer.WriteString("output_type", output.Type);
+
+        if (output.Type == "stream")
+        {
+            writer.WriteString("name", output.Name ?? "stdout");
+            writer.WriteString("text", output.Text ?? "");
+        }
+        else if (output.Type is "execute_result" or "display_data")
+        {
+            if (output.Type == "execute_result")
+            {
+                int? ec = output.ExecutionCount ?? cellExecutionCount;
+                if (ec.HasValue)
+                    writer.WriteNumber("execution_count", ec.Value);
+                else
+                    writer.WriteNull("execution_count");
+            }
+
+            writer.WriteStartObject("data");
+            if (output.Data is not null)
+            {
+                if (output.Data.TryGetValue(DataFrameOutput.MimeType, out var dfRaw)
+                    && DataFrameOutput.TryParse(dfRaw) is { } dfOutput)
+                {
+                    // Convert Datateal DataFrame to standard MIME types for VS Code compatibility
+                    writer.WriteString("text/html", DataFrameToHtml(dfOutput));
+                    writer.WriteString("text/plain", DataFrameToPlainText(dfOutput));
+                }
+                else
+                {
+                    foreach (var (key, value) in output.Data)
+                    {
+                        writer.WritePropertyName(key);
+                        if (value is JsonElement je)
+                            je.WriteTo(writer);
+                        else
+                            writer.WriteStringValue(value?.ToString() ?? "");
+                    }
+                }
+            }
+            writer.WriteEndObject(); // data
+
+            writer.WriteStartObject("metadata");
+            writer.WriteEndObject();
+        }
+
+        writer.WriteEndObject();
+    }
+
+    private static void WriteExportError(Utf8JsonWriter writer, ErrorInfo err)
+    {
+        writer.WriteStartObject();
+        writer.WriteString("output_type", "error");
+        writer.WriteString("ename", err.Ename);
+        writer.WriteString("evalue", err.Evalue);
+        writer.WriteStartArray("traceback");
+        foreach (var line in err.Traceback)
+            writer.WriteStringValue(line);
+        writer.WriteEndArray();
+        writer.WriteEndObject();
+    }
+
+    private static string DataFrameToHtml(DataFrameOutput df)
+    {
+        var sb = new StringBuilder();
+        sb.Append("<div><table border=\"1\" class=\"dataframe\"><thead><tr style=\"text-align: right;\"><th></th>");
+        foreach (var col in df.Columns)
+        {
+            sb.Append("<th>");
+            sb.Append(HtmlEncode(col.Name));
+            sb.Append("</th>");
+        }
+        sb.Append("</tr></thead><tbody>");
+
+        for (int i = 0; i < df.Rows.Count; i++)
+        {
+            sb.Append("<tr><th>");
+            sb.Append(i);
+            sb.Append("</th>");
+            foreach (var cell in df.Rows[i])
+            {
+                sb.Append("<td>");
+                if (cell is not null) sb.Append(HtmlEncode(cell.ToString()!));
+                sb.Append("</td>");
+            }
+            sb.Append("</tr>");
+        }
+
+        sb.Append("</tbody></table>");
+        if (df.TotalRows > df.DisplayedRows)
+            sb.Append($"<p>{df.DisplayedRows:N0} rows × {df.Columns.Count} columns (capped at {DataFrameOutput.RowCap:N0})</p>");
+        else
+            sb.Append($"<p>{df.TotalRows:N0} rows × {df.Columns.Count} columns</p>");
+        sb.Append("</div>");
+
+        return sb.ToString();
+    }
+
+    private static string DataFrameToPlainText(DataFrameOutput df)
+    {
+        if (df.Columns.Count == 0) return "";
+
+        var colWidths = new int[df.Columns.Count];
+        for (int c = 0; c < df.Columns.Count; c++)
+        {
+            colWidths[c] = df.Columns[c].Name.Length;
+            foreach (var row in df.Rows)
+                if (c < row.Count)
+                    colWidths[c] = Math.Max(colWidths[c], row[c]?.ToString()?.Length ?? 4);
+        }
+        int indexWidth = Math.Max(1, (df.Rows.Count - 1).ToString().Length);
+
+        var sb = new StringBuilder();
+
+        sb.Append("".PadRight(indexWidth));
+        for (int c = 0; c < df.Columns.Count; c++)
+        {
+            sb.Append("  ");
+            sb.Append(df.Columns[c].Name.PadLeft(colWidths[c]));
+        }
+        sb.AppendLine();
+
+        for (int r = 0; r < df.Rows.Count; r++)
+        {
+            sb.Append(r.ToString().PadRight(indexWidth));
+            for (int c = 0; c < df.Columns.Count; c++)
+            {
+                sb.Append("  ");
+                string val = c < df.Rows[r].Count ? (df.Rows[r][c]?.ToString() ?? "None") : "";
+                sb.Append(val.PadLeft(colWidths[c]));
+            }
+            sb.AppendLine();
+        }
+
+        if (df.TotalRows > df.DisplayedRows)
+            sb.Append($"\n[{df.TotalRows} rows x {df.Columns.Count} columns]");
+
+        return sb.ToString();
+    }
+
+    private static string HtmlEncode(string s) =>
+        s.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;").Replace("\"", "&quot;");
+
+    private static string SanitizeFilename(string name) =>
+        Regex.Replace(name, @"[^\w\s\-.]", "_").Trim();
+
+    private static List<Output>? ParseOutputs(string? json)
+    {
+        if (string.IsNullOrEmpty(json)) return null;
+        try { return JsonSerializer.Deserialize<List<Output>>(json, _jsonOptions); }
+        catch { return null; }
+    }
+
+    private static ErrorInfo? ParseError(string? json)
+    {
+        if (string.IsNullOrEmpty(json)) return null;
+        try { return JsonSerializer.Deserialize<ErrorInfo>(json, _jsonOptions); }
+        catch { return null; }
+    }
+
+    private static string? GetDataText(Dictionary<string, object>? data, string mimeType)
+    {
+        if (data?.TryGetValue(mimeType, out var value) != true) return null;
+        return value?.ToString();
+    }
+
+    private static string StripAnsi(string text) =>
+        Regex.Replace(text, @"\x1B\[[0-9;]*[a-zA-Z]", "");
+
+    private static string GetCellStatusColor(string status) => status.ToLowerInvariant() switch
+    {
+        "succeeded" => "green",
+        "failed" => "red",
+        "running" => "blue",
+        "pending" => "default",
+        "skipped" => "default",
+        _ => "default",
+    };
+}

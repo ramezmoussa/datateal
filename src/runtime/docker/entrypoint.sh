@@ -2,7 +2,7 @@
 set -e
 
 KERNEL_PIP=/opt/venvs/kernel/bin/pip
-REQUIREMENTS_FILE=/etc/duckhouse/kernel-requirements.txt
+REQUIREMENTS_FILE=/etc/datateal/kernel-requirements.txt
 
 if [ -f "$REQUIREMENTS_FILE" ]; then
     echo "Installing kernel packages from $REQUIREMENTS_FILE"
@@ -19,4 +19,4 @@ if find /etc/wheels -name "*.whl" -type f 2>/dev/null | grep -q .; then
     find /etc/wheels -name "*.whl" -type f -exec "$KERNEL_PIP" install --no-cache-dir {} +
 fi
 
-exec /opt/venvs/api/bin/duckhouse-runtime
+exec /opt/venvs/api/bin/datateal-runtime

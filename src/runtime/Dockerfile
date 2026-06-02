@@ -12,7 +12,7 @@ RUN /opt/venvs/api/bin/pip install --no-cache-dir /tmp/wheels/*.whl \
 # Only ipykernel is required here as a base. Additional packages can be
 # supplied at build time (KERNEL_PACKAGES build arg), at runtime via the
 # KERNEL_PACKAGES environment variable, or via a requirements.txt file
-# mounted at /etc/duckhouse/kernel-requirements.txt.
+# mounted at /etc/datateal/kernel-requirements.txt.
 RUN python -m venv /opt/venvs/kernel \
     && /opt/venvs/kernel/bin/pip install --no-cache-dir ipykernel==7.2.0 duckdb==1.5.2 numpy==2.4.4 pandas==3.0.2
 
@@ -22,11 +22,11 @@ RUN sed -i 's/\r$//' /usr/local/bin/entrypoint.sh \
     && chmod +x /usr/local/bin/entrypoint.sh
 
 # ── Runtime configuration ────────────────────────────────────────────────────
-ENV DUCKHOUSE_KERNEL_PYTHON=/opt/venvs/kernel/bin/python
+ENV DATATEAL_KERNEL_PYTHON=/opt/venvs/kernel/bin/python
 
-RUN useradd -r -m -s /bin/false duckhouse \
-    && chown -R duckhouse:duckhouse /opt/venvs
-USER duckhouse
+RUN useradd -r -m -s /bin/false datateal \
+    && chown -R datateal:datateal /opt/venvs
+USER datateal
 
 EXPOSE 8000
 

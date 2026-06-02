@@ -1,0 +1,38 @@
+<Solution>
+  <Folder Name="/app-host/">
+    <Project Path="app-host/Datateal.AppHost/Datateal.AppHost.csproj" />
+    <Project Path="app-host/Datateal.ServiceDefaults/Datateal.ServiceDefaults.csproj" />
+  </Folder>
+  <Folder Name="/control-plane/">
+    <Project Path="control-plane/Datateal.ControlPlane.Application/Datateal.ControlPlane.Application.csproj" />
+    <Project Path="control-plane/Datateal.ControlPlane.Core/Datateal.ControlPlane.Core.csproj" />
+    <Project Path="control-plane/Datateal.ControlPlane.Infrastructure/Datateal.ControlPlane.Infrastructure.csproj" />
+    <Project Path="control-plane/Datateal.ControlPlane/Datateal.ControlPlane.csproj" />
+  </Folder>
+  <Folder Name="/orchestrator/">
+    <Project Path="orchestrator/Datateal.Orchestrator.Core/Datateal.Orchestrator.Core.csproj" />
+    <Project Path="orchestrator/Datateal.Orchestrator.Application/Datateal.Orchestrator.Application.csproj" />
+    <Project Path="orchestrator/Datateal.Orchestrator.Infrastructure/Datateal.Orchestrator.Infrastructure.csproj" />
+    <Project Path="orchestrator/Datateal.Orchestrator/Datateal.Orchestrator.csproj" />
+  </Folder>
+  <Folder Name="/shared/">
+    <Project Path="shared/Datateal.Core/Datateal.Core.csproj" />
+    <Project Path="shared/Datateal.Data/Datateal.Data.csproj" />
+    <Project Path="shared/Datateal.Auth.Abstractions/Datateal.Auth.Abstractions.csproj" />
+    <Project Path="shared/Datateal.Auth/Datateal.Auth.csproj" />
+    <Project Path="shared/Datateal.Auth.EntraId/Datateal.Auth.EntraId.csproj" />
+  </Folder>
+  <Folder Name="/ui/server/">
+      <Project Path="ui/server/Datateal.Ui.Server.Application/Datateal.Ui.Server.Application.csproj" />
+      <Project Path="ui/server/Datateal.Ui.Server.Infrastructure/Datateal.Ui.Server.Infrastructure.csproj" />
+      <Project Path="ui/server/Datateal.Ui.Server.Core/Datateal.Ui.Server.Core.csproj" />
+      <Project Path="ui/server/Datateal.Ui.Server/Datateal.Ui.Server.csproj" />
+    </Folder>
+  <Folder Name="/ui/">
+    <Project Path="ui/Datateal.Ui.Shared/Datateal.Ui.Shared.csproj" />
+  </Folder>
+  <Folder Name="/ui/client/">
+      <Project Path="ui/client/Datateal.Ui.Client.Components/Datateal.Ui.Client.Components.csproj" />
+      <Project Path="ui/client/Datateal.Ui.Client/Datateal.Ui.Client.csproj" />
+    </Folder>
+</Solution>

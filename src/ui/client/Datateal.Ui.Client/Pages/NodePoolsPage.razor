@@ -1,0 +1,843 @@
+@page "/node-pools"
+@attribute [Authorize(Policy = AuthPolicy.NodePoolOperate)]
+
+@using Datateal.Ui.Shared.Orchestration
+@using Datateal.Ui.Shared.Environment
+@using Datateal.Ui.Shared.Nodes
+@using Datateal.Core.Nodes
+@using Datateal.Ui.Client.Validation
+@using Datateal.Ui.Shared.Packages
+@using System.ComponentModel.DataAnnotations
+@inject INodePoolService NodePoolService
+@inject IInteractivePoolService InteractivePoolService
+@inject INodeService NodeService
+@inject IWheelPackageService WheelPackageService
+@inject IEnvironmentService EnvironmentService
+@inject IJSRuntime JS
+@inject NavigationManager Navigation
+
+<PageTitle>Node Pools — Datateal</PageTitle>
+<NavigationLock ConfirmExternalNavigation="@_showDrawer"
+                OnBeforeInternalNavigation="ConfirmInternalNavigationAsync" />
+
+<Flex Justify="FlexJustify.FlexStart" Align="FlexAlign.Center" Style="margin-bottom: 24px;" Gap="FlexGap.Small">
+    <Space Align="SpaceAlign.End" Size="SpaceSize.Middle">
+        <SpaceItem>
+            <Icon Height="24px" Width="24px" Type="@IconType.Outline.Cluster" />
+        </SpaceItem>
+        <SpaceItem>
+            <h2 style="margin: 0;">Node pool configurations</h2>
+        </SpaceItem>
+    </Space>
+</Flex>
+
+@if (!string.IsNullOrEmpty(_error))
+{
+    <Alert Type="@AlertType.Error" Message="@_error" Closable OnClose="() => _error = null"
+            Style="margin-bottom: 16px;" />
+}
+
+<Tabs ActiveKey="@_activeTab" OnChange="key => _activeTab = key">
+    <TabPane Key="interactive" Tab="Interactive">
+        <p style="margin: 0 0 16px; color: #888; font-size: 13px;">
+            An interactive pool has at most one underlying node at a time. When you connect from the notebook or query editor,
+            a node is started if none is running — otherwise you join the existing one. Job tasks that reference an interactive
+            pool behave the same way: they join a running node or start one, and the node pool is <strong>not</strong> stopped when
+            the job completes. Idling node pools are automatically stopped by the eviction service.
+        </p>
+        <Flex Align="FlexAlign.Center" Justify="FlexJustify.End" Style="margin-bottom: 12px;">
+            <Space Size="SpaceSize.Small">
+                <SpaceItem>
+                    <Button OnClick="LoadAsync" Loading="_loading">
+                        <Icon Type="@IconType.Outline.Reload" /> Refresh
+                    </Button>
+                </SpaceItem>
+                <SpaceItem>
+                    <AuthorizeView Policy="@AuthPolicy.NodePoolManage">
+                        <Button Type="@ButtonType.Primary" OnClick="StartCreate">
+                            <Icon Type="@IconType.Outline.Plus" /> New interactive node pool
+                        </Button>
+                    </AuthorizeView>
+                </SpaceItem>
+            </Space>
+        </Flex>
+        <Spin Spinning="_loading">
+            @if (_interactivePools.Count == 0 && !_loading)
+            {
+                <p><Text Type="TextElementType.Secondary">No interactive node pools. Create one to connect from Notebook and Query pages.</Text></p>
+            }
+            else
+            {
+                <Table TItem="InteractivePoolDto" DataSource="_interactivePools" Size="@TableSize.Small" PageSize="int.MaxValue" PaginationPosition="none">
+                    <PropertyColumn Property="c => c.Name" Title="Name" Sortable />
+                    <PropertyColumn Property="c => c.VmSize" Title="VM size" />
+                    <PropertyColumn Property="c => c.KernelIdleTimeout" Title="Kernel idle">
+                        @(context.KernelIdleTimeout.HasValue ? $"{context.KernelIdleTimeout.Value.TotalMinutes:F0} min" : "Default")
+                    </PropertyColumn>
+                    <PropertyColumn Property="c => c.NodeIdleTimeout" Title="Node idle">
+                        @if (!context.NodeIdleTimeout.HasValue)
+                        {
+                            <span>Default</span>
+                        }
+                        else if (context.NodeIdleTimeout.Value == TimeSpan.Zero)
+                        {
+                            <span>Never</span>
+                        }
+                        else
+                        {
+                            <span>@($"{context.NodeIdleTimeout.Value.TotalMinutes:F0} min")</span>
+                        }
+                    </PropertyColumn>
+                    <PropertyColumn Property="c => c.Description" Title="Description">
+                        @(context.Description ?? "—")
+                    </PropertyColumn>
+                    <PropertyColumn Property="c => c.Status" Title="Status">
+                        <Tag Color="@InteractivePoolStatusTagColor(context.Status)">@context.Status</Tag>
+                    </PropertyColumn>
+                    <ActionColumn Title="Actions">
+                        <Space>
+                            @{
+                                var poolForEdit = _jobAndInteractivePools.FirstOrDefault(p => p.Id == context.Id);
+                            }
+                            <SpaceItem>
+                                <AuthorizeView Policy="@AuthPolicy.NodePoolManage" Context="auth">
+                                    <Tooltip Title="Edit">
+                                        <Button Size="@ButtonSize.Small"
+                                                Disabled="@(poolForEdit is null)"
+                                                OnClick="() => StartEdit(poolForEdit!)">
+                                            <Icon Type="@IconType.Outline.Edit" />
+                                        </Button>
+                                    </Tooltip>
+                                </AuthorizeView>
+                            </SpaceItem>
+                            <SpaceItem>
+                                <AuthorizeView Policy="@AuthPolicy.NodePoolManage" Context="auth">
+                                    <Tooltip Title="Delete">
+                                        <Popconfirm Title="@($"Delete pool '{context.Name}'?")"
+                                                    OnConfirm="() => DeleteInteractiveAsync(context)">
+                                            <Button Danger Size="@ButtonSize.Small">
+                                                <Icon Type="@IconType.Outline.Delete" />
+                                            </Button>
+                                        </Popconfirm>
+                                    </Tooltip>
+                                </AuthorizeView>
+                            </SpaceItem>
+                            @if (context.Status is InteractivePoolStatus.Stopped or InteractivePoolStatus.Error)
+                            {
+                                var poolName = context.Name;
+                                <SpaceItem>
+                                    <Button Size="@ButtonSize.Small"
+                                            Loading="@(_startingPool == poolName)"
+                                            Disabled="@(_startingPool is not null || _busyNode is not null)"
+                                            OnClick="() => StartInteractiveNodeAsync(poolName)">
+                                        <Icon Type="@IconType.Outline.PlayCircle" /> Start
+                                    </Button>
+                                </SpaceItem>
+                            }
+                            @if (context.Status is InteractivePoolStatus.Running or InteractivePoolStatus.Starting)
+                            {
+                                var nodeName = context.NodeName;
+                                <SpaceItem>
+                                    <Popconfirm Title="@($"Stop the node pool '{context.Name}'? The pool config will remain.")"
+                                                OnConfirm="() => RemoveInteractiveNodeAsync(nodeName)">
+                                        <Button Size="@ButtonSize.Small"
+                                                Loading="@(_busyNode == nodeName)"
+                                                Disabled="@(_busyNode is not null || _startingPool is not null)">
+                                            <Icon Type="@IconType.Outline.Poweroff" /> Stop
+                                        </Button>
+                                    </Popconfirm>
+                                </SpaceItem>
+                            }
+                        </Space>
+                    </ActionColumn>
+                </Table>
+            }
+        </Spin>
+    </TabPane>
+    <TabPane Key="job" Tab="Job">
+        <p style="margin: 0 0 16px; color: #888; font-size: 13px;">
+            A job pool is managed entirely by the orchestrator. Each job run provisions a dedicated node for every unique
+            pool reference used by its tasks, and that node is deleted when the run finishes. Multiple concurrent runs can
+            each have their own node from the same pool config. Nodes left running after an orchestrator failure are cleaned
+            up by the eviction service.
+        </p>
+        <Flex Align="FlexAlign.Center" Justify="FlexJustify.End" Style="margin-bottom: 12px;">
+            <Space Size="SpaceSize.Small">
+                <AuthorizeView Policy="@AuthPolicy.NodePoolManage">
+                    <SpaceItem>
+                        <Button Type="@ButtonType.Primary" OnClick="StartCreate">
+                            <Icon Type="@IconType.Outline.Plus" /> New job node pool
+                        </Button>
+                    </SpaceItem>
+                </AuthorizeView>
+            </Space>
+        </Flex>
+        <Spin Spinning="_loading">
+            @if (_jobPools.Count == 0 && !_loading)
+            {
+                <p><Text Type="TextElementType.Secondary">No job node pools.</Text></p>
+            }
+            else
+            {
+                <Table TItem="NodePoolConfigDto" DataSource="_jobPools" Size="@TableSize.Small" PageSize="int.MaxValue" PaginationPosition="none">
+                    <PropertyColumn Property="c => c.Name" Title="Name" Sortable />
+                    <PropertyColumn Property="c => c.VmSize" Title="VM size" />
+                    <PropertyColumn Property="c => c.KernelIdleTimeout" Title="Kernel idle timeout">
+                        @(context.KernelIdleTimeout.HasValue ? $"{context.KernelIdleTimeout.Value.TotalMinutes:F0} min" : "Default")
+                    </PropertyColumn>
+                    <PropertyColumn Property="c => c.NodeIdleTimeout" Title="Node idle timeout">
+                        @if (!context.NodeIdleTimeout.HasValue)
+                        {
+                            <span>Default</span>
+                        }
+                        else if (context.NodeIdleTimeout.Value == TimeSpan.Zero)
+                        {
+                            <span>Never</span>
+                        }
+                        else
+                        {
+                            <span>@($"{context.NodeIdleTimeout.Value.TotalMinutes:F0} min")</span>
+                        }
+                    </PropertyColumn>
+                    <PropertyColumn Property="c => c.Description" Title="Description">
+                        @(context.Description ?? "—")
+                    </PropertyColumn>
+                    <PropertyColumn Property="c => c.WarmNodes" Title="Warm nodes">
+                        @if (context.WarmNodes > 0)
+                        {
+                            <span>@context.WarmNodes warm@(context.MaxNodes.HasValue ? $" / {context.MaxNodes} max" : "")</span>
+                        }
+                        else
+                        {
+                            <span style="color: #888;">On demand</span>
+                        }
+                    </PropertyColumn>
+                    <PropertyColumn Property="c => c.UpdatedAt" Title="Updated" Sortable>
+                        @context.UpdatedAt.ToString("yyyy-MM-dd")
+                    </PropertyColumn>
+                    <ActionColumn Title="Actions">
+                        <AuthorizeView Policy="@AuthPolicy.NodePoolManage" Context="auth">
+                            <Space>
+                                <SpaceItem>
+                                    <Tooltip Title="Edit">
+                                        <Button Size="@ButtonSize.Small" OnClick="() => StartEdit(context)">
+                                            <Icon Type="@IconType.Outline.Edit" />
+                                        </Button>
+                                    </Tooltip>
+                                </SpaceItem>
+                                <SpaceItem>
+                                    <Tooltip Title="Delete">
+                                        <Popconfirm Title="@($"Delete node pool '{context.Name}'?")"
+                                                    OnConfirm="() => DeleteAsync(context)">
+                                            <Button Danger Size="@ButtonSize.Small">
+                                                <Icon Type="@IconType.Outline.Delete" />
+                                            </Button>
+                                        </Popconfirm>
+                                    </Tooltip>
+                                </SpaceItem>
+                            </Space>
+                        </AuthorizeView>
+                    </ActionColumn>
+                </Table>
+            }
+        </Spin>
+    </TabPane>
+    <TabPane Key="active-nodes" Tab="Active nodes">
+        <Flex Align="FlexAlign.Center" Justify="FlexJustify.End" Style="margin-bottom: 12px;">
+            <Space Size="SpaceSize.Small">
+                <SpaceItem>
+                    <Button OnClick="LoadNodesAsync"
+                            Disabled="@(_nodesLoading || _nodesTabBusy is not null)"
+                            Icon="@IconType.Outline.Reload">
+                        Refresh
+                    </Button>
+                </SpaceItem>
+            </Space>
+        </Flex>
+        @if (_nodesLoading)
+        {
+            <Flex Justify="@("center")" Style="padding: 40px 0;">
+                <Spin />
+            </Flex>
+        }
+        else if (_nodesList.Count == 0)
+        {
+            <p><Text Type="TextElementType.Secondary">No active nodes.</Text></p>
+        }
+        else
+        {
+            <Table TItem="NodeInfo" DataSource="@_nodesList" Bordered PageSize="int.MaxValue" PaginationPosition="none">
+                <PropertyColumn Property="n => n.Name" Title="Name">
+                    <span style="font-weight: 600;">@context.Name</span>
+                </PropertyColumn>
+                <PropertyColumn Property="n => n.State" Title="State">
+                    <Tag Color="@NodeStateTagColor(context.State)">@context.State</Tag>
+                </PropertyColumn>
+                <PropertyColumn Property="n => n.VmSize" Title="VM size">
+                    <Text Type="TextElementType.Secondary" Style="font-size: 0.875rem;">@(context.VmSize ?? "—")</Text>
+                </PropertyColumn>
+                <PropertyColumn Property="n => n.KernelIdleTimeout" Title="Kernel idle">
+                    <Text Type="TextElementType.Secondary" Style="font-size: 0.875rem;">@FormatDuration(context.KernelIdleTimeout)</Text>
+                </PropertyColumn>
+                <PropertyColumn Property="n => n.NodeIdleTimeout" Title="Node idle">
+                    <Text Type="TextElementType.Secondary" Style="font-size: 0.875rem;">@FormatDuration(context.NodeIdleTimeout)</Text>
+                </PropertyColumn>
+                <ActionColumn Title="Actions">
+                    <Space>
+                        <SpaceItem>
+                            <Button Size="ButtonSize.Small"
+                                    Disabled="@(context.State != NodeState.Running)"
+                                    Icon="@IconType.Outline.Interaction"
+                                    OnClick="@(() => Navigation.NavigateTo($"nodes/{context.Name}/kernels"))">
+                                Kernels
+                            </Button>
+                        </SpaceItem>
+                        @{
+                            var nodeName = context.Name;
+                            var nodeBusy = _nodesTabBusy == nodeName;
+                        }
+                        <SpaceItem>
+                            <Popconfirm Title="@($"Are you sure you want to remove '{context.Name}'?")"
+                                        OkText="Remove"
+                                        CancelText="Cancel"
+                                        OkType="ButtonType.Primary"
+                                        OkButtonProps="new ButtonProps { Danger = true }"
+                                        OnConfirm="@(() => RemoveNodeAsync(context.Name))">
+                                <Button Size="ButtonSize.Small" Danger Type="ButtonType.Primary"
+                                        Loading="@nodeBusy"
+                                        Disabled="@(nodeBusy || (_nodesTabBusy is not null && _nodesTabBusy != nodeName))"
+                                        Icon="@IconType.Outline.Delete">
+                                    Remove...
+                                </Button>
+                            </Popconfirm>
+                        </SpaceItem>
+                    </Space>
+                </ActionColumn>
+            </Table>
+        }
+    </TabPane>
+</Tabs>
+
+<Drawer Closable="true" @bind-Visible="_showDrawer" Placement="DrawerPlacement.Right"
+        Width="480" Title="@(_editTarget is null ? "New node pool" : "Edit node pool")"
+        OnClose="() => _showDrawer = false"
+        BodyStyle="display: flex; flex-direction: column; padding: 0; overflow: hidden;">
+    <div style="flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+        <Form Model="@_form" Layout="FormLayout.Vertical" ValidateOnChange="true">
+            <FormItem Label="Name">
+                <Input @bind-Value="context.Name" Placeholder="Analytics Node Pool"
+                       BindOnInput
+                       Class="@(NameDisplayError is not null ? "ant-input-status-error" : "")"
+                       OnPressEnter="@(async _ => await ConfirmSave())" />
+                @if (NameDisplayError is not null)
+                {
+                    <div class="ant-form-item-explain-error">@NameDisplayError</div>
+                }
+            </FormItem>
+            <FormItem Label="VM Size" Rules="@_requiredRule">
+                <Input @bind-Value="context.VmSize" Placeholder="Standard_D4as_v5"
+                       BindOnInput
+                       OnPressEnter="@(async _ => await ConfirmSave())" />
+            </FormItem>
+            <FormItem Label="Kernel idle timeout (minutes)">
+                <AntDesign.InputNumber @bind-Value="context.KernelIdleMin" Min="0" />
+            </FormItem>
+            <FormItem Label="Node idle timeout (minutes)">
+                <AntDesign.InputNumber @bind-Value="context.NodeIdleMin" Min="0" Placeholder="Default" />
+                <div style="color: #888; font-size: 12px; margin-top: 4px;">
+                    Leave blank to use the control plane default. Set to <strong>0</strong> to disable automatic node eviction for this pool.
+                    Warm standby nodes are always eviction-protected while waiting; this timeout applies once a node is claimed by a job.
+                </div>
+            </FormItem>
+            <FormItem Label="Kernel requirements (pip)">
+                <TextArea @bind-Value="context.KernelReqs" Rows="3" Placeholder="@("scipy>=1.14\nscikit-learn>=1.6")"
+                          BindOnInput />
+            </FormItem>
+            @{
+                var isJobPool = _editTarget?.PoolType == NodePoolType.Job || (_editTarget is null && _activeTab == "job");
+            }
+            @if (isJobPool)
+            {
+                <FormItem Label="Warm nodes">
+                    <AntDesign.InputNumber @bind-Value="context.WarmNodes" Min="0" Style="width: 100%;" />
+                    <div style="color: #888; font-size: 12px; margin-top: 4px;">
+                        Number of standby nodes to keep running and ready for immediate use.
+                        Set to <strong>0</strong> to provision nodes on demand (default).
+                        Warm nodes count toward the <em>Max nodes</em> limit.
+                        Standby nodes are eviction-protected; the node idle timeout takes effect once a standby is claimed by a job.
+                    </div>
+                </FormItem>
+                <FormItem Label="Max nodes">
+                    <AntDesign.InputNumber @bind-Value="context.MaxNodes" Min="1" Placeholder="Unlimited" Style="width: 100%;" />
+                    <div style="color: #888; font-size: 12px; margin-top: 4px;">
+                        Maximum total nodes running simultaneously (warm standby + in use).
+                        Leave blank for no limit. Jobs queue for a node when this limit is reached.
+                    </div>
+                </FormItem>
+                <FormItem Label="Node acquire timeout (minutes)">
+                    <AntDesign.InputNumber @bind-Value="context.NodeAcquireTimeoutMin" Min="1" Placeholder="Wait indefinitely" Style="width: 100%;" />
+                    <div style="color: #888; font-size: 12px; margin-top: 4px;">
+                        How long a job task waits for an available node when <em>Max nodes</em> is reached.
+                        Leave blank to wait indefinitely (bounded only by job cancellation).
+                    </div>
+                </FormItem>
+            }
+            <FormItem Label="Wheel packages">
+                <Select Mode="SelectMode.Multiple"
+                        TItem="WheelPackageDto"
+                        TItemValue="Guid"
+                        DataSource="_availablePackages"
+                        LabelName="@nameof(WheelPackageDto.Name)"
+                        ValueName="@nameof(WheelPackageDto.Id)"
+                        @bind-Values="context.WheelPackageIds"
+                        Placeholder="Select packages to install"
+                        Style="width: 100%;" />
+            </FormItem>
+            <FormItem Label="Environment variables">
+                <Select Mode="SelectMode.Multiple"
+                        TItem="EnvironmentVariableDto"
+                        TItemValue="Guid"
+                        DataSource="_availableEnvVars"
+                        LabelName="@nameof(EnvironmentVariableDto.Key)"
+                        ValueName="@nameof(EnvironmentVariableDto.Id)"
+                        @bind-Values="context.EnvVarIds"
+                        Placeholder="Select environment variables"
+                        Style="width: 100%;" />
+            </FormItem>
+            <FormItem Label="Secrets">
+                <Select Mode="SelectMode.Multiple"
+                        TItem="SecretDto"
+                        TItemValue="Guid"
+                        DataSource="_availableSecrets"
+                        LabelName="@nameof(SecretDto.Key)"
+                        ValueName="@nameof(SecretDto.Id)"
+                        @bind-Values="context.SecretIds"
+                        Placeholder="Select secrets"
+                        Style="width: 100%;" />
+            </FormItem>
+            <FormItem Label="Description">
+                <TextArea @bind-Value="context.Description" Rows="2"
+                          BindOnInput />
+            </FormItem>
+        </Form>
+    </div>
+    <div class="drawer-footer">
+        @if (_showRestartPrompt)
+        {
+            var isInteractive = _editTarget?.PoolType == NodePoolType.Interactive;
+            <div style="font-size: 13px; margin-bottom: 8px; flex: 1;">
+                <AntDesign.Text Type="TextElementType.Warning">
+                    @(isInteractive
+                        ? "The running node must be restarted for these changes to take effect."
+                        : "Existing warm nodes will be recreated to apply these changes.")
+                </AntDesign.Text>
+            </div>
+            <Button OnClick="CancelSave" Disabled="_saving">Cancel</Button>
+            <Button OnClick="SaveOnly" Loading="@(_saving && !_restartSaving)">Save only</Button>
+            <Button Type="@ButtonType.Primary" OnClick="SaveWithRestart" Loading="_restartSaving">
+                @(isInteractive ? "Save & restart" : "Save & recreate")
+            </Button>
+        }
+        else
+        {
+            @if (_formValidationError is not null)
+            {
+                <div style="font-size: 13px; margin-bottom: 8px; flex: 1;">
+                    <AntDesign.Text Type="TextElementType.Danger">
+                        @_formValidationError
+                    </AntDesign.Text>
+                </div>
+            }
+            <Button OnClick="() => _showDrawer = false">Cancel</Button>
+            <Button Type="@ButtonType.Primary" OnClick="ConfirmSave" Loading="_saving"
+                    Disabled="@(string.IsNullOrWhiteSpace(_form.Name) || string.IsNullOrWhiteSpace(_form.VmSize) || ValidationHelper.ValidateNodePoolName(_form.Name) is not null)">
+                Save
+            </Button>
+        }
+    </div>
+</Drawer>
+
+@code {
+    private IReadOnlyList<NodePoolConfigDto> _jobAndInteractivePools = [];
+    private IReadOnlyList<InteractivePoolDto> _interactivePools = [];
+    private bool _loading = true;
+    private string? _error;
+    private string _activeTab = "interactive";
+    private string? _busyNode;
+    private string? _startingPool;
+
+    // Active nodes tab state
+    private List<NodeInfo> _nodesList = [];
+    private bool _nodesLoading = true;
+    private string? _nodesTabBusy;
+
+    private List<NodePoolConfigDto> _jobPools => _jobAndInteractivePools
+        .Where(p => p.PoolType == NodePoolType.Job).ToList();
+
+    // Drawer state
+    private bool _showDrawer;
+    private bool _saving;
+    private bool _restartSaving;
+    private bool _showRestartPrompt;
+    private string? _formValidationError;
+    private NodePoolConfigDto? _editTarget;
+    private NodePoolFormModel _form = new();
+    private bool _nameSubmitAttempted;
+
+    private string? NameDisplayError =>
+        (_nameSubmitAttempted || !string.IsNullOrEmpty(_form.Name)) ? GetNameError() : null;
+
+    private string? GetNameError()
+    {
+        if (string.IsNullOrEmpty(_form.Name)) return "Name is required.";
+        if (ValidationHelper.ValidateNodePoolName(_form.Name) is { } formatError) return formatError;
+        var trimmed = _form.Name.Trim();
+        if (_jobAndInteractivePools.Any(p => p.Name.Equals(trimmed, StringComparison.OrdinalIgnoreCase)
+                                            && p != _editTarget))
+            return "A node pool with this name already exists.";
+        return null;
+    }
+
+    private static readonly FormValidationRule[] _nodePoolNameRules =
+    [
+        new() { Required = true, Message = "Name is required." },
+        new() { Validator = ctx =>
+            ValidationHelper.ValidateNodePoolName(ctx.Value?.ToString()) is { } err
+                ? new ValidationResult(err, [ctx.FieldName]) : null }
+    ];
+    private static readonly FormValidationRule[] _requiredRule =
+    [
+        new() { Required = true, Message = "This field is required." }
+    ];
+
+    private List<WheelPackageDto> _availablePackages = [];
+    private List<EnvironmentVariableDto> _availableEnvVars = [];
+    private List<SecretDto> _availableSecrets = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Task.WhenAll(LoadAsync(), LoadPackagesAsync(), LoadEnvVarsAsync(), LoadSecretsAsync(), LoadNodesAsync());
+    }
+
+    private async Task LoadPackagesAsync()
+    {
+        try { _availablePackages = [.. await WheelPackageService.GetPackagesAsync()]; }
+        catch { /* non-fatal */ }
+    }
+
+    private async Task LoadEnvVarsAsync()
+    {
+        try { _availableEnvVars = [.. await EnvironmentService.GetVariablesAsync()]; }
+        catch { /* non-fatal */ }
+    }
+
+    private async Task LoadSecretsAsync()
+    {
+        try { _availableSecrets = [.. await EnvironmentService.GetSecretsAsync()]; }
+        catch { /* non-fatal */ }
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            var allTask = NodePoolService.GetNodePoolsAsync();
+            var interactiveTask = InteractivePoolService.GetInteractivePoolsAsync();
+            await Task.WhenAll(allTask, interactiveTask);
+            _jobAndInteractivePools = await allTask;
+            _interactivePools = [.. await interactiveTask];
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to load node pools: {ex.Message}";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void StartCreate()
+    {
+        _editTarget = null;
+        _form = new NodePoolFormModel();
+        _nameSubmitAttempted = false;
+        _formValidationError = null;
+        _showRestartPrompt = false;
+        _showDrawer = true;
+    }
+
+    private void StartEdit(NodePoolConfigDto pool)
+    {
+        _editTarget = pool;
+        _nameSubmitAttempted = false;
+        _form = new NodePoolFormModel
+        {
+            Name = pool.Name,
+            VmSize = pool.VmSize,
+            KernelIdleMin = (int)(pool.KernelIdleTimeout?.TotalMinutes ?? 0),
+            NodeIdleMin = pool.NodeIdleTimeout.HasValue ? (int)pool.NodeIdleTimeout.Value.TotalMinutes : (int?)null,
+            KernelReqs = pool.KernelRequirements,
+            Description = pool.Description,
+            WarmNodes = pool.WarmNodes,
+            MaxNodes = pool.MaxNodes,
+            NodeAcquireTimeoutMin = pool.NodeAcquireTimeout.HasValue ? (int)pool.NodeAcquireTimeout.Value.TotalMinutes : (int?)null,
+            WheelPackageIds = pool.WheelPackageIds ?? [],
+            EnvVarIds = pool.EnvironmentVariableIds ?? [],
+            SecretIds = pool.SecretIds ?? [],
+        };
+        _formValidationError = null;
+        _showRestartPrompt = false;
+        _showDrawer = true;
+    }
+
+    private async Task ConfirmSave()
+    {
+        _nameSubmitAttempted = true;
+        if (GetNameError() is not null) return;
+        if (string.IsNullOrWhiteSpace(_form.VmSize)) return;
+
+        var isJobPool = _editTarget?.PoolType == NodePoolType.Job || (_editTarget is null && _activeTab == "job");
+        if (isJobPool)
+        {
+            if (_form.MaxNodes.HasValue && _form.MaxNodes.Value < 1)
+            {
+                _formValidationError = "Max nodes must be 1 or greater.";
+                return;
+            }
+            if (_form.MaxNodes.HasValue && _form.MaxNodes.Value < _form.WarmNodes)
+            {
+                _formValidationError = $"Max nodes ({_form.MaxNodes.Value}) must be greater than or equal to Warm nodes ({_form.WarmNodes}).";
+                return;
+            }
+        }
+        _formValidationError = null;
+
+        if (_editTarget is not null && HasNodeImpactingChanges(_editTarget, _form) && IsNodeActive(_editTarget))
+        {
+            _showRestartPrompt = true;
+            return;
+        }
+
+        await ExecuteSaveAsync(restartNodes: false);
+    }
+
+    private Task SaveWithRestart()
+    {
+        _restartSaving = true;
+        return ExecuteSaveAsync(restartNodes: true);
+    }
+
+    private Task SaveOnly()
+    {
+        _showRestartPrompt = false;
+        return ExecuteSaveAsync(restartNodes: false);
+    }
+
+    private void CancelSave() => _showRestartPrompt = false;
+
+    private async Task ExecuteSaveAsync(bool restartNodes)
+    {
+        var kernelTimeout = _form.KernelIdleMin > 0 ? TimeSpan.FromMinutes(_form.KernelIdleMin) : (TimeSpan?)null;
+        var nodeTimeout = _form.NodeIdleMin.HasValue ? TimeSpan.FromMinutes(_form.NodeIdleMin.Value) : (TimeSpan?)null;
+        var acquireTimeout = _form.NodeAcquireTimeoutMin.HasValue ? TimeSpan.FromMinutes(_form.NodeAcquireTimeoutMin.Value) : (TimeSpan?)null;
+
+        _saving = true;
+        try
+        {
+            if (_editTarget is null)
+            {
+                var poolType = _activeTab == "interactive" ? NodePoolType.Interactive : NodePoolType.Job;
+                await NodePoolService.CreateNodePoolAsync(new CreateNodePoolRequest(
+                    _form.Name.Trim(), poolType, _form.VmSize.Trim(), kernelTimeout, nodeTimeout,
+                    _form.KernelReqs?.Trim(), _form.Description?.Trim(),
+                    _form.WheelPackageIds.Any() ? [.. _form.WheelPackageIds] : null,
+                    _form.EnvVarIds.Any() ? [.. _form.EnvVarIds] : null,
+                    _form.SecretIds.Any() ? [.. _form.SecretIds] : null,
+                    _form.WarmNodes, _form.MaxNodes, acquireTimeout));
+            }
+            else
+            {
+                await NodePoolService.UpdateNodePoolAsync(_editTarget.Id, new UpdateNodePoolRequest(
+                    _form.Name.Trim(), _form.VmSize.Trim(), kernelTimeout, nodeTimeout,
+                    _form.KernelReqs?.Trim(), _form.Description?.Trim(),
+                    _form.WheelPackageIds.Any() ? [.. _form.WheelPackageIds] : null,
+                    _form.EnvVarIds.Any() ? [.. _form.EnvVarIds] : null,
+                    _form.SecretIds.Any() ? [.. _form.SecretIds] : null,
+                    _form.WarmNodes, _form.MaxNodes, acquireTimeout,
+                    RestartNodes: restartNodes));
+            }
+            _showDrawer = false;
+            _showRestartPrompt = false;
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to save: {ex.Message}";
+        }
+        finally
+        {
+            _saving = false;
+            _restartSaving = false;
+        }
+    }
+
+    private static bool HasNodeImpactingChanges(NodePoolConfigDto original, NodePoolFormModel form)
+    {
+        if (!string.Equals(original.VmSize.Trim(), form.VmSize?.Trim(), StringComparison.OrdinalIgnoreCase))
+            return true;
+        var originalReqs = original.KernelRequirements?.Trim();
+        var formReqs = form.KernelReqs?.Trim();
+        if (!string.Equals(originalReqs, formReqs, StringComparison.Ordinal))
+            return true;
+        if (!new HashSet<Guid>(original.WheelPackageIds ?? []).SetEquals(form.WheelPackageIds))
+            return true;
+        if (!new HashSet<Guid>(original.EnvironmentVariableIds ?? []).SetEquals(form.EnvVarIds))
+            return true;
+        if (!new HashSet<Guid>(original.SecretIds ?? []).SetEquals(form.SecretIds))
+            return true;
+        return false;
+    }
+
+    private bool IsNodeActive(NodePoolConfigDto pool)
+    {
+        if (pool.PoolType == NodePoolType.Interactive)
+        {
+            var live = _interactivePools.FirstOrDefault(p => p.Id == pool.Id);
+            return live?.Status is InteractivePoolStatus.Running or InteractivePoolStatus.Starting;
+        }
+        return pool.WarmNodes > 0;
+    }
+
+    private async Task DeleteAsync(NodePoolConfigDto pool)
+    {
+        try
+        {
+            await NodePoolService.DeleteNodePoolAsync(pool.Id);
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to delete: {ex.Message}";
+        }
+    }
+
+    private async Task DeleteInteractiveAsync(InteractivePoolDto pool)
+    {
+        var dto = _jobAndInteractivePools.FirstOrDefault(p => p.Id == pool.Id);
+        if (dto is null) return;
+        await DeleteAsync(dto);
+    }
+
+    private async Task StartInteractiveNodeAsync(string poolName)
+    {
+        _startingPool = poolName;
+        _error = null;
+        try
+        {
+            await InteractivePoolService.EnsureNodeAsync(poolName);
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to start node: {ex.Message}";
+        }
+        finally
+        {
+            _startingPool = null;
+        }
+    }
+
+    private async Task RemoveInteractiveNodeAsync(string nodeName)
+    {
+        _busyNode = nodeName;
+        _error = null;
+        try
+        {
+            await NodeService.RemoveNodeAsync(nodeName);
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to remove node: {ex.Message}";
+        }
+        finally
+        {
+            _busyNode = null;
+        }
+    }
+
+    private async Task LoadNodesAsync()
+    {
+        _nodesLoading = true;
+        try
+        {
+            _nodesList = [.. await NodeService.GetNodesAsync()];
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to load nodes: {ex.Message}";
+        }
+        finally
+        {
+            _nodesLoading = false;
+        }
+    }
+
+    private async Task RemoveNodeAsync(string name)
+    {
+        _nodesTabBusy = name;
+        _error = null;
+        try
+        {
+            await NodeService.RemoveNodeAsync(name);
+            _nodesList.RemoveAll(n => n.Name == name);
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to remove node '{name}': {ex.Message}";
+        }
+        finally
+        {
+            _nodesTabBusy = null;
+        }
+    }
+
+    private static string FormatDuration(TimeSpan? ts)
+    {
+        if (ts is null) return "—";
+        var t = ts.Value;
+        if (t.TotalHours >= 1)
+        {
+            var h = (int)t.TotalHours;
+            var m = t.Minutes;
+            return m > 0 ? $"{h} h {m} min" : $"{h} h";
+        }
+        return $"{(int)t.TotalMinutes} min";
+    }
+
+    private static string InteractivePoolStatusTagColor(InteractivePoolStatus status) => status switch
+    {
+        InteractivePoolStatus.Running  => "success",
+        InteractivePoolStatus.Starting => "processing",
+        InteractivePoolStatus.Stopping => "warning",
+        InteractivePoolStatus.Error    => "error",
+        _                              => "default",
+    };
+
+    private static string NodeStateTagColor(NodeState state) => state switch
+    {
+        NodeState.Running => "success",
+        NodeState.Failure => "error",
+        _ => "warning"
+    };
+
+    private async Task ConfirmInternalNavigationAsync(LocationChangingContext ctx)
+    {
+        if (!_showDrawer) return;
+        var confirmed = await JS.InvokeAsync<bool>("confirm", "You have unsaved changes. Are you sure you want to leave?");
+        if (!confirmed)
+            ctx.PreventNavigation();
+    }
+}

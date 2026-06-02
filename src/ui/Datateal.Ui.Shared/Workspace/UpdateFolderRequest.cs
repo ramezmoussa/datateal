@@ -1,0 +1,3 @@
+namespace Datateal.Ui.Shared.Workspace;
+
+public record UpdateFolderRequest(string Name, Guid? ParentId = null);

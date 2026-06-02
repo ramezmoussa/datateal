@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <base href="/"/>
+    <ResourcePreloader/>
+    <link id="ant-theme-css" rel="stylesheet" href="_content/AntDesign/css/ant-design-blazor.css" />
+    <link rel="stylesheet" href="@Assets["Datateal.Ui.Server.styles.css"]"/>
+    <link rel="stylesheet" href="@Assets["css/app.css"]" />
+    <link rel="stylesheet" href="@Assets["_content/Datateal.Ui.Components/defaults.css"]" />
+    <ImportMap/>
+    <HeadOutlet @rendermode="_renderMode"/>
+    <script>
+        // Apply stored theme immediately to prevent flash of unstyled content.
+        (function () {
+            var stored = localStorage.getItem('datateal-theme') || 'auto';
+            var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            var effective = stored === 'dark' ? 'dark' : stored === 'light' ? 'light' : (prefersDark ? 'dark' : 'light');
+            if (effective === 'dark') {
+                var link = document.getElementById('ant-theme-css');
+                if (link) link.href = '_content/AntDesign/css/ant-design-blazor.dark.css';
+                document.documentElement.classList.add('ant-dark');
+            }
+        })();
+    </script>
+</head>
+
+<body>
+    <!-- WASM loading overlay: visible immediately on page load, removed by MainLayout on first render -->
+    <div id="wasm-loading-overlay">
+        <div id="wasm-loading-content">
+            <div class="ant-spin ant-spin-spinning">
+                <span class="ant-spin-dot ant-spin-dot-spin">
+                    <i class="ant-spin-dot-item"></i>
+                    <i class="ant-spin-dot-item"></i>
+                    <i class="ant-spin-dot-item"></i>
+                    <i class="ant-spin-dot-item"></i>
+                </span>
+            </div>
+            <div id="wasm-loading-label">Loading Datateal…</div>
+            <div id="wasm-progress-wrapper">
+                <div id="wasm-progress-track">
+                    <div id="wasm-progress-bar"></div>
+                </div>
+                <span id="wasm-progress-pct"></span>
+            </div>
+        </div>
+    </div>
+    <Routes @rendermode="_renderMode"/>
+    <script src="_content/AntDesign/js/ant-design-blazor.js"></script>
+    <script src="_content/BlazorMonaco/jsInterop.js"></script>
+    <script src="_content/BlazorMonaco/lib/monaco-editor/min/vs/loader.js"></script>
+    <script src="_content/BlazorMonaco/lib/monaco-editor/min/vs/editor/editor.main.js"></script>
+    <script src="@Assets["js/monaco-themes.js"]"></script>
+    <script src="@Assets["js/python-language.js"]"></script>
+    <script src="@Assets["js/duckdb-language.js"]"></script>
+    <script src="@Assets["_framework/blazor.web.js"]"></script>
+    <script src="@Assets["js/app.js"]"></script>
+    <script src="@Assets["js/crypto-storage.js"]"></script>
+    <script>var __define = window.define; window.define = undefined;</script>
+    <script src="@Assets["js/dagre.min.js"]"></script>
+    <script src="@Assets["js/cytoscape.min.js"]"></script>
+    <script src="@Assets["js/cytoscape-dagre.js"]"></script>
+    <script>window.define = __define;</script>
+    <script src="@Assets["js/job-dag.js"]"></script>
+</body>
+
+</html>
+
+@code {
+    private readonly IComponentRenderMode _renderMode = new InteractiveWebAssemblyRenderMode(prerender: false);
+}

@@ -1,5 +1,5 @@
 .venv
 __pycache__
-duckhouse_runtime.egg-info
+datateal_runtime.egg-info
 build
 dist

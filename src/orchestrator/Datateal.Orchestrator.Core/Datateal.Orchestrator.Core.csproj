@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Quartz" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\shared\Datateal.Core\Datateal.Core.csproj" />
+  </ItemGroup>
+
+</Project>

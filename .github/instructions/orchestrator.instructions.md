@@ -2,11 +2,11 @@
 applyTo: src/orchestrator/**
 ---
 
-# DuckHouse Orchestrator
+# Datateal Orchestrator
 
 ASP.NET Core Web API that schedules and executes multi-task jobs against compute nodes managed by the Control Plane. Follows the same Clean Architecture and custom mediator pattern as the UI server and Control Plane.
 
-Shared domain types (`NodeInfo`, `KernelInfo`, mediator interfaces) live in `src/shared/DuckHouse.Core`. The orchestrator shares the same PostgreSQL database as the UI server — Aspire resource name `duckhouse-ui`. There is no separate database.
+Shared domain types (`NodeInfo`, `KernelInfo`, mediator interfaces) live in `src/shared/Datateal.Core`. The orchestrator shares the same PostgreSQL database as the UI server — Aspire resource name `datateal-ui`. There is no separate database.
 
 ## Engine service lifetime model
 
@@ -90,5 +90,5 @@ Scheduling uses Quartz.NET (`SchedulesManager`, a singleton `BackgroundService`)
 ## Adding new features
 
 - **New mediator command/query**: add to `Application/Mediator/Commands/` or `Queries/`. The mediator scans by assembly.
-- **New endpoint**: add a static class in `DuckHouse.Orchestrator/Endpoints/` and register it in `Program.cs`.
-- **New entity / EF migration**: uses `DuckHouseDbContext` from `src/shared`. Migrations live in `DuckHouse.Ui.Server` — run `dotnet ef migrations add` from that project.
+- **New endpoint**: add a static class in `Datateal.Orchestrator/Endpoints/` and register it in `Program.cs`.
+- **New entity / EF migration**: uses `DatatealDbContext` from `src/shared`. Migrations live in `Datateal.Ui.Server` — run `dotnet ef migrations add` from that project.

@@ -1,0 +1,21 @@
+@using Datateal.Ui.Client.Notebook
+
+<Flex Align="FlexAlign.Center" Gap="FlexGap.Small" Style="opacity: 0.6; font-size: 0.75rem;">
+    <Divider Style="margin: 0;">
+        <Button Type="ButtonType.Dashed" Size="ButtonSize.Small" Style="padding: 0 8px;" Icon="@IconType.Outline.Plus" OnClick="OnAddPython">
+            Python
+        </Button>
+        <Button Type="ButtonType.Dashed" Size="ButtonSize.Small" Style="padding: 0 8px;" Icon="@IconType.Outline.Plus" OnClick="OnAddSql">
+            SQL
+        </Button>
+        <Button Type="ButtonType.Dashed" Size="ButtonSize.Small" Style="padding: 0 8px;" Icon="@IconType.Outline.Plus" OnClick="OnAddMarkdown">
+            Markdown
+        </Button>
+    </Divider>
+</Flex>
+
+@code {
+    [Parameter] public EventCallback OnAddPython { get; set; }
+    [Parameter] public EventCallback OnAddSql { get; set; }
+    [Parameter] public EventCallback OnAddMarkdown { get; set; }
+}

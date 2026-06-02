@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authorization" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\shared\Datateal.Auth.Abstractions\Datateal.Auth.Abstractions.csproj" />
+    <ProjectReference Include="..\..\shared\Datateal.Core\Datateal.Core.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,6 +1,6 @@
-# DuckHouse UI
+# Datateal UI
 
-Blazor Web App: an ASP.NET Core server host (`DuckHouse.Ui.Server`) with a WebAssembly client (`DuckHouse.Ui.Client`). Provides the notebook editor, SQL query editor, workspace browser, catalog management, and interactive node pool management.
+Blazor Web App: an ASP.NET Core server host (`Datateal.Ui.Server`) with a WebAssembly client (`Datateal.Ui.Client`). Provides the notebook editor, SQL query editor, workspace browser, catalog management, and interactive node pool management.
 
 ---
 
@@ -8,13 +8,13 @@ Blazor Web App: an ASP.NET Core server host (`DuckHouse.Ui.Server`) with a WebAs
 
 | Project                              | Role                                                               |
 | ------------------------------------ | ------------------------------------------------------------------ |
-| `DuckHouse.Ui.Shared`                | DTOs shared between server and WASM client                         |
-| `DuckHouse.Ui.Server`                | ASP.NET Core host; REST API controllers; EF Core migrations        |
-| `DuckHouse.Ui.Server.Core`           | Domain entities and repository interfaces                          |
-| `DuckHouse.Ui.Server.Application`    | Use-case layer: custom mediator pattern (commands + queries)       |
-| `DuckHouse.Ui.Server.Infrastructure` | EF Core + SQLite; concrete repositories and services               |
-| `DuckHouse.Ui.Client`                | WASM client: pages and typed `HttpClient` services                 |
-| `DuckHouse.Ui.Client.Components`     | Razor Class Library: `CodeCell` (Monaco wrapper), `ExecutionTimer` |
+| `Datateal.Ui.Shared`                | DTOs shared between server and WASM client                         |
+| `Datateal.Ui.Server`                | ASP.NET Core host; REST API controllers; EF Core migrations        |
+| `Datateal.Ui.Server.Core`           | Domain entities and repository interfaces                          |
+| `Datateal.Ui.Server.Application`    | Use-case layer: custom mediator pattern (commands + queries)       |
+| `Datateal.Ui.Server.Infrastructure` | EF Core + SQLite; concrete repositories and services               |
+| `Datateal.Ui.Client`                | WASM client: pages and typed `HttpClient` services                 |
+| `Datateal.Ui.Client.Components`     | Razor Class Library: `CodeCell` (Monaco wrapper), `ExecutionTimer` |
 
 ---
 
@@ -90,11 +90,11 @@ Authentication is handled by an external identity provider (currently Entra ID) 
 
 ### Pluggable identity provider
 
-The OIDC setup is isolated behind `IIdentityProviderSetup` (`DuckHouse.Auth.Abstractions`). Each identity provider ships its own implementation:
+The OIDC setup is isolated behind `IIdentityProviderSetup` (`Datateal.Auth.Abstractions`). Each identity provider ships its own implementation:
 
 | Package                  | Implementation                 | Extension method             |
 | ------------------------ | ------------------------------ | ---------------------------- |
-| `DuckHouse.Auth.EntraId` | `EntraIdIdentityProviderSetup` | `AddEntraIdAuthentication()` |
+| `Datateal.Auth.EntraId` | `EntraIdIdentityProviderSetup` | `AddEntraIdAuthentication()` |
 
 To switch providers, replace the `AddEntraIdAuthentication()` call in `Program.cs` with the new provider's registration. Only one provider is active at a time.
 
@@ -118,7 +118,7 @@ Users are stored in `AppUser` (Postgres via EF Core). Key fields:
 | `Email`               | Primary identifier used for admin seed matching and first-login lookup                                                           |
 | `ExternalId`          | Entra OID — captured on first login for stable future lookups. Once set it becomes the primary key for `AppClaimsTransformation` |
 | `IsEnabled`           | Disabled users are authenticated but receive no role claims                                                                      |
-| `Roles`               | `List<string>` stored as a JSON array column; use `DuckHouseRole.*` constants                                                    |
+| `Roles`               | `List<string>` stored as a JSON array column; use `DatatealRole.*` constants                                                    |
 | `HasAllCatalogAccess` | `true` = user can access all catalogs (present and future)                                                                       |
 | `CatalogAccessList`   | `UserCatalogAccess` rows granting access to specific catalogs when `HasAllCatalogAccess` is `false`                              |
 
@@ -128,7 +128,7 @@ Admin and `CatalogContributor` users always have implicit access to all catalogs
 
 Roles are coarse-grained capability buckets. Policies are the named groups checked by `[Authorize]` and `<AuthorizeView>` — always use policy names, not role names directly.
 
-#### Roles (`DuckHouseRole`)
+#### Roles (`DatatealRole`)
 
 | Role                   | What it grants                                                                                                               |
 | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
@@ -228,6 +228,6 @@ Backend services authenticate each other with API keys, not user tokens:
 
 ## Styling
 
-Custom CSS in `DuckHouse.Ui.Server/wwwroot/css/app.css`. Component-scoped CSS in `DuckHouse.Ui.Client.Components/wwwroot/defaults.css`. Dark mode class `ant-dark` is toggled on `<html>`.
+Custom CSS in `Datateal.Ui.Server/wwwroot/css/app.css`. Component-scoped CSS in `Datateal.Ui.Client.Components/wwwroot/defaults.css`. Dark mode class `ant-dark` is toggled on `<html>`.
 
 Do not use `var(--ant-*)` CSS custom properties — they do not exist in this build of Ant Design Blazor. Use hardcoded hex values and target dark mode with `html.ant-dark` selectors in `app.css`. Typical values: borders `#d9d9d9` / `#434343` (dark), subtle backgrounds `#fafafa` / `#1d1d1d` (dark).

@@ -2,20 +2,20 @@
 applyTo: src/control-plane/**
 ---
 
-# DuckHouse Control Plane
+# Datateal Control Plane
 
-ASP.NET Core 10 Web API (.NET Aspire, `DuckHouse.ControlPlane.slnx`) that dynamically provisions compute nodes and manages Jupyter kernels running on them.
+ASP.NET Core 10 Web API (.NET Aspire, `Datateal.ControlPlane.slnx`) that dynamically provisions compute nodes and manages Jupyter kernels running on them.
 
 ## Projects (Clean Architecture)
 
 | Project | Role |
 |---|---|
-| `DuckHouse.ControlPlane` | ASP.NET Core host; minimal API endpoints, Aspire wiring |
-| `DuckHouse.ControlPlane.Application` | Use-case layer: mediator handlers, `InactivityEvictionService` |
-| `DuckHouse.ControlPlane.Core` | Domain interfaces: `INodeService`, `INodeRuntimeClient` |
-| `DuckHouse.ControlPlane.Infrastructure` | Implementations: `LocalNodeService`, `AksNodeService`, `KubernetesRuntimeClient` |
+| `Datateal.ControlPlane` | ASP.NET Core host; minimal API endpoints, Aspire wiring |
+| `Datateal.ControlPlane.Application` | Use-case layer: mediator handlers, `InactivityEvictionService` |
+| `Datateal.ControlPlane.Core` | Domain interfaces: `INodeService`, `INodeRuntimeClient` |
+| `Datateal.ControlPlane.Infrastructure` | Implementations: `LocalNodeService`, `AksNodeService`, `KubernetesRuntimeClient` |
 
-Domain types (`NodeInfo`, `NodeState`, `KernelInfo`, `KernelStatus`, kernel request/response models, mediator interfaces) live in `src/shared/DuckHouse.Core`, which is also referenced by the UI server.
+Domain types (`NodeInfo`, `NodeState`, `KernelInfo`, `KernelStatus`, kernel request/response models, mediator interfaces) live in `src/shared/Datateal.Core`, which is also referenced by the UI server.
 
 ## Node backends
 
@@ -26,7 +26,7 @@ Domain types (`NodeInfo`, `NodeState`, `KernelInfo`, `KernelStatus`, kernel requ
 | `Local` | `LocalNodeService` | Kubernetes pod in Docker Desktop |
 | `Aks` | `AksNodeService` | AKS agent pool (one VM, one pod) |
 
-**Local**: creates pods from `duckhouse-runtime:latest` with `ImagePullPolicy: Never`. Uses `~/.kube/config` with context from `NodeService:Local:KubeContext` (default `"docker-desktop"`). Stop/Start are not supported (removed).
+**Local**: creates pods from `datateal-runtime:latest` with `ImagePullPolicy: Never`. Uses `~/.kube/config` with context from `NodeService:Local:KubeContext` (default `"docker-desktop"`). Stop/Start are not supported (removed).
 
 **AKS**: creates an AKS agent pool (`Count=1`, `Mode=User`) then deploys one pod pinned to that pool via `nodeSelector`. Pods are deleted before the agent pool is removed.
 

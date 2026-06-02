@@ -1,13 +1,13 @@
 """Tests for Jedi-based language features: semantic tokens, completions, hover.
 
 These tests exercise the KernelConnection language-feature methods using the
-current Python interpreter as the Jedi environment (DUCKHOUSE_KERNEL_PYTHON is
+current Python interpreter as the Jedi environment (DATATEAL_KERNEL_PYTHON is
 not set, so sys.executable is used).
 """
 
 import pytest
 
-from duckhouse_runtime.kernels.manager import KernelConnection
+from datateal_runtime.kernels.manager import KernelConnection
 
 
 # ---------------------------------------------------------------------------

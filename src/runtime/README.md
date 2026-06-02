@@ -1,6 +1,6 @@
-## DuckHouse Runtime
+## Datateal Runtime
 
-Fast API runtime for DuckHouse. The API runs on each node in the Kubernetes cluster and manages the Python kernels.
+Fast API runtime for Datateal. The API runs on each node in the Kubernetes cluster and manages the Python kernels.
 
 ### Development and build environment setup
 
@@ -103,7 +103,7 @@ After that, you can install the built .whl (wheel) file.
 > py -m pipx install ./<file_name>.whl
 ```
 
-The DuckHouse runtime package depends on the duckdb Python package, which in turn requires [Microsoft Visual C++ Redistributable](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-170#latest-supported-redistributable-version) to be installed on the machine (Windows). See [this GitHub issue](https://github.com/duckdb/duckdb/issues/8101) for more context. Otherwise the runtime will fail during execution.
+The Datateal runtime package depends on the duckdb Python package, which in turn requires [Microsoft Visual C++ Redistributable](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-170#latest-supported-redistributable-version) to be installed on the machine (Windows). See [this GitHub issue](https://github.com/duckdb/duckdb/issues/8101) for more context. Otherwise the runtime will fail during execution.
 
 ### Docker
 
@@ -114,7 +114,7 @@ The container image runs the API in an isolated Python environment and spins up 
 Build the wheel first (see [Development and build environment setup](#development-and-build-environment-setup)), then build the Docker image from the `src/runtime` directory.
 
 ```
-docker build -t duckhouse-runtime .
+docker build -t datateal-runtime .
 ```
 
 The kernel environment comes with `ipykernel`, `duckdb`, `numpy` and `pandas` pre-installed. Additional packages can be supplied at runtime without rebuilding (see below).
@@ -126,10 +126,10 @@ Packages can also be installed in the kernel environment at container startup, w
 **Via environment variable** — set `KERNEL_PACKAGES` in the pod spec or `docker run` command.
 
 ```
-docker run --rm -p 8000:8000 -e KERNEL_PACKAGES="numpy pandas" duckhouse-runtime
+docker run --rm -p 8000:8000 -e KERNEL_PACKAGES="numpy pandas" datateal-runtime
 ```
 
-**Via a mounted requirements file** — mount a `requirements.txt` to `/etc/duckhouse/kernel-requirements.txt`. In Kubernetes this is typically done with a ConfigMap.
+**Via a mounted requirements file** — mount a `requirements.txt` to `/etc/datateal/kernel-requirements.txt`. In Kubernetes this is typically done with a ConfigMap.
 
 ```yaml
 # configmap.yaml
@@ -146,7 +146,7 @@ data:
 # deployment.yaml (relevant excerpt)
 volumeMounts:
   - name: kernel-requirements
-    mountPath: /etc/duckhouse
+    mountPath: /etc/datateal
 volumes:
   - name: kernel-requirements
     configMap:
@@ -163,7 +163,7 @@ Both mechanisms can be used together. The requirements file is processed first, 
 After building, the image is immediately available in Docker Desktop. Run it locally to verify.
 
 ```
-docker run --rm -p 8000:8000 duckhouse-runtime
+docker run --rm -p 8000:8000 datateal-runtime
 ```
 
 The API will be available at `http://localhost:8000`. Interactive API docs are at `http://localhost:8000/docs`.
@@ -179,25 +179,25 @@ az acr login --name <registry>
 Tag the local image with the fully qualified ACR repository name.
 
 ```
-docker tag duckhouse-runtime <registry>.azurecr.io/duckhouse-runtime:<tag>
+docker tag datateal-runtime <registry>.azurecr.io/datateal-runtime:<tag>
 ```
 
 For example:
 
 ```
-docker tag duckhouse-runtime acrduckhousedev.azurecr.io/duckhouse-runtime:latest
+docker tag datateal-runtime acrdatatealdev.azurecr.io/datateal-runtime:latest
 ```
 
 Push the image.
 
 ```
-docker push <registry>.azurecr.io/duckhouse-runtime:<tag>
+docker push <registry>.azurecr.io/datateal-runtime:<tag>
 ```
 
 Reference the image in a Kubernetes pod spec or Helm chart.
 
 ```yaml
-image: <registry>.azurecr.io/duckhouse-runtime:<tag>
+image: <registry>.azurecr.io/datateal-runtime:<tag>
 ```
 
 Make sure the Kubernetes nodes have pull access to the registry. For AKS this is typically done by attaching the ACR to the cluster. This is automatically done by the Bicep template in the infra folder of this repository.

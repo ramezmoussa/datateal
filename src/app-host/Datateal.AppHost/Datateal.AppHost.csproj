@@ -1,0 +1,20 @@
+<Project Sdk="Aspire.AppHost.Sdk/13.2.0">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <UserSecretsId>0aa70405-374e-4693-a9c0-4b04925b3daf</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../control-plane/Datateal.ControlPlane/Datateal.ControlPlane.csproj" />
+    <ProjectReference Include="..\..\orchestrator\Datateal.Orchestrator\Datateal.Orchestrator.csproj" />
+    <ProjectReference Include="..\..\ui\server\Datateal.Ui.Server\Datateal.Ui.Server.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.PostgreSQL" />
+  </ItemGroup>
+
+</Project>

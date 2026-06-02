@@ -1,33 +1,33 @@
-# DuckHouse UI
+# Datateal UI
 
-Blazor Web App: ASP.NET Core server host (`DuckHouse.Ui.Server`) with a WebAssembly client (`DuckHouse.Ui.Client`). Uses **Ant Design Blazor** (`AntDesign`) for UI components, **BlazorMonaco** for code editing, and **Markdig** for Markdown rendering. Integrates with .NET Aspire.
+Blazor Web App: ASP.NET Core server host (`Datateal.Ui.Server`) with a WebAssembly client (`Datateal.Ui.Client`). Uses **Ant Design Blazor** (`AntDesign`) for UI components, **BlazorMonaco** for code editing, and **Markdig** for Markdown rendering. Integrates with .NET Aspire.
 
 ## Projects
 
 | Project                              | Role                                                                                       |
 | ------------------------------------ | ------------------------------------------------------------------------------------------ |
-| `DuckHouse.Ui.Shared`                | DTOs shared between server and WASM client (`Nodes/`, `Kernels/`, `Workspace/` subfolders) |
-| `DuckHouse.Ui.Server`                | ASP.NET Core host; REST API controllers, Blazor/WASM bootstrap, EF Core migrations         |
-| `DuckHouse.Ui.Server.Core`           | Domain layer: entity classes, repository interfaces                                        |
-| `DuckHouse.Ui.Server.Application`    | Use-case layer: custom mediator pattern (commands + queries)                               |
-| `DuckHouse.Ui.Server.Infrastructure` | EF Core + SQLite; concrete repositories, `AddInfrastructureServices()`                     |
-| `DuckHouse.Ui.Client`                | WASM client: pages, layouts, typed `HttpClient` services                                   |
-| `DuckHouse.Ui.Client.Components`     | Razor Class Library: `CodeCell` (Monaco wrapper), `ExecutionTimer`                         |
+| `Datateal.Ui.Shared`                | DTOs shared between server and WASM client (`Nodes/`, `Kernels/`, `Workspace/` subfolders) |
+| `Datateal.Ui.Server`                | ASP.NET Core host; REST API controllers, Blazor/WASM bootstrap, EF Core migrations         |
+| `Datateal.Ui.Server.Core`           | Domain layer: entity classes, repository interfaces                                        |
+| `Datateal.Ui.Server.Application`    | Use-case layer: custom mediator pattern (commands + queries)                               |
+| `Datateal.Ui.Server.Infrastructure` | EF Core + SQLite; concrete repositories, `AddInfrastructureServices()`                     |
+| `Datateal.Ui.Client`                | WASM client: pages, layouts, typed `HttpClient` services                                   |
+| `Datateal.Ui.Client.Components`     | Razor Class Library: `CodeCell` (Monaco wrapper), `ExecutionTimer`                         |
 
 ## Architecture
 
-**Server** follows Clean Architecture (Core → Application → Infrastructure → Host). Use cases are implemented via a custom mediator (`IMediator`, `IRequest<T>`, `IRequestHandler<TReq,TRes>`) with commands in `Mediator/Commands/` and queries in `Mediator/Queries/`. REST API controllers in `DuckHouse.Ui.Server/Controllers/` map requests to mediator calls.
+**Server** follows Clean Architecture (Core → Application → Infrastructure → Host). Use cases are implemented via a custom mediator (`IMediator`, `IRequest<T>`, `IRequestHandler<TReq,TRes>`) with commands in `Mediator/Commands/` and queries in `Mediator/Queries/`. REST API controllers in `Datateal.Ui.Server/Controllers/` map requests to mediator calls.
 
 **Hosting**: `App.razor` renders `<Routes>` with `InteractiveWebAssemblyRenderMode(prerender: false)`. All interactive pages live in the WASM client. No prerender.
 
-**Client services**: typed `HttpClient` wrappers in `DuckHouse.Ui.Client/Services/` call the server REST API. Register all services in `DuckHouse.Ui.Client/Program.cs`.
+**Client services**: typed `HttpClient` wrappers in `Datateal.Ui.Client/Services/` call the server REST API. Register all services in `Datateal.Ui.Client/Program.cs`.
 
 ## Workspace feature
 
 Workspaces store **notebooks** and **SQL query files** in a folder hierarchy backed by EF Core + SQLite using **TPH inheritance**. `WorkspaceItem` is the abstract EF base class; `Notebook` and `Query` are concrete subclasses. The EF discriminator column is `ItemType varchar(32)`. `Query` adds nullable columns for the last execution result (`LastExecutedAt`, `LastDurationMs`, `LastResultStatus`, `LastResultJson` as a JSON blob).
 
 - Server: `WorkspaceController` at `api/workspace`; typed repository methods use `.OfType<Notebook>()` / `.OfType<Query>()`
-- Client: `IWorkspaceService` / `WorkspaceService` in `DuckHouse.Ui.Client/Services/`
+- Client: `IWorkspaceService` / `WorkspaceService` in `Datateal.Ui.Client/Services/`
 - Workspace listing: folders first (alphabetical), then notebooks and queries merged and sorted alphabetically
 
 **WorkspacePage** (`/workspace`): lists folders and items with a Type column; supports create, rename, move, clone, delete for both notebooks and queries.
@@ -43,8 +43,8 @@ Interactive node pools are a class of `NodePoolConfig` with `PoolType = "Interac
 - Server: `InteractivePoolsController` at `api/interactive-pools`; key endpoints:
   - `GET api/interactive-pools` — lists all `InteractiveNodePoolConfig` entries with live node state (fetched from the control plane per pool)
   - `POST api/interactive-pools/{name}/ensure-node` — idempotent "start or join" call; returns `NodeInfo`; handles 409 race by retrying GET
-- Client: `IInteractivePoolService` / `InteractivePoolService` in `DuckHouse.Ui.Client/Services/`; registered in `Program.cs`
-- DTO: `InteractivePoolDto` in `DuckHouse.Ui.Shared/Nodes/`; carries `Name`, `VmSize`, `Description`, `NodeState`
+- Client: `IInteractivePoolService` / `InteractivePoolService` in `Datateal.Ui.Client/Services/`; registered in `Program.cs`
+- DTO: `InteractivePoolDto` in `Datateal.Ui.Shared/Nodes/`; carries `Name`, `VmSize`, `Description`, `NodeState`
 
 **Node naming**: `"i" + pool.Id.ToString("N")[..11].ToLowerInvariant()` — stable across pool renames; always 12 characters.
 
@@ -64,7 +64,7 @@ Interactive node pools are a class of `NodePoolConfig` with `PoolType = "Interac
 
 ## Styling
 
-Custom CSS in `server/DuckHouse.Ui.Server/wwwroot/css/app.css`. Component-scoped CSS in `DuckHouse.Ui.Client.Components/wwwroot/defaults.css`. Dark mode class `ant-dark` is toggled on `<html>`.
+Custom CSS in `server/Datateal.Ui.Server/wwwroot/css/app.css`. Component-scoped CSS in `Datateal.Ui.Client.Components/wwwroot/defaults.css`. Dark mode class `ant-dark` is toggled on `<html>`.
 
 **Do not use `var(--ant-*)` CSS custom properties** — they do not exist in this build of Ant Design Blazor. Use hardcoded hex values and target dark mode with `html.ant-dark` selectors in `app.css`. Typical values: borders `#d9d9d9` / `#434343` (dark), subtle backgrounds `#fafafa` / `#1d1d1d` (dark).
 
@@ -128,7 +128,7 @@ protected override async Task OnInitializedAsync()
 
 ### `AppClaimsTransformation` — use `AsNoTracking()`
 
-`AppClaimsTransformation` runs inside the same scoped `DuckHouseDbContext` as the rest of the request. Always query with `.AsNoTracking()` here. If the user entity is tracked, subsequent repository operations in the same request may find a stale cached instance in the EF identity map, causing silent data corruption or `DbUpdateConcurrencyException`.
+`AppClaimsTransformation` runs inside the same scoped `DatatealDbContext` as the rest of the request. Always query with `.AsNoTracking()` here. If the user entity is tracked, subsequent repository operations in the same request may find a stale cached instance in the EF identity map, causing silent data corruption or `DbUpdateConcurrencyException`.
 
 ### Updating `UserCatalogAccess` — bypass the change tracker
 
@@ -144,7 +144,7 @@ Replacing a user's catalog access list must use `ExecuteDeleteAsync` (bulk SQL) 
 
 ## Monaco editor (`CodeCell`)
 
-`CodeCell.razor` wraps BlazorMonaco. `Height=0` = auto-size from line count; `Height>0` = fixed pixel height. `AutomaticLayout=true` causes Monaco to reflow when its container resizes — important after a splitter drag. JS helpers in `App.razor`: `setMonacoEditorLanguage`, `getDuckhouseMonacoTheme`, `openFileAsText`, `downloadFile`, `clickElement`, `initQueryPageSplitter`.
+`CodeCell.razor` wraps BlazorMonaco. `Height=0` = auto-size from line count; `Height>0` = fixed pixel height. `AutomaticLayout=true` causes Monaco to reflow when its container resizes — important after a splitter drag. JS helpers in `App.razor`: `setMonacoEditorLanguage`, `getDatatealMonacoTheme`, `openFileAsText`, `downloadFile`, `clickElement`, `initQueryPageSplitter`.
 
 ## DataFrameView
 
@@ -152,4 +152,4 @@ Replacing a user's catalog access list must use `ExecuteDeleteAsync` (bulk SQL) 
 
 ## Theme
 
-`IThemeService` / `ThemeService` persist the theme preference (`Auto`/`Light`/`Dark`) in `localStorage` as `duckhouse-theme`. A FOUC-prevention script in `App.razor`'s `<head>` applies the theme synchronously before page paint.
+`IThemeService` / `ThemeService` persist the theme preference (`Auto`/`Light`/`Dark`) in `localStorage` as `datateal-theme`. A FOUC-prevention script in `App.razor`'s `<head>` applies the theme synchronously before page paint.

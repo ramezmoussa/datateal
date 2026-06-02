@@ -1,4 +1,4 @@
-// Deploys the full DuckHouse Control Plane AKS infrastructure at resource group scope.
+// Deploys the full Datateal Control Plane AKS infrastructure at resource group scope.
 //
 // One additional resource group is created:
 //   • nodeResourceGroupName – AKS creates it automatically to
@@ -22,19 +22,19 @@ targetScope = 'resourceGroup'
 param location string = 'westeurope'
 
 @description('Name of the AKS cluster.')
-param clusterName string = 'aks-duckhouse-dev'
+param clusterName string = 'aks-datateal-dev'
 
 @description('Name of the Azure Container Registry. Must be globally unique and alphanumeric only.')
 param acrName string
 
 @description('Name of the PostgreSQL Flexible Server. Must be globally unique.')
-param psqlName string = 'psql-aks-duckhouse-dev'
+param psqlName string = 'psql-aks-datateal-dev'
 
 @description('Name of the storage account for ADLS Gen2. Must be globally unique and lowercase only.')
-param storageAccountName string = 'stduckhousedev'
+param storageAccountName string = 'stdatatealdev'
 
 @description('Name of the AKS-managed node resource group (created automatically by AKS).')
-param nodeResourceGroupName string = 'mrg-duckhouse-dev'
+param nodeResourceGroupName string = 'mrg-datateal-dev'
 
 @description('VM size for the required system node pool.')
 param systemNodePoolVmSize string = 'Standard_D2as_v5'

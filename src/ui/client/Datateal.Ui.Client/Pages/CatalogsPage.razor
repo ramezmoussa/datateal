@@ -1,0 +1,449 @@
+@page "/catalogs"
+
+@using Datateal.Ui.Shared.Catalogs
+@using Datateal.Ui.Client.Validation
+@using Datateal.Ui.Client.Components
+@inject ICatalogService CatalogService
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+
+<PageTitle>Catalogs — Datateal</PageTitle>
+
+<Space>
+    <SpaceItem>
+        <Icon Height="24px" Width="24px" Type="@IconType.Outline.Database" />
+    </SpaceItem>
+    <SpaceItem>
+        <h2>Catalogs</h2>
+    </SpaceItem>
+</Space>
+
+<Tabs @bind-ActiveKey="_activeTab" OnChange="OnTabChange">
+    <TabPane Key="browse" Tab="Browse">
+        @if (_browsePanelCollapsed)
+        {
+            <div class="cb-layout">
+                <div class="cp-collapsed-strip">
+                    <button class="cp-collapse-btn" title="Show catalog explorer"
+                            @onclick="@(() => SetBrowsePanelCollapsed(false))">
+                        <Icon Type="@IconType.Outline.DoubleRight" />
+                    </button>
+                </div>
+                <div class="cp-main" style="padding: 16px; overflow-y: auto;">
+                    <CatalogObjectDetail Selection="@_selectedObject" />
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="cb-layout">
+                <div id="cb-panel" class="cp-side-panel" style="width: @(_browsePanelWidth)px;">
+                    <div class="cp-panel-header">
+                        <span class="cp-panel-title">
+                            <Icon Type="@IconType.Outline.Database" />
+                            <span style="margin-left: 6px;">Catalogs</span>
+                        </span>
+                        <div style="display: flex; align-items: center; gap: 2px;">
+                            <button class="cp-collapse-btn" title="Refresh catalog explorer"
+                                    disabled="@_browseRefreshing"
+                                    @onclick="RefreshBrowserAsync">
+                                <Icon Type="@(_browseRefreshing ? IconType.Outline.Loading : IconType.Outline.Reload)" />
+                            </button>
+                            <button class="cp-collapse-btn" title="Collapse catalog explorer"
+                                    @onclick="@(() => SetBrowsePanelCollapsed(true))">
+                                <Icon Type="@IconType.Outline.DoubleLeft" />
+                            </button>
+                        </div>
+                    </div>
+                    <div class="cp-panel-body">
+                        <CatalogBrowserTree @ref="_browserTreeRef"
+                                            OnObjectSelected="OnObjectSelected" />
+                    </div>
+                </div>
+                <div id="cb-handle" class="cp-drag-handle">
+                    <div class="cp-drag-handle-inner"></div>
+                </div>
+                <div class="cp-main" style="overflow-y: auto;">
+                    <CatalogObjectDetail Selection="@_selectedObject" />
+                </div>
+            </div>
+        }
+    </TabPane>
+
+    <TabPane Key="manage" Tab="Manage">
+        <AuthorizeView Policy="@AuthPolicy.CatalogManage" Context="authCtx">
+            <Authorized Context="authCtx">
+        @if (!string.IsNullOrEmpty(_error))
+        {
+            <Alert Type="@AlertType.Error" Message="@_error" Closable OnClose="() => _error = null"
+                    Style="margin-bottom: 16px;" />
+        }
+
+        <Flex Justify="FlexJustify.FlexEnd" Style="margin-bottom: 12px;">
+            <Button Type="@ButtonType.Primary" OnClick="StartCreate">
+                <Icon Type="@IconType.Outline.Plus" /> New catalog
+            </Button>
+        </Flex>
+
+        <Spin Spinning="_loading">
+            <Table TItem="CatalogDto" DataSource="_catalogs" Size="@TableSize.Small" PageSize="int.MaxValue" PaginationPosition="none">
+                <PropertyColumn Property="c => c.Name" Title="Name" Sortable>
+                    <span style="font-family: monospace;">@context.Name</span>
+                </PropertyColumn>
+                <PropertyColumn Property="c => c.GetType().Name" Title="Type" Sortable>
+                    @if (context is ManagedCatalogDto)
+                    {
+                        <Tag Color="@("blue")">Managed</Tag>
+                    }
+                    else
+                    {
+                        <Tag Color="@("orange")">Unmanaged</Tag>
+                    }
+                </PropertyColumn>
+                <PropertyColumn Property="c => c.CatalogHost" Title="Host">
+                    @(context.CatalogHost ?? "—")
+                </PropertyColumn>
+                <PropertyColumn Property="c => c.CatalogDatabase" Title="Database">
+                    @(context.CatalogDatabase ?? "—")
+                </PropertyColumn>
+                <PropertyColumn Property="c => c.UpdatedAt" Title="Updated" Sortable>
+                    @context.UpdatedAt.ToString("yyyy-MM-dd")
+                </PropertyColumn>
+                <ActionColumn Title="Actions">
+                    <Space>
+                        <SpaceItem>
+                            <Tooltip Title="Edit">
+                                <Button Size="@ButtonSize.Small" OnClick="() => StartEdit(context)">
+                                    <Icon Type="@IconType.Outline.Edit" />
+                                </Button>
+                            </Tooltip>
+                        </SpaceItem>
+                        <SpaceItem>
+                            <Tooltip Title="Delete">
+                                <Popconfirm Title="@(context is ManagedCatalogDto ? $"Delete catalog '{context.Name}'? The PostgreSQL database will also be dropped." : $"Delete catalog '{context.Name}'?")"
+                                            OnConfirm="() => DeleteAsync(context)">
+                                    <Button Danger Size="@ButtonSize.Small">
+                                        <Icon Type="@IconType.Outline.Delete" />
+                                    </Button>
+                                </Popconfirm>
+                            </Tooltip>
+                        </SpaceItem>
+                    </Space>
+                </ActionColumn>
+            </Table>
+        </Spin>
+            </Authorized>
+            <NotAuthorized>
+                <Alert Type="@AlertType.Warning" ShowIcon="true"
+                       Message="You don't have permission to manage catalogs."
+                       Style="margin-top: 8px;" />
+            </NotAuthorized>
+        </AuthorizeView>
+    </TabPane>
+</Tabs>
+
+<AuthorizeView Policy="@AuthPolicy.CatalogManage" Context="authCtx">
+<Authorized Context="authCtx">
+<Drawer Closable="true" @bind-Visible="_showModal" Placement="DrawerPlacement.Right"
+        Width="520" Title="@(_editTarget is null ? "New catalog" : "Edit catalog")"
+        OnClose="() => _showModal = false"
+        BodyStyle="display: flex; flex-direction: column; padding: 0; overflow: hidden;">
+    <div style="flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+        <Form Model="@_form" Layout="FormLayout.Vertical">
+            <FormItem Label="Name">
+                <Input @bind-Value="context.Name" Placeholder="my_catalog"
+                       BindOnInput
+                       Class="@(NameDisplayError is not null ? "ant-input-status-error" : "")"
+                       OnPressEnter="@(async _ => await ConfirmSave())" />
+                @if (NameDisplayError is not null)
+                {
+                    <div class="ant-form-item-explain-error">@NameDisplayError</div>
+                }
+            </FormItem>
+
+            @if (_editTarget is null)
+            {
+                <FormItem Label="Type">
+                    <RadioGroup @bind-Value="context.IsManaged">
+                        <Radio Value="true">Managed</Radio>
+                        <Radio Value="false">Unmanaged</Radio>
+                    </RadioGroup>
+                </FormItem>
+
+                @if (_form.IsManaged)
+                {
+                    <FormItem>
+                        <Checkbox @bind-Value="context.AllowExistingDatabase">
+                            Allow existing PostgreSQL database
+                        </Checkbox>
+                        <div style="color: #8c8c8c; font-size: 12px; margin-top: 2px;">
+                            When checked, the catalog will be registered even if a PostgreSQL database with this name already exists. Useful when migrating an environment.
+                        </div>
+                    </FormItem>
+                }
+            }
+
+            @if (!_form.IsManaged)
+            {
+                <FormItem Label="Data path" Rules="@_requiredRule">
+                    <Input @bind-Value="context.DataPath" Placeholder="/data/ducklake/my_catalog or abfss://..."
+                           BindOnInput
+                           OnPressEnter="@(async _ => await ConfirmSave())" />
+                </FormItem>
+                <FormItem Label="@("Storage connection string (Azure only)")">
+                    <InputPassword @bind-Value="context.StorageConnectionString"
+                        Placeholder="@(_editTarget is UnmanagedCatalogDto u1 && u1.HasStorageConnectionString ? "••••••••" : "DefaultEndpointsProtocol=https;...")"
+                        BindOnInput
+                        OnPressEnter="@(async _ => await ConfirmSave())" />
+                </FormItem>
+                <FormItem Label="Catalog host" Rules="@_requiredRule">
+                    <Input @bind-Value="context.CatalogHost" Placeholder="localhost"
+                           BindOnInput
+                           OnPressEnter="@(async _ => await ConfirmSave())" />
+                </FormItem>
+                <FormItem Label="Catalog port">
+                    <AntDesign.InputNumber @bind-Value="context.CatalogPort" Min="1" Max="65535" Style="width: 100%;" />
+                </FormItem>
+                <FormItem Label="Catalog database" Rules="@_requiredRule">
+                    <Input @bind-Value="context.CatalogDatabase" Placeholder="my_catalog"
+                           BindOnInput
+                           OnPressEnter="@(async _ => await ConfirmSave())" />
+                </FormItem>
+                <FormItem Label="Catalog user" Rules="@_requiredRule">
+                    <Input @bind-Value="context.CatalogUser" Placeholder="postgres"
+                           BindOnInput
+                           OnPressEnter="@(async _ => await ConfirmSave())" />
+                </FormItem>
+                <FormItem Label="@(_editTarget is not null ? "Catalog password (leave blank to keep current)" : "Catalog password")">
+                    <InputPassword @bind-Value="context.CatalogPassword"
+                        Placeholder="@(_editTarget is UnmanagedCatalogDto u2 && u2.HasCatalogPassword ? "••••••••" : "Enter password")"
+                        BindOnInput
+                        OnPressEnter="@(async _ => await ConfirmSave())" />
+                </FormItem>
+            }
+        </Form>
+    </div>
+    <div class="drawer-footer">
+        <Button OnClick="() => _showModal = false">Cancel</Button>
+        <Button Type="@ButtonType.Primary" OnClick="ConfirmSave" Disabled="@(!IsFormValid())">Save</Button>
+    </div>
+</Drawer>
+</Authorized>
+</AuthorizeView>
+
+@code {
+    // ── Tab state ─────────────────────────────────────────────────────
+    private string _activeTab = "browse";
+
+    // ── Browse tab state ──────────────────────────────────────────────
+    private CatalogObjectSelection? _selectedObject;
+    private bool _browsePanelCollapsed;
+    private int _browsePanelWidth = 260;
+    private bool _browseSplitterInitialized;
+    private bool _browseRefreshing;
+    private CatalogBrowserTree _browserTreeRef = default!;
+    private DotNetObjectReference<CatalogsPage>? _dotNetRef;
+
+    // ── Manage tab state ──────────────────────────────────────────────
+    private IReadOnlyList<CatalogDto> _catalogs = [];
+    private bool _loading = true;
+    private string? _error;
+
+    private bool _showModal;
+    private CatalogDto? _editTarget;
+    private CatalogFormModel _form = new();
+    private bool _nameSubmitAttempted;
+
+    private string? NameDisplayError =>
+        (_nameSubmitAttempted || !string.IsNullOrEmpty(_form.Name)) ? GetNameError() : null;
+
+    private static readonly FormValidationRule[] _requiredRule =
+    [
+        new() { Required = true, Message = "This field is required." }
+    ];
+
+    private string? GetNameError()
+    {
+        if (string.IsNullOrEmpty(_form.Name)) return "Name is required.";
+        if (ValidationHelper.ValidateCatalogName(_form.Name) is { } formatError) return formatError;
+        var trimmed = _form.Name.Trim();
+        if (_catalogs.Any(c => c.Name.Equals(trimmed, StringComparison.OrdinalIgnoreCase)
+                               && c != _editTarget))
+            return "A catalog with this name already exists.";
+        return null;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCatalogsAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_activeTab == "browse" && !_browsePanelCollapsed && !_browseSplitterInitialized)
+        {
+            _browseSplitterInitialized = true;
+            _dotNetRef ??= DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("initCatalogPanelSplitter", "cb-panel", "cb-handle", _dotNetRef);
+        }
+    }
+
+    private void OnTabChange(string key)
+    {
+        if (key == "browse")
+            _browseSplitterInitialized = false;
+    }
+
+    // ── Browse tab handlers ───────────────────────────────────────────
+
+    private Task OnObjectSelected(CatalogObjectSelection? selection)
+    {
+        _selectedObject = selection;
+        return Task.CompletedTask;
+    }
+
+    private async Task RefreshBrowserAsync()
+    {
+        _browseRefreshing = true;
+        _selectedObject = null;
+        try { await _browserTreeRef.RefreshAsync(); }
+        finally { _browseRefreshing = false; }
+    }
+
+    private void SetBrowsePanelCollapsed(bool value)
+    {
+        _browsePanelCollapsed = value;
+        if (!value)
+            _browseSplitterInitialized = false;
+    }
+
+    [JSInvokable]
+    public void OnCatalogPanelDragEnd(double width)
+    {
+        _browsePanelWidth = Math.Max(160, (int)width);
+        StateHasChanged();
+    }
+
+    // ── Manage tab handlers ───────────────────────────────────────────
+
+    private async Task LoadCatalogsAsync()
+    {
+        _loading = true;
+        try { _catalogs = await CatalogService.GetCatalogsAsync(); }
+        catch (Exception ex) { _error = $"Failed to load catalogs: {ex.Message}"; }
+        finally { _loading = false; }
+    }
+
+    private bool IsFormValid()
+    {
+        if (GetNameError() is not null) return false;
+
+        if (!_form.IsManaged)
+        {
+            if (string.IsNullOrWhiteSpace(_form.DataPath)) return false;
+            if (string.IsNullOrWhiteSpace(_form.CatalogHost)) return false;
+            if (string.IsNullOrWhiteSpace(_form.CatalogDatabase)) return false;
+            if (string.IsNullOrWhiteSpace(_form.CatalogUser)) return false;
+            if (_editTarget is null && string.IsNullOrWhiteSpace(_form.CatalogPassword)) return false;
+        }
+
+        return true;
+    }
+
+    private void StartCreate()
+    {
+        _editTarget = null;
+        _form = new CatalogFormModel();
+        _nameSubmitAttempted = false;
+        _showModal = true;
+    }
+
+    private void StartEdit(CatalogDto catalog)
+    {
+        _editTarget = catalog;
+        _nameSubmitAttempted = false;
+        _form = new CatalogFormModel
+        {
+            Name = catalog.Name,
+            IsManaged = catalog is ManagedCatalogDto,
+        };
+
+        if (catalog is UnmanagedCatalogDto u)
+        {
+            _form.DataPath = u.DataPath;
+            _form.CatalogHost = u.CatalogHost;
+            _form.CatalogPort = u.CatalogPort;
+            _form.CatalogDatabase = u.CatalogDatabase;
+            _form.CatalogUser = u.CatalogUser;
+        }
+
+        _showModal = true;
+    }
+
+    private async Task ConfirmSave()
+    {
+        _nameSubmitAttempted = true;
+        if (GetNameError() is not null) return;
+        if (!IsFormValid()) return;
+
+        try
+        {
+            if (_editTarget is null)
+            {
+                if (_form.IsManaged)
+                {
+                    await CatalogService.CreateManagedCatalogAsync(new CreateManagedCatalogRequest(_form.Name.Trim(), _form.AllowExistingDatabase));
+                }
+                else
+                {
+                    await CatalogService.CreateUnmanagedCatalogAsync(new CreateUnmanagedCatalogRequest(
+                        _form.Name.Trim(),
+                        _form.DataPath.Trim(),
+                        string.IsNullOrWhiteSpace(_form.StorageConnectionString) ? null : _form.StorageConnectionString,
+                        _form.CatalogHost.Trim(),
+                        _form.CatalogPort,
+                        _form.CatalogDatabase.Trim(),
+                        _form.CatalogUser.Trim(),
+                        string.IsNullOrWhiteSpace(_form.CatalogPassword) ? null : _form.CatalogPassword));
+                }
+            }
+            else if (_editTarget is ManagedCatalogDto)
+            {
+                await CatalogService.UpdateManagedCatalogAsync(_editTarget.Id,
+                    new UpdateManagedCatalogRequest(_form.Name.Trim()));
+            }
+            else
+            {
+                await CatalogService.UpdateUnmanagedCatalogAsync(_editTarget.Id, new UpdateUnmanagedCatalogRequest(
+                    _form.Name.Trim(),
+                    string.IsNullOrWhiteSpace(_form.DataPath) ? null : _form.DataPath.Trim(),
+                    string.IsNullOrWhiteSpace(_form.StorageConnectionString) ? null : _form.StorageConnectionString,
+                    string.IsNullOrWhiteSpace(_form.CatalogHost) ? null : _form.CatalogHost.Trim(),
+                    _form.CatalogPort,
+                    string.IsNullOrWhiteSpace(_form.CatalogDatabase) ? null : _form.CatalogDatabase.Trim(),
+                    string.IsNullOrWhiteSpace(_form.CatalogUser) ? null : _form.CatalogUser.Trim(),
+                    string.IsNullOrWhiteSpace(_form.CatalogPassword) ? null : _form.CatalogPassword));
+            }
+            _showModal = false;
+            await LoadCatalogsAsync();
+        }
+        catch (Exception ex) { _error = $"Failed to save catalog: {ex.Message}"; }
+    }
+
+    private async Task DeleteAsync(CatalogDto catalog)
+    {
+        try
+        {
+            await CatalogService.DeleteCatalogAsync(catalog.Id);
+            await LoadCatalogsAsync();
+        }
+        catch (Exception ex) { _error = $"Failed to delete catalog: {ex.Message}"; }
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        _dotNetRef?.Dispose();
+        return ValueTask.CompletedTask;
+    }
+}
+

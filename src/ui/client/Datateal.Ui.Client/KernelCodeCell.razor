@@ -1,0 +1,456 @@
+@using BlazorMonaco
+@using BlazorMonaco.Languages
+@using BlazorMonaco.Editor
+@using Datateal.Core.Kernels
+@using Datateal.Ui.Client.Notebook
+@using System.Text.Json
+@using System.Text.RegularExpressions
+@using Microsoft.JSInterop
+@inject IKernelService KernelService
+@inject IJSRuntime JsRuntime
+@implements IAsyncDisposable
+
+<CodeCell @ref="_codeCell"
+          Value="@Value"
+          ValueChanged="OnValueChangedAsync"
+          Height="@Height"
+          ReadOnly="@ReadOnly"
+          OnExecute="OnExecute"
+          OnEditorReady="OnEditorReadyAsync"
+          AlwaysConsumeMouseWheel="@AlwaysConsumeMouseWheel"
+          Class="@Class" />
+
+@code {
+    [Parameter, EditorRequired] public string NodeName { get; set; } = "";
+    [Parameter, EditorRequired] public string KernelId { get; set; } = "";
+    [Parameter] public string Value { get; set; } = "";
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+    [Parameter] public int Height { get; set; } = 0;
+    [Parameter] public bool ReadOnly { get; set; }
+    [Parameter] public EventCallback OnExecute { get; set; }
+    [Parameter] public string? Class { get; set; }
+    /// <summary>Returns the accumulated code from all prior cells (joined by newlines).
+    /// Used as context for completions and diagnostics so Jedi/pyflakes can see
+    /// variables and imports defined in earlier cells of the same session.</summary>
+    [Parameter] public Func<Task<string>>? PriorContext { get; set; }
+    /// <summary>
+    /// Optional callback to provide workspace item completions for <c>%run</c> magic lines.
+    /// Given a directory path (e.g., <c>./</c> or <c>../subfolder/</c>), returns folder names,
+    /// notebook titles, and query titles in the resolved folder.
+    /// </summary>
+    [Parameter] public Func<string, Task<IReadOnlyList<RunMagicCompletionItem>>>? ProvideRunMagicCompletions { get; set; }
+    [Parameter] public bool AlwaysConsumeMouseWheel { get; set; } = true;
+
+    private static readonly Regex RunLinePrefix = new(@"^\s*%run\s+(.*)", RegexOptions.Compiled);
+
+    private CodeCell _codeCell = default!;
+    private TextModel? _model;
+    private string _modelUri = "";
+    private string _currentCode = "";
+    private CancellationTokenSource? _diagCts;
+    private DotNetObjectReference<KernelCodeCell>? _semanticDotNetRef;
+    private int[]? _lastSemanticTokensEncoded;
+
+    // Semantic token type legend — indices must match window._datatealSemanticTokenLegend in app.js.
+    private static readonly Dictionary<string, int> SemanticTokenTypeMap = new()
+    {
+        ["function"]      = 0,
+        ["class"]         = 1,
+        ["parameter"]     = 2,
+        ["variable"]      = 3,
+        ["selfParameter"] = 4,
+        ["builtin"]       = 5,
+        ["property"]      = 6,
+        ["decorator"]     = 7,
+        ["namespace"]     = 8,
+        ["enumMember"]    = 9,
+    };
+
+    private async Task OnEditorReadyAsync()
+    {
+        _model = await _codeCell.Editor!.GetModel();
+        _modelUri = _model?.Uri ?? "";
+        _currentCode = Value;
+        await RegisterCompletionProviderAsync();
+        await RegisterHoverProviderAsync();
+        await RegisterSemanticTokensProviderAsync();
+        await RunDiagnosticsAsync(_currentCode);
+    }
+
+    private async Task<string> GetPriorContextAsync() =>
+        PriorContext is not null ? await PriorContext() : "";
+
+    private Task RegisterCompletionProviderAsync() =>
+        BlazorMonaco.Languages.Global.RegisterCompletionItemProvider(
+            JsRuntime,
+            "datateal-python",
+            new CompletionItemProvider(new List<string> { ".", "/" }, ProvideCompletionsAsync, null));
+
+    private Task RegisterHoverProviderAsync() =>
+        BlazorMonaco.Languages.Global.RegisterHoverProviderAsync(
+            JsRuntime,
+            "datateal-python",
+            async (uri, position, _) =>
+            {
+                try
+                {
+                    // Only respond for our own editor model — the provider is registered globally.
+                    if (!string.Equals(uri, _modelUri, StringComparison.Ordinal))
+                        return null;
+
+                    var code = _model is not null ? await _model.GetValue(EndOfLinePreference.LF, false) : _currentCode;
+                    if (string.IsNullOrEmpty(code))
+                        return null;
+
+                    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+                    var response = await KernelService.GetHoverInfoAsync(
+                        NodeName, KernelId,
+                        new HoverInfoRequest(code, position.LineNumber, position.Column - 1, await GetPriorContextAsync()),
+                        cts.Token);
+
+                    if (response.Contents.Count == 0)
+                        return null;
+
+                    // Determine the word range for the hover highlight
+                    BlazorMonaco.Range? range = null;
+                    if (_model is not null)
+                    {
+                        var word = await _model.GetWordAtPosition(position);
+                        if (word is not null)
+                        {
+                            range = new BlazorMonaco.Range
+                            {
+                                StartLineNumber = position.LineNumber,
+                                EndLineNumber = position.LineNumber,
+                                StartColumn = word.StartColumn,
+                                EndColumn = word.EndColumn,
+                            };
+                        }
+                    }
+
+                    return new BlazorMonaco.Languages.Hover
+                    {
+                        // SupportThemeIcons must be explicitly set to avoid a BlazorMonaco serialization
+                        // bug where null bool? properties break Monaco's hover renderer (Issue #184).
+                        Contents = response.Contents
+                            .Select(c => new BlazorMonaco.MarkdownString { Value = c, SupportThemeIcons = false })
+                            .ToArray(),
+                        Range = range,
+                    };
+                }
+                catch (Exception ex)
+                {
+                    await JsRuntime.InvokeVoidAsync("console.error", "Error fetching hover info:", ex.ToString());
+                    return null;
+                }
+            });
+
+    private async Task<CompletionList> ProvideCompletionsAsync(
+        string modelUri,
+        BlazorMonaco.Position position,
+        CompletionContext context)
+    {
+        try
+        {
+            // Only respond for our own editor model — the provider is registered globally.
+            if (!string.Equals(modelUri, _modelUri, StringComparison.Ordinal))
+                return new CompletionList { Suggestions = [], Incomplete = false };
+
+            // Check if the current line is a %run line
+            if (_model is not null && ProvideRunMagicCompletions is not null)
+            {
+                string lineContent = await _model.GetLineContent(position.LineNumber);
+                var runMatch = RunLinePrefix.Match(lineContent);
+                if (runMatch.Success)
+                    return await ProvideRunMagicCompletionListAsync(runMatch.Groups[1].Value, position);
+            }
+
+            // Read code from the model, not _currentCode, to avoid stale data.
+            // When a trigger character (e.g. '.') is typed, Monaco calls the
+            // completion provider and the change handler concurrently via JS interop.
+            // _currentCode may not include the trigger character yet.
+            var code = _model is not null
+                ? await _model.GetValue(EndOfLinePreference.LF, false)
+                : _currentCode;
+            if (string.IsNullOrEmpty(code))
+                return new CompletionList { Suggestions = [], Incomplete = false };
+
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+
+            int startCol = position.Column;
+            if (_model is not null)
+            {
+                var wordInfo = await _model.GetWordUntilPosition(position);
+                startCol = wordInfo?.StartColumn ?? position.Column;
+            }
+
+            var response = await KernelService.CompleteAsync(
+                NodeName, KernelId,
+                new CompleteRequest(code, position.LineNumber, position.Column - 1, await GetPriorContextAsync()),
+                cts.Token);
+
+            var range = JsonSerializer.SerializeToElement(new
+            {
+                startLineNumber = position.LineNumber,
+                startColumn = startCol,
+                endLineNumber = position.LineNumber,
+                endColumn = position.Column,
+            });
+
+            var suggestions = response.Items
+                .Select(item => new BlazorMonaco.Languages.CompletionItem
+                {
+                    Label = JsonSerializer.SerializeToElement(item.Label),
+                    Kind = MapKind(item.Kind),
+                    InsertText = item.InsertText,
+                    Detail = item.Detail,
+                    SortText = GetSortText(item.Label),
+                    Range = range,
+                })
+                .ToList();
+
+            return new CompletionList { Suggestions = suggestions, Incomplete = false };
+        }
+        catch (Exception ex)
+        {
+            await JsRuntime.InvokeVoidAsync("console.error", "Completions failed:", ex.ToString());
+            return new CompletionList { Suggestions = [], Incomplete = false };
+        }
+    }
+
+    private async Task<CompletionList> ProvideRunMagicCompletionListAsync(
+        string typedPath,
+        BlazorMonaco.Position position)
+    {
+        // Strip a surrounding or leading quote so quoted paths work transparently:
+        // e.g. %run "./My Folder/" → strip " → "./My Folder/"
+        int quoteOffset = 0;
+        if (typedPath.Length > 0 && (typedPath[0] == '"' || typedPath[0] == '\''))
+        {
+            char q = typedPath[0];
+            quoteOffset = 1;
+            typedPath = typedPath[1..];
+            if (typedPath.Length > 0 && typedPath[^1] == q)
+                typedPath = typedPath[..^1];
+        }
+
+        // Split typed path into directory portion and name prefix
+        string dirPath;
+        string namePrefix;
+        int lastSlash = typedPath.LastIndexOf('/');
+        if (lastSlash >= 0)
+        {
+            dirPath = typedPath[..(lastSlash + 1)];
+            namePrefix = typedPath[(lastSlash + 1)..];
+        }
+        else
+        {
+            dirPath = "./";
+            namePrefix = typedPath;
+        }
+
+        var items = await ProvideRunMagicCompletions!(dirPath);
+
+        // Calculate the column where the name prefix starts (after "%run ", any quote, and the dir path)
+        string lineContent = await _model!.GetLineContent(position.LineNumber);
+        var match = RunLinePrefix.Match(lineContent);
+        int runArgStart = match.Groups[1].Index + 1; // 1-based column
+        int nameStartCol = runArgStart + quoteOffset + (lastSlash >= 0 ? lastSlash + 1 : 0);
+
+        var range = JsonSerializer.SerializeToElement(new
+        {
+            startLineNumber = position.LineNumber,
+            startColumn = nameStartCol,
+            endLineNumber = position.LineNumber,
+            endColumn = position.Column,
+        });
+
+        var suggestions = items
+            .Where(i => string.IsNullOrEmpty(namePrefix) || i.Label.StartsWith(namePrefix, StringComparison.OrdinalIgnoreCase))
+            .Select(item => new BlazorMonaco.Languages.CompletionItem
+            {
+                Label = JsonSerializer.SerializeToElement(item.Label),
+                Kind = item.Kind switch
+                {
+                    "folder" => BlazorMonaco.Languages.CompletionItemKind.Folder,
+                    _ => BlazorMonaco.Languages.CompletionItemKind.File,
+                },
+                InsertText = item.InsertText,
+                Detail = item.Kind,
+                SortText = item.Kind == "folder" ? "0" + item.Label : "1" + item.Label,
+                Range = range,
+            })
+            .ToList();
+
+        return new CompletionList { Suggestions = suggestions, Incomplete = false };
+    }
+
+    private async Task OnValueChangedAsync(string value)
+    {
+        Value = value;
+        _currentCode = value;
+        await ValueChanged.InvokeAsync(value);
+        await ScheduleDiagnosticsAsync(value);
+    }
+
+    private async Task ScheduleDiagnosticsAsync(string value)
+    {
+        _diagCts?.Cancel();
+        _diagCts = new CancellationTokenSource();
+        var ct = _diagCts.Token;
+        try
+        {
+            await Task.Delay(400, ct);
+            await RunDiagnosticsAsync(value, ct);
+        }
+        catch (OperationCanceledException) { }
+    }
+
+    private async Task RunDiagnosticsAsync(string value, CancellationToken ct = default)
+    {
+        if (_model is null) return;
+        try
+        {
+            var codeForDiag = RunMagicHelper.ReplaceRunLinesWithPass(value);
+            var response = await KernelService.DiagnoseAsync(
+                NodeName, KernelId,
+                new DiagnoseRequest(codeForDiag, await GetPriorContextAsync()),
+                ct);
+
+            var markers = response.Diagnostics
+                .Select(d => new MarkerData
+                {
+                    StartLineNumber = d.Row,
+                    StartColumn = d.Col + 1,
+                    EndLineNumber = d.Row,
+                    EndColumn = 9999,
+                    Message = d.Message,
+                    Severity = d.Severity == "error" ? MarkerSeverity.Error : MarkerSeverity.Warning,
+                })
+                .ToList();
+
+            await BlazorMonaco.Editor.Global.SetModelMarkers(JsRuntime, _model!, "datateal-kernel", markers);
+        }
+        catch (OperationCanceledException) { }
+        catch { /* diagnostics are best-effort */ }
+    }
+
+    // ── Semantic tokens ──
+
+    private async Task RegisterSemanticTokensProviderAsync()
+    {
+        _semanticDotNetRef = DotNetObjectReference.Create(this);
+        try
+        {
+            await JsRuntime.InvokeVoidAsync("registerSemanticTokensCell", _semanticDotNetRef, _modelUri);
+        }
+        catch { /* best-effort — older BlazorMonaco builds may not support this */ }
+    }
+
+    /// <summary>
+    /// Called by Monaco's semantic token provider via JS interop. Fetches fresh tokens
+    /// from the runtime API and returns them directly, avoiding stale-cache race conditions.
+    /// </summary>
+    [JSInvokable]
+    public async Task<int[]> ProvideSemanticTokensAsync()
+    {
+        try
+        {
+            // When no kernel is connected, skip the API call entirely so
+            // the Monarch grammar's highlighting remains untouched.
+            if (string.IsNullOrEmpty(KernelId))
+                return [];
+
+            var code = _model is not null
+                ? await _model.GetValue(EndOfLinePreference.LF, false)
+                : _currentCode;
+            if (string.IsNullOrEmpty(code))
+                return [];
+
+            var codeForTokens = RunMagicHelper.ReplaceRunLinesWithPass(code);
+            var response = await KernelService.GetSemanticTokensAsync(
+                NodeName, KernelId,
+                new SemanticTokenRequest(codeForTokens, await GetPriorContextAsync()),
+                CancellationToken.None);
+
+            _lastSemanticTokensEncoded = EncodeSemanticTokens(response.Tokens);
+            return _lastSemanticTokensEncoded;
+        }
+        catch
+        {
+            // On error, return the last known good tokens (or empty)
+            return _lastSemanticTokensEncoded ?? [];
+        }
+    }
+
+    /// <summary>
+    /// Encode semantic tokens into Monaco's delta-encoded format:
+    /// [deltaLine, deltaStartChar, length, tokenType, tokenModifiers] per token.
+    /// </summary>
+    private static int[] EncodeSemanticTokens(IReadOnlyList<SemanticToken> tokens)
+    {
+        if (tokens.Count == 0) return [];
+
+        // Sort tokens by line then column
+        var sorted = tokens
+            .Where(t => SemanticTokenTypeMap.ContainsKey(t.TokenType))
+            .OrderBy(t => t.Line)
+            .ThenBy(t => t.StartChar)
+            .ToList();
+
+        var encoded = new int[sorted.Count * 5];
+        int prevLine = 0;
+        int prevStart = 0;
+
+        for (int i = 0; i < sorted.Count; i++)
+        {
+            var token = sorted[i];
+            int line = token.Line - 1; // Monaco uses 0-based lines for semantic tokens
+            int deltaLine = line - prevLine;
+            int deltaStart = deltaLine == 0 ? token.StartChar - prevStart : token.StartChar;
+
+            encoded[i * 5 + 0] = deltaLine;
+            encoded[i * 5 + 1] = deltaStart;
+            encoded[i * 5 + 2] = token.Length;
+            encoded[i * 5 + 3] = SemanticTokenTypeMap[token.TokenType];
+            encoded[i * 5 + 4] = 0; // no modifiers
+
+            prevLine = line;
+            prevStart = token.StartChar;
+        }
+
+        return encoded;
+    }
+
+    private static string GetSortText(string label) =>
+        label.StartsWith("__") ? "2" + label :
+        label.StartsWith("_")  ? "1" + label :
+                                  "0" + label;
+
+    private static BlazorMonaco.Languages.CompletionItemKind MapKind(string jediType) => jediType switch
+    {
+        "function"  => BlazorMonaco.Languages.CompletionItemKind.Function,
+        "class"     => BlazorMonaco.Languages.CompletionItemKind.Class,
+        "module"    => BlazorMonaco.Languages.CompletionItemKind.Module,
+        "instance"  => BlazorMonaco.Languages.CompletionItemKind.Variable,
+        "keyword"   => BlazorMonaco.Languages.CompletionItemKind.Keyword,
+        "statement" => BlazorMonaco.Languages.CompletionItemKind.Variable,
+        "import"    => BlazorMonaco.Languages.CompletionItemKind.Module,
+        "param"     => BlazorMonaco.Languages.CompletionItemKind.Variable,
+        "property"  => BlazorMonaco.Languages.CompletionItemKind.Property,
+        "path"      => BlazorMonaco.Languages.CompletionItemKind.File,
+        _           => BlazorMonaco.Languages.CompletionItemKind.Text,
+    };
+
+    public async ValueTask DisposeAsync()
+    {
+        _diagCts?.Cancel();
+        _diagCts?.Dispose();
+        if (!string.IsNullOrEmpty(_modelUri))
+        {
+            try { await JsRuntime.InvokeVoidAsync("unregisterSemanticTokensCell", _modelUri); }
+            catch { /* best-effort cleanup */ }
+        }
+        _semanticDotNetRef?.Dispose();
+    }
+}
