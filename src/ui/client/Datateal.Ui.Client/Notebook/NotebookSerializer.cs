@@ -13,6 +13,18 @@ public static class NotebookSerializer
 
         var document = new NotebookDocument();
 
+        if (root.TryGetProperty("metadata", out var rootMeta)
+            && rootMeta.TryGetProperty("datateal", out var dt)
+            && dt.TryGetProperty("attached_catalogs", out var acEl)
+            && acEl.ValueKind == JsonValueKind.Array)
+        {
+            document.AttachedCatalogs = acEl.EnumerateArray()
+                .Select(x => x.GetString())
+                .Where(s => s is not null)
+                .Select(s => s!)
+                .ToList();
+        }
+
         if (!root.TryGetProperty("cells", out var cellsEl)) return document;
 
         foreach (var cellEl in cellsEl.EnumerateArray())
@@ -143,6 +155,13 @@ public static class NotebookSerializer
         writer.WriteEndObject();
         writer.WriteStartObject("datateal");
         writer.WriteString("version", "1");
+        if (document.AttachedCatalogs.Count > 0)
+        {
+            writer.WriteStartArray("attached_catalogs");
+            foreach (var name in document.AttachedCatalogs)
+                writer.WriteStringValue(name);
+            writer.WriteEndArray();
+        }
         writer.WriteEndObject();
         writer.WriteEndObject(); // metadata
 

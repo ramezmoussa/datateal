@@ -197,6 +197,12 @@
                 OnClose="@(() => _error = null)" Style="margin-bottom: 16px;" />
         }
 
+        @if (_warning is not null)
+        {
+            <Alert Type="AlertType.Warning" Message="@_warning" Closable ShowIcon="true"
+                OnClose="@(() => _warning = null)" Style="margin-bottom: 16px;" />
+        }
+
         </div>@* end .nb-header *@
 
         <div class="nb-cells-wrapper">
@@ -307,6 +313,8 @@
     private NotebookCell? _aiFocusedCell;
     private IReadOnlyList<Guid> AiCatalogIds =>
         _allCatalogs.Where(c => _selectedCatalogNames.Contains(c.Name)).Select(c => c.Id).ToList();
+
+    private string? _warning;
 
     private bool _isLoading;
     private bool HasKernel => !string.IsNullOrEmpty(_kernelId);
@@ -964,11 +972,25 @@
             _workspaceNotebookId = null;
             _workspaceNotebookFolderId = null;
             _breadcrumbs = [];
-            _selectedCatalogNames = [];
             _error = null;
+            _warning = null;
             _editingTitle = false;
             _editingTitleValue = "";
             _showFolderPicker = false;
+
+            if (_notebook.AttachedCatalogs.Count > 0)
+            {
+                var knownNames = _allCatalogs.Select(c => c.Name).ToHashSet();
+                var valid = _notebook.AttachedCatalogs.Where(n => knownNames.Contains(n)).ToList();
+                var missing = _notebook.AttachedCatalogs.Where(n => !knownNames.Contains(n)).ToList();
+                _selectedCatalogNames = valid;
+                if (missing.Count > 0)
+                    _warning = $"The following catalog(s) from this notebook are not available in this environment and were skipped: {string.Join(", ", missing)}.";
+            }
+            else
+            {
+                _selectedCatalogNames = [];
+            }
         }
         catch (Exception ex)
         {
@@ -1045,6 +1067,7 @@
     {
         try
         {
+            _notebook.AttachedCatalogs = _selectedCatalogNames.ToList();
             var json = NotebookSerializer.Serialize(_notebook);
             var filename = (_notebook.Title.Trim().Length > 0 ? _notebook.Title.Trim() : "notebook") + ".ipynb";
             await JS.InvokeVoidAsync("downloadFile", filename, json);

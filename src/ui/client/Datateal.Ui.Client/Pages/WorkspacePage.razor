@@ -2,8 +2,11 @@
 @attribute [Authorize(Policy = AuthPolicy.WorkspaceRead)]
 
 @using Datateal.Ui.Shared.Workspace
+@using Datateal.Ui.Shared.Catalogs
 @using Datateal.Core.Workspace
+@using Datateal.Ui.Client.Notebook
 @inject IWorkspaceService WorkspaceService
+@inject ICatalogService CatalogService
 @inject IRecentItemsService RecentItemsService
 @inject NavigationManager Navigation
 @inject IJSRuntime JS
@@ -63,6 +66,12 @@
 {
     <Alert Type="AlertType.Error" Message="@_error" Closable ShowIcon="true"
            OnClose="@(() => _error = null)" Style="margin-bottom: 16px;" />
+}
+
+@if (_warning is not null)
+{
+    <Alert Type="AlertType.Warning" Message="@_warning" Closable ShowIcon="true"
+           OnClose="@(() => _warning = null)" Style="margin-bottom: 16px;" />
 }
 
 @if (_loading)
@@ -345,6 +354,7 @@ else
     private Guid? _lastLoadedFolder = Guid.Empty; // sentinel — differs from null (root)
     private bool _loading;
     private string? _error;
+    private string? _warning;
 
     // New folder
     private bool _showNewFolderDrawer;
@@ -513,9 +523,16 @@ else
         if (_importing) return;
         _importing = true;
         _error = null;
+        _warning = null;
         var errors = new List<string>();
+        var catalogWarnings = new List<string>();
         try
         {
+            IReadOnlyList<CatalogDto> allCatalogs = [];
+            try { allCatalogs = await CatalogService.GetCatalogsAsync(); }
+            catch { /* non-fatal — catalog names won't be applied */ }
+            var knownCatalogNames = allCatalogs.Select(c => c.Name).ToHashSet();
+
             foreach (var file in args.GetMultipleFiles(100))
             {
                 try
@@ -524,7 +541,21 @@ else
                     using var reader = new StreamReader(stream);
                     var json = await reader.ReadToEndAsync();
                     var title = System.IO.Path.GetFileNameWithoutExtension(file.Name);
-                    await WorkspaceService.CreateNotebookAsync(new CreateNotebookRequest(title, json, Folder));
+                    var summary = await WorkspaceService.CreateNotebookAsync(new CreateNotebookRequest(title, json, Folder));
+
+                    var doc = NotebookSerializer.Deserialize(json);
+                    if (doc.AttachedCatalogs.Count > 0)
+                    {
+                        var valid = doc.AttachedCatalogs.Where(n => knownCatalogNames.Contains(n)).ToList();
+                        var missing = doc.AttachedCatalogs.Where(n => !knownCatalogNames.Contains(n)).ToList();
+                        if (valid.Count > 0)
+                        {
+                            try { await CatalogService.UpdateWorkspaceItemCatalogsAsync(summary.Id, valid); }
+                            catch { /* non-fatal — warn below */ }
+                        }
+                        if (missing.Count > 0)
+                            catalogWarnings.Add($"{file.Name}: catalog(s) not found — {string.Join(", ", missing)}");
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -539,6 +570,8 @@ else
 
         if (errors.Count > 0)
             _error = $"Some notebooks could not be imported:\n{string.Join("\n", errors)}";
+        if (catalogWarnings.Count > 0)
+            _warning = $"Some catalog(s) from the imported notebooks are not available in this environment and were skipped:\n{string.Join("\n", catalogWarnings)}";
 
         await LoadAsync();
     }
