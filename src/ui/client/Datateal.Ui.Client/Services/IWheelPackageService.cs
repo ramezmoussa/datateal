@@ -1,4 +1,4 @@
-using Datateal.Ui.Shared.Packages;
+using Datateal.Ui.Shared.RuntimePackages;
 
 namespace Datateal.Ui.Client.Services;
 

@@ -1,6 +1,6 @@
 using System.Net.Http.Json;
 using System.Text.Json;
-using Datateal.Ui.Shared.Packages;
+using Datateal.Ui.Shared.RuntimePackages;
 using Microsoft.AspNetCore.Components.Forms;
 
 namespace Datateal.Ui.Client.Services;

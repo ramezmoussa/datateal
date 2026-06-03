@@ -3,7 +3,7 @@ using Datateal.Core.Mediator;
 using Datateal.Ui.Server.Application.Mediator.Commands;
 using Datateal.Ui.Server.Application.Mediator.Queries;
 using Datateal.Ui.Server.Core.Repositories;
-using Datateal.Ui.Shared.Packages;
+using Datateal.Ui.Shared.RuntimePackages;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
