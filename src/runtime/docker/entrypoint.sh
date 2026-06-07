@@ -1,22 +1,22 @@
 #!/bin/bash
 set -e
 
-KERNEL_PIP=/opt/venvs/kernel/bin/pip
+KERNEL_PYTHON=/opt/venvs/kernel/bin/python
 REQUIREMENTS_FILE=/etc/datateal/kernel-requirements.txt
 
 if [ -f "$REQUIREMENTS_FILE" ]; then
     echo "Installing kernel packages from $REQUIREMENTS_FILE"
-    "$KERNEL_PIP" install --no-cache-dir --only-binary :all: -r "$REQUIREMENTS_FILE"
+    uv pip install --python "$KERNEL_PYTHON" -r "$REQUIREMENTS_FILE"
 fi
 
 if [ -n "$KERNEL_PACKAGES" ]; then
     echo "Installing kernel packages from KERNEL_PACKAGES env var"
-    "$KERNEL_PIP" install --no-cache-dir --only-binary :all: $KERNEL_PACKAGES
+    uv pip install --python "$KERNEL_PYTHON" $KERNEL_PACKAGES
 fi
 
 if find /etc/wheels -name "*.whl" -type f 2>/dev/null | grep -q .; then
     echo "Installing custom wheel packages from /etc/wheels/"
-    find /etc/wheels -name "*.whl" -type f -exec "$KERNEL_PIP" install --no-cache-dir {} +
+    find /etc/wheels -name "*.whl" -type f -exec uv pip install --python "$KERNEL_PYTHON" {} +
 fi
 
 exec /opt/venvs/api/bin/datateal-runtime
