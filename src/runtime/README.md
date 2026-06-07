@@ -4,40 +4,40 @@ Fast API runtime for Datateal. The API runs on each node in the Kubernetes clust
 
 ### Development and build environment setup
 
-Create virtual environment in the workspace root.
+Install [uv](https://docs.astral.sh/uv/getting-started/installation/) if not already installed.
 
 ```
-> py -m venv .venv
+curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-Activate virtual environment.
+Create a virtual environment and install the runtime package with all dependencies. Run from `src/runtime/`.
 
+```
+> uv sync
+```
+
+This creates `.venv/` and installs all dependencies from the lockfile. Activate the virtual environment when needed:
+
+Windows:
 ```
 > .\.venv\Scripts\activate
 ```
 
-Install dependencies defined in `pyproject.toml` using pip.
-
+macOS / Linux:
 ```
-> pip install .
-```
-
-Install `build` using pip.
-
-```
-> pip install build
+> source .venv/bin/activate
 ```
 
-Build the wheel package with `build`. **Note, that the build and target (installation) environments should be using the same Python version.**
+Build the wheel package with uv.
 
 ```
-> py -m build --wheel
+> uv build
 ```
 
 The wheel package can then be installed in development mode.
 
 ```
-pip install --editable .
+uv pip install --python .venv/bin/python --editable .
 ```
 
 ### Testing
@@ -45,7 +45,7 @@ pip install --editable .
 The project uses [pytest](https://docs.pytest.org/) with the [pytest-asyncio](https://pypi.org/project/pytest-asyncio/) plugin. Install the test dependencies first.
 
 ```
-> pip install ".[test]"
+> uv sync --extra test
 ```
 
 Run the full test suite from the `src/runtime` directory.
@@ -64,43 +64,30 @@ Tests exercise the `KernelConnection` language-feature methods directly (no kern
 
 ### Installation (Linux)
 
-First make sure both python3 and pip are installed.
+First install [uv](https://docs.astral.sh/uv/getting-started/installation/).
 
 ```
-$ sudo apt install python3
-$ sudo apt install python3-pip
+$ curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-Then install pipx and make sure relevant PATH additions are in place (`ensurepath`).
+Then use `uv tool install` to install the built `.whl` (wheel) file.
 
 ```
-$ sudo apt install pipx
-$ pipx ensurepath
-```
-
-After that, you can install the built .whl (wheel) file.
-
-```
-pipx install ./<file_name>.whl
+uv tool install ./<file_name>.whl
 ```
 
 ### Installation (Windows)
 
-First, make sure Python and pip are installed. Use the installer available from the Python website.
-
-Install pipx and make sure relevant PATH additions are in place.
+First install [uv](https://docs.astral.sh/uv/getting-started/installation/).
 
 ```
-> py -m pip install --upgrade pipx
-> py -m pipx ensurepath
+> powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
 ```
 
-Reopen the terminal for PATH changes to take effect in the terminal session.
-
-After that, you can install the built .whl (wheel) file.
+Then use `uv tool install` to install the built `.whl` (wheel) file.
 
 ```
-> py -m pipx install ./<file_name>.whl
+> uv tool install ./<file_name>.whl
 ```
 
 The Datateal runtime package depends on the duckdb Python package, which in turn requires [Microsoft Visual C++ Redistributable](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-170#latest-supported-redistributable-version) to be installed on the machine (Windows). See [this GitHub issue](https://github.com/duckdb/duckdb/issues/8101) for more context. Otherwise the runtime will fail during execution.
@@ -111,7 +98,7 @@ The container image runs the API in an isolated Python environment and spins up 
 
 #### Build the image
 
-Build the wheel first (see [Development and build environment setup](#development-and-build-environment-setup)), then build the Docker image from the `src/runtime` directory.
+Build the wheel first with `uv build` (see [Development and build environment setup](#development-and-build-environment-setup)), then build the Docker image from the `src/runtime` directory.
 
 ```
 docker build -t datateal-runtime .

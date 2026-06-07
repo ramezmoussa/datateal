@@ -39,4 +39,4 @@ A requirements file at `/etc/datateal/kernel-requirements.txt` is also installed
 
 ## Docker
 
-Build requires the wheel first (`py -m build --wheel`), then `docker build -t datateal-runtime .` from `src/runtime/`. Push to ACR and AKS pulls without credentials — the kubelet identity has `AcrPull` (granted by the Bicep template).
+Build requires the wheel first (`uv build`), then `docker build -t datateal-runtime .` from `src/runtime/`. Push to ACR and AKS pulls without credentials — the kubelet identity has `AcrPull` (granted by the Bicep template).

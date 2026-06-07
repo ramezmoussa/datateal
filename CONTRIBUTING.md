@@ -11,6 +11,7 @@ This guide covers everything you need to get Datateal running on your local mach
 | [Docker Desktop](https://www.docker.com/products/docker-desktop/) | v4+        | Runs runtime pods locally via the built-in Kubernetes cluster            |
 | [.NET 10 SDK](https://dotnet.microsoft.com/download)              | 10         | All ASP.NET Core services and the Aspire app host                        |
 | [Python](https://www.python.org/downloads/)                       | 3.11+      | Building and packaging the runtime service                               |
+| [uv](https://docs.astral.sh/uv/)                                   | latest     | Python package and dependency management for the runtime component       |
 | [PostgreSQL](https://www.postgresql.org/download/)                | any recent | DuckLake catalog metadata storage                                        |
 | Microsoft Entra ID                                                | —          | OIDC authentication for the UI server (app registration + client secret) |
 
@@ -183,40 +184,28 @@ All commands run from `src/runtime/`.
 
 **Create and activate a virtual environment:**
 
+From `src/runtime/`, run:
+
+```sh
+uv sync
+```
+
+This creates `.venv/` and installs all dependencies from the lockfile. Activate the virtual environment when needed:
+
 Windows:
 ```powershell
-py -m venv .venv
 .\.venv\Scripts\activate
 ```
 
 macOS / Linux:
 ```sh
-python3 -m venv .venv
 source .venv/bin/activate
-```
-
-**Install the runtime package and its dependencies:**
-
-```sh
-pip install .
-```
-
-**Install the build tool:**
-
-```sh
-pip install build
 ```
 
 **Build the wheel package:**
 
-Windows:
-```powershell
-py -m build --wheel
-```
-
-macOS / Linux:
 ```sh
-python3 -m build --wheel
+uv build
 ```
 
 > The Python version used to build the wheel should match the Python version in the Docker image (`python:3.14-slim` at the time of writing). Mismatches can cause import errors at runtime.
