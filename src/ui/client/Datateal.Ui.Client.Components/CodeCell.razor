@@ -130,11 +130,14 @@
         {
             _suppressChange = false;
         }
-        // Apply the correct custom theme once Monaco modules are fully loaded
-        await JS.InvokeVoidAsync("applyDatatealMonacoTheme", _id, Language);
-        // Override Monaco's default Ctrl+Enter (insertLineAfter) with execute-only command
+        // Apply theme and register execute command (best-effort: failures must not block OnEditorReady)
+        try { await JS.InvokeVoidAsync("applyDatatealMonacoTheme", _id, Language); } catch { /* best effort */ }
         _dotNetRef = DotNetObjectReference.Create(this);
-        await JS.InvokeVoidAsync("registerMonacoExecuteCommand", _id, _dotNetRef);
+        try { await JS.InvokeVoidAsync("registerMonacoExecuteCommand", _id, _dotNetRef); } catch { /* best effort */ }
+        // Deferred layout: forces Monaco to re-measure its container on the next animation frame.
+        // Fixes incorrect sizing when navigating to a page via Blazor SPA router, where the
+        // flexbox container may not have settled to its final dimensions on initial measurement.
+        try { await JS.InvokeVoidAsync("relayoutMonacoEditor", _id); } catch { /* best effort */ }
         await OnEditorReady.InvokeAsync();
     }
 

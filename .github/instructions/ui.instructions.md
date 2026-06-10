@@ -68,7 +68,7 @@ Interactive node pools are a class of `NodePoolConfig` with `PoolType = "Interac
 
 ## Styling
 
-Custom CSS in `server/Datateal.Ui.Server/wwwroot/css/app.css`. Component-scoped CSS in `Datateal.Ui.Client.Components/wwwroot/defaults.css`. Dark mode class `ant-dark` is toggled on `<html>`.
+Global CSS in `server/Datateal.Ui.Server/wwwroot/css/app.css` — layout skeleton (`.cp-layout`, `.cp-main`, site header, Monaco cell borders, dark mode tokens). Component-specific styles live in component-scoped `.razor.css` files co-located with their component (e.g., `NotebookPage.razor.css`, `QueryPage.razor.css`, `AiChatPanel.razor.css`). RCL static CSS in `Datateal.Ui.Client.Components/wwwroot/defaults.css`. Dark mode class `ant-dark` is toggled on `<html>`.
 
 **Do not use `var(--ant-*)` CSS custom properties** — they do not exist in this build of Ant Design Blazor. Use hardcoded hex values and target dark mode with `html.ant-dark` selectors in `app.css`. Typical values: borders `#d9d9d9` / `#434343` (dark), subtle backgrounds `#fafafa` / `#1d1d1d` (dark).
 
@@ -137,7 +137,22 @@ Replacing a user's catalog access list must use `ExecuteDeleteAsync` (bulk SQL) 
 
 ## Monaco editor (`CodeCell`)
 
-`CodeCell.razor` wraps BlazorMonaco. `Height=0` = auto-size from line count; `Height>0` = fixed pixel height. `AutomaticLayout=true` causes Monaco to reflow when its container resizes — important after a splitter drag. JS helpers in `App.razor`: `setMonacoEditorLanguage`, `getDatatealMonacoTheme`, `openFileAsText`, `downloadFile`, `clickElement`, `initQueryPageSplitter`.
+`CodeCell.razor` wraps BlazorMonaco. `Height=0` = auto-size from line count; `Height>0` = fixed pixel height. `AutomaticLayout=true` causes Monaco to reflow when its container resizes — important after a splitter drag.
+
+**SPA navigation layout fix**: `CodeCell.OnEditorInitAsync` always calls `relayoutMonacoEditor` after editor init. This forces `editor.layout()` on the next `requestAnimationFrame`, ensuring Monaco re-measures its container after the browser's layout pass has settled. Without this, Monaco measures its flexbox container before the browser has computed flex heights on SPA navigation (where the DOM is patched incrementally), resulting in zero-height editors. This call is intentional and must be kept — do not remove it. Any new page that embeds `CodeCell` inherits the fix automatically.
+
+JS is split across focused files in `Datateal.Ui.Server/wwwroot/js/`, all loaded as global scripts in `App.razor`:
+
+| File | Contents | Primary consumers |
+|------|----------|-------------------|
+| `theme.js` | `datatealMonacoReady` promise, `setDatatealTheme`, `getStoredDatatealTheme`, `getDatatealMonacoTheme` | `ThemeService` |
+| `monaco-interop.js` | `applyDatatealMonacoTheme`, `setMonacoEditorLanguage`, `getMonacoEditorSelection`, `registerMonacoExecuteCommand`, `relayoutMonacoEditor` | `CodeCell.razor` |
+| `semantic-tokens.js` | `registerSemanticTokensCell`, `unregisterSemanticTokensCell`, token registry | `KernelCodeCell.razor` |
+| `splitter.js` | `initQueryPageSplitter`, `initCatalogPanelSplitter` | `QueryPage.razor`, `CatalogSidePanel.razor`, `CatalogsPage.razor` |
+| `file-helpers.js` | `openFileAsText`, `downloadFile`, `downloadFileBytes`, `clickElement` | `NotebookPage.razor`, `WorkspacePage.razor`, `DataFrameView.razor` |
+| `notebook-interop.js` | `scrollNotebookToCell`, `getItemNodePref`, `setItemNodePref` | `NotebookProgressGutter.razor`, `NotebookPage.razor`, `QueryPage.razor` |
+
+**Script load order matters**: `theme.js` must load before `monaco-interop.js` because `applyDatatealMonacoTheme` awaits `window.datatealMonacoReady` which is defined in `theme.js`.
 
 ## DataFrameView
 
