@@ -1,7 +1,3 @@
----
-applyTo: src/ui/**
----
-
 # Datateal UI
 
 Blazor Web App: ASP.NET Core server host (`Datateal.Ui.Server`) with a WebAssembly client (`Datateal.Ui.Client`). Uses **Ant Design Blazor** (`AntDesign`) for UI components, **BlazorMonaco** for code editing, and **Markdig** for Markdown rendering. Integrates with .NET Aspire.
@@ -144,7 +140,7 @@ Replacing a user's catalog access list must use `ExecuteDeleteAsync` (bulk SQL) 
 JS is split across focused files in `Datateal.Ui.Server/wwwroot/js/`, all loaded as global scripts in `App.razor`:
 
 | File | Contents | Primary consumers |
-|------|----------|-------------------|
+|---|---|---|
 | `theme.js` | `datatealMonacoReady` promise, `setDatatealTheme`, `getStoredDatatealTheme`, `getDatatealMonacoTheme` | `ThemeService` |
 | `monaco-interop.js` | `applyDatatealMonacoTheme`, `setMonacoEditorLanguage`, `getMonacoEditorSelection`, `registerMonacoExecuteCommand`, `relayoutMonacoEditor` | `CodeCell.razor` |
 | `semantic-tokens.js` | `registerSemanticTokensCell`, `unregisterSemanticTokensCell`, token registry | `KernelCodeCell.razor` |
@@ -161,4 +157,3 @@ JS is split across focused files in `Datateal.Ui.Server/wwwroot/js/`, all loaded
 ## Theme
 
 `IThemeService` / `ThemeService` persist the theme preference (`Auto`/`Light`/`Dark`) in `localStorage` as `datateal-theme`. A FOUC-prevention script in `App.razor`'s `<head>` applies the theme synchronously before page paint.
-

@@ -1,7 +1,3 @@
----
-applyTo: src/orchestrator/**
----
-
 # Datateal Orchestrator
 
 ASP.NET Core Web API that schedules and executes multi-task jobs against compute nodes managed by the Control Plane. Follows the same Clean Architecture and custom mediator pattern as the UI server and Control Plane.

@@ -1,7 +1,3 @@
----
-applyTo: src/control-plane/**
----
-
 # Datateal Control Plane
 
 ASP.NET Core 10 Web API (.NET Aspire, `Datateal.ControlPlane.slnx`) that dynamically provisions compute nodes and manages Jupyter kernels running on them.
