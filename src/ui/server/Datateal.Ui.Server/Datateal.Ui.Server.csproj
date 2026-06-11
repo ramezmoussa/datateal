@@ -14,6 +14,7 @@
         <ProjectReference Include="..\Datateal.Ui.Server.Infrastructure\Datateal.Ui.Server.Infrastructure.csproj" />
         <ProjectReference Include="..\..\Datateal.Ui.Shared\Datateal.Ui.Shared.csproj" />
         <ProjectReference Include="..\..\..\shared\Datateal.Auth\Datateal.Auth.csproj" />
+        <ProjectReference Include="..\..\..\shared\Datateal.Auth.Dev\Datateal.Auth.Dev.csproj" />
         <ProjectReference Include="..\..\..\shared\Datateal.Auth.EntraId\Datateal.Auth.EntraId.csproj" />
         <ProjectReference Include="..\..\..\shared\Datateal.Data\Datateal.Data.csproj" />
         <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" />

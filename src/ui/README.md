@@ -82,21 +82,37 @@ Authentication is handled by an external identity provider (currently Entra ID) 
 
 ### Authentication flow
 
+#### Entra ID provider (`Authentication:Provider: "EntraId"`)
+
 1. The user visits a protected page and is redirected to the OIDC login endpoint (`/authentication/login`).
 2. Entra ID validates credentials and returns an ID token. The server exchanges it for a cookie session (OpenID Connect → Cookie scheme).
 3. `AppClaimsTransformation` runs on every authenticated request. It looks up the user in the app database by Entra OID (`objectidentifier` claim) or email (`preferred_username`), then adds `ClaimTypes.Role` claims for each role stored in `AppUser.Roles`.
 4. The serialized claims principal (including role claims) is embedded in the server-rendered HTML via `AddAuthenticationStateSerialization(options => options.SerializeAllClaims = true)`. The WASM client reads this payload through `PersistentAuthenticationStateProvider` — no extra auth round-trip is needed from the browser.
 5. Logout calls `SignOutAsync` for both the Cookie and OpenID Connect schemes.
 
+#### Dev provider (`Authentication:Provider: "Dev"`)
+
+Every request is automatically authenticated as the user configured in `Authentication:Dev`. No browser redirect or credential prompt occurs.
+
+1. `DevAuthenticationHandler` returns `AuthenticateResult.Success` on every request, building a `ClaimsIdentity` with `preferred_username` and `name` from `Authentication:Dev:User`.
+2. **Role resolution depends on whether `Authentication:Dev:Roles` is present in config:**
+   - **`Roles` is set** (e.g. `["Admin"]` or even `[]`): those roles are applied as-is, a `datateal:dev-roles-override` marker claim is added, and `AppClaimsTransformation` skips its admin seed list check and database lookup entirely. The configured roles are the only roles.
+   - **`Roles` is absent / null**: no roles are added by the handler. `AppClaimsTransformation` runs normally — it looks up the user in the database by `preferred_username` (email) and applies their stored roles and catalog permissions, exactly as a real OIDC login would. This lets you impersonate any database user by setting their email and omitting `Roles`.
+3. Auth state is serialized and sent to the WASM client identically to the Entra ID flow.
+4. Login redirects straight to the return URL (the user is already authenticated). Logout is a no-op redirect to `/`.
+
 ### Pluggable identity provider
 
-The OIDC setup is isolated behind `IIdentityProviderSetup` (`Datateal.Auth.Abstractions`). Each identity provider ships its own implementation:
+The OIDC/auth setup is isolated behind `IIdentityProviderSetup` (`Datateal.Auth.Abstractions`). The active provider is selected at startup by reading `Authentication:Provider` from configuration. Each identity provider ships its own implementation:
 
-| Package                  | Implementation                 | Extension method             |
-| ------------------------ | ------------------------------ | ---------------------------- |
-| `Datateal.Auth.EntraId` | `EntraIdIdentityProviderSetup` | `AddEntraIdAuthentication()` |
+| Package                   | Implementation                 | Extension method              | `Authentication:Provider` value |
+| ------------------------- | ------------------------------ | ----------------------------- | ------------------------------- |
+| `Datateal.Auth.EntraId`   | `EntraIdIdentityProviderSetup` | `AddEntraIdAuthentication()`  | `"EntraId"` (default)           |
+| `Datateal.Auth.Dev`       | `DevIdentityProviderSetup`     | `AddDevAuthentication()`      | `"Dev"`                         |
 
-To switch providers, replace the `AddEntraIdAuthentication()` call in `Program.cs` with the new provider's registration. Only one provider is active at a time.
+Set `Authentication:Provider` in `appsettings.Development.json` to switch providers. Only one provider is active at a time.
+
+Providers may also implement `ILoginLogoutEndpoints` (from `Datateal.Auth`) to customize the `/authentication/login` and `/authentication/logout` endpoints. `DevIdentityProviderSetup` implements this interface; `EntraIdIdentityProviderSetup` does not, so the default OIDC challenge/sign-out behavior is preserved for Entra ID.
 
 ### Admin seed list
 
@@ -197,13 +213,17 @@ Backend services authenticate each other with API keys, not user tokens:
 
 ### Configuration reference
 
-| Key                               | Location           | Description                                       |
-| --------------------------------- | ------------------ | ------------------------------------------------- |
-| `Authorization:AdminUsers`        | `appsettings.json` | Email list of bootstrap admin users               |
-| `AzureAd:TenantId`                | `appsettings.json` | Entra ID tenant                                   |
-| `AzureAd:ClientId`                | `appsettings.json` | Entra ID app registration client ID               |
-| `AzureAd:ClientSecret`            | secrets / env var  | Entra ID client secret                            |
-| `ServiceAuth:Orchestrator:ApiKey` | secrets / env var  | API key the UI uses when calling the orchestrator |
+| Key                               | Provider    | Description                                                   |
+| --------------------------------- | ----------- | ------------------------------------------------------------- |
+| `Authentication:Provider`         | both        | `"EntraId"` (default) or `"Dev"`                              |
+| `Authorization:AdminUsers`        | both        | Email list of bootstrap admin users (Entra ID: matched against `preferred_username`; Dev: matched against `Authentication:Dev:User:Email`) |
+| `Authentication:EntraId:TenantId` | `EntraId`   | Entra ID tenant                                               |
+| `Authentication:EntraId:ClientId` | `EntraId`   | Entra ID app registration client ID                           |
+| `Authentication:EntraId:ClientSecret` | `EntraId` | Entra ID client secret (use secrets / env var in production) |
+| `Authentication:Dev:User:Email`   | `Dev`       | Email of the auto-authenticated dummy user (`dev@local` default) |
+| `Authentication:Dev:User:DisplayName` | `Dev`   | Display name of the dummy user                                |
+| `Authentication:Dev:Roles`        | `Dev`       | JSON array of role names granted to every request. Use `DatatealRole` constants. Example: `["Admin"]`. **When omitted**, roles are looked up from the database by `User:Email` instead (same as real OIDC login). |
+| `ServiceAuth:Orchestrator:ApiKey` | both        | API key the UI uses when calling the orchestrator             |
 
 ---
 

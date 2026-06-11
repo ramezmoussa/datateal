@@ -13,7 +13,7 @@ This guide covers everything you need to get Datateal running on your local mach
 | [Python](https://www.python.org/downloads/)                       | 3.11+      | Building and packaging the runtime service                               |
 | [uv](https://docs.astral.sh/uv/)                                   | latest     | Python package and dependency management for the runtime component       |
 | [PostgreSQL](https://www.postgresql.org/download/)                | any recent | DuckLake catalog metadata storage                                        |
-| Microsoft Entra ID                                                | —          | OIDC authentication for the UI server (app registration + client secret) |
+| Microsoft Entra ID _(optional)_                                   | —          | OIDC authentication for the UI server. Only required when using the `EntraId` auth provider (see [Authentication provider](#authentication-provider) below). |
 
 **Docker Desktop Kubernetes** must be enabled in Docker Desktop → Settings → Kubernetes → Enable Kubernetes. The control plane uses the `docker-desktop` kubeconfig context and creates pods with `ImagePullPolicy: Never`, so the runtime image must be built locally (see [Build and deploy the runtime](#4-build-and-deploy-the-runtime)).
 
@@ -113,6 +113,60 @@ All three service projects exclude `appsettings.Development.json` from source co
 
 **`src/ui/server/Datateal.Ui.Server/appsettings.Development.json`**
 
+The UI server supports two authentication providers selected by `Authentication:Provider`.
+Choose the one that fits your setup.
+
+#### Option A — Dev provider (no Entra ID required, recommended for first-time local dev)
+
+```json
+{
+  "Catalogs": {
+    "BaseDataPath": "/data/ducklake",
+    "StorageConnectionString": "",
+    "CatalogHost": "localhost",
+    "CatalogPodHost": "host.docker.internal",
+    "CatalogPort": 5432,
+    "CatalogUser": "postgres",
+    "CatalogPassword": "<your postgres password>"
+  },
+  "Authentication": {
+    "Provider": "Dev",
+    "Dev": {
+      "User": {
+        "Email": "dev@local",
+        "DisplayName": "Local Dev User"
+      },
+      "Roles": ["Admin"]
+    }
+  },
+  "ServiceAuth": {
+    "Orchestrator": { "ApiKey": "dev_key" },
+    "ControlPlane": { "ApiKey": "dev_key" }
+  }
+}
+```
+
+With the `Dev` provider every request is automatically authenticated as the configured user
+— no browser redirect or credential prompt occurs.
+
+**`Roles` behaviour:**
+- **Set** (e.g. `["Admin"]`): those exact roles are used. The database is not consulted for roles. Use this to get full admin access on a fresh install.
+- **Omitted**: roles and catalog permissions are looked up from the application database by `User:Email`, the same way a real login would. This lets you impersonate any database user — useful for testing specific role combinations after you've set them up via the admin UI. Example:
+
+```json
+"Dev": {
+  "User": {
+    "Email": "alice@example.com",
+    "DisplayName": "Alice"
+  }
+  // Roles omitted → fetched from DB for alice@example.com
+}
+```
+
+To switch identities, change `Email` (and optionally `DisplayName`) and restart the app.
+
+#### Option B — Entra ID provider
+
 ```json
 {
   "Catalogs": {
@@ -143,10 +197,15 @@ All three service projects exclude `appsettings.Development.json` from source co
 }
 ```
 
-- `Catalogs:CatalogHost` — `localhost` because the UI server process runs on the host and reaches Postgres directly.
-- `Catalogs:CatalogPodHost` — `host.docker.internal` because runtime pods resolve the Postgres host from inside Docker Desktop.
 - `Authentication:EntraId` — fill in the tenant ID, client ID, and client secret from your app registration (see [Entra ID app registration](#entra-id-app-registration) below).
 - `Authorization:AdminUsers` — at least one email address that will have full admin access on first login, before any users are configured in the database.
+
+---
+
+Common settings for both options:
+
+- `Catalogs:CatalogHost` — `localhost` because the UI server process runs on the host and reaches Postgres directly.
+- `Catalogs:CatalogPodHost` — `host.docker.internal` because runtime pods resolve the Postgres host from inside Docker Desktop.
 - `ServiceAuth:Orchestrator:ApiKey` — must equal `ServiceAuth:ExpectedApiKey` in the orchestrator config.
 - `ServiceAuth:ControlPlane:ApiKey` — must equal `ServiceAuth:ExpectedApiKey` in the control plane config.
 
@@ -165,7 +224,9 @@ Use any value you like for local development. Do not reuse development keys in p
 
 ---
 
-## 3. Entra ID app registration
+## 3. Entra ID app registration _(Option B only)_
+
+> Skip this step if you are using `Authentication:Provider: "Dev"`.
 
 You need a Microsoft Entra ID app registration for the UI server's OpenID Connect authentication. In the [Azure portal](https://portal.azure.com) → Entra ID → App registrations:
 

@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 using Datateal.Auth;
+using Datateal.Auth.Dev;
 using Datateal.Auth.EntraId;
 using Datateal.Data;
 using Datateal.Ui.Server;
@@ -28,8 +29,12 @@ builder.Services.AddControllers()
 builder.Services.AddExceptionHandler<UpstreamExceptionHandler>();
 builder.Services.AddProblemDetails();
 
-// Authentication — pluggable OIDC provider (Entra ID)
-builder.Services.AddEntraIdAuthentication();
+// Authentication — pluggable OIDC/dummy provider selected by Authentication:Provider
+var authProvider = builder.Configuration["Authentication:Provider"] ?? "EntraId";
+if (authProvider.Equals("Dev", StringComparison.OrdinalIgnoreCase))
+    builder.Services.AddDevAuthentication();
+else
+    builder.Services.AddEntraIdAuthentication();
 builder.Services.AddDatatealWebAppAuthentication(builder.Configuration);
 builder.Services.AddDatatealAuthorizationPolicies();
 builder.Services.Configure<AdminUsersOptions>(builder.Configuration.GetSection("Authorization"));

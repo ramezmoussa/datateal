@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Datateal.Auth;
+using Datateal.Auth.Dev;
 using Datateal.Data;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.EntityFrameworkCore;
@@ -19,6 +20,14 @@ public class AppClaimsTransformation(
     public async Task<ClaimsPrincipal> TransformAsync(ClaimsPrincipal principal)
     {
         if (principal.Identity is not ClaimsIdentity identity || !identity.IsAuthenticated)
+            return principal;
+
+        // When the dev auth provider has explicitly configured roles, they were already
+        // added by DevAuthenticationHandler. Require both the dev scheme name AND the
+        // override marker so this fast-path can never be triggered by a claim in a
+        // production OIDC token (e.g. from Entra ID), regardless of its content.
+        if (identity.AuthenticationType == DevAuthenticationOptions.SchemeName
+            && identity.HasClaim(DevAuthenticationOptions.RolesOverrideClaim, "true"))
             return principal;
 
         var externalId = identity.FindFirst("http://schemas.microsoft.com/identity/claims/objectidentifier")?.Value
