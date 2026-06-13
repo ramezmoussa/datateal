@@ -3,8 +3,10 @@
 
 @using Datateal.Ui.Shared.Catalogs
 @using Datateal.Ui.Shared.Users
+@using Datateal.Ui.Shared.Workspaces
 @inject IUserService UserService
 @inject ICatalogService CatalogService
+@inject IWorkspaceManagementService WorkspaceService
 
 <PageTitle>Users — Datateal</PageTitle>
 
@@ -185,6 +187,37 @@
                 </FormItem>
             }
 
+            @if (_workspaces.Count > 0)
+            {
+                <FormItem Label="Workspace access">
+                    <div style="color: #8c8c8c; font-size: 12px; margin-bottom: 8px;">
+                        Grant per-workspace roles directly here, or manage them later from each
+                        workspace's <b>Members</b> list on the Workspaces page. Leave a workspace
+                        empty to grant no access.
+                    </div>
+                    <Table TItem="WorkspaceDto" DataSource="_workspaces" Size="@TableSize.Small"
+                           Context="ws" PageSize="int.MaxValue" PaginationPosition="none">
+                        <PropertyColumn Property="w => w.Name" Title="Workspace" />
+                        <ActionColumn Title="Roles">
+                            <Select Mode="SelectMode.Multiple"
+                                    TItemValue="string" TItem="string"
+                                    Values="@WorkspaceRolesFor(ws.Id)"
+                                    ValuesChanged="@((IEnumerable<string> v) => SetWorkspaceRoles(ws.Id, v))"
+                                    Placeholder="No access"
+                                    Style="width: 100%; min-width: 220px;"
+                                    AllowClear>
+                                <SelectOptions>
+                                    @foreach (var role in DatatealRole.PerWorkspace)
+                                    {
+                                        <SelectOption TItemValue="string" TItem="string" Value="@role" Label="@role" />
+                                    }
+                                </SelectOptions>
+                            </Select>
+                        </ActionColumn>
+                    </Table>
+                </FormItem>
+            }
+
             @if (_saveError is not null)
             {
                 <Alert Type="@AlertType.Error" Message="@_saveError" ShowIcon="true" />
@@ -201,6 +234,8 @@
 @code {
     private IReadOnlyList<AppUserDto> _users = [];
     private IReadOnlyList<CatalogDto> _catalogs = [];
+    private IReadOnlyList<WorkspaceDto> _workspaces = [];
+    private Dictionary<Guid, IReadOnlyList<WorkspaceMemberDto>> _membershipsByWorkspace = [];
     private bool _loading = true;
     private string? _error;
 
@@ -214,6 +249,15 @@
     // Checkbox group binding
     private string[] _selectedRoles = [];
     private IEnumerable<Guid> _selectedCatalogIds = [];
+
+    // Per-workspace roles selected in the modal, keyed by workspace id.
+    private Dictionary<Guid, string[]> _workspaceRoles = [];
+
+    private IEnumerable<string> WorkspaceRolesFor(Guid workspaceId) =>
+        _workspaceRoles.TryGetValue(workspaceId, out var roles) ? roles : [];
+
+    private void SetWorkspaceRoles(Guid workspaceId, IEnumerable<string>? roles) =>
+        _workspaceRoles[workspaceId] = roles?.ToArray() ?? [];
 
     private RenderFragment RoleInfoContent(string role) =>
         @<span style="max-width: 260px; display: block;">@RoleCatalog.Describe(role)</span>;
@@ -246,7 +290,7 @@
 
     protected override async Task OnInitializedAsync()
     {
-        await Task.WhenAll(LoadUsersAsync(), LoadCatalogsAsync());
+        await Task.WhenAll(LoadUsersAsync(), LoadCatalogsAsync(), LoadWorkspacesAsync());
     }
 
     private async Task LoadUsersAsync()
@@ -263,12 +307,51 @@
         catch { /* non-fatal — catalog picker just won't have data */ }
     }
 
+    private async Task LoadWorkspacesAsync()
+    {
+        try
+        {
+            _workspaces = await WorkspaceService.GetAccessibleAsync();
+            await LoadMembershipsAsync();
+        }
+        catch { /* non-fatal — workspace access section just won't have data */ }
+    }
+
+    private async Task LoadMembershipsAsync()
+    {
+        var map = new Dictionary<Guid, IReadOnlyList<WorkspaceMemberDto>>();
+        foreach (var ws in _workspaces)
+        {
+            try { map[ws.Id] = await WorkspaceService.GetMembersAsync(ws.Id); }
+            catch { map[ws.Id] = []; }
+        }
+        _membershipsByWorkspace = map;
+    }
+
+    private Dictionary<Guid, string[]> BuildWorkspaceRoles(Guid? userId)
+    {
+        var map = new Dictionary<Guid, string[]>();
+        foreach (var ws in _workspaces)
+        {
+            string[] roles = [];
+            if (userId is not null
+                && _membershipsByWorkspace.TryGetValue(ws.Id, out var members))
+            {
+                var membership = members.FirstOrDefault(m => m.UserId == userId);
+                if (membership is not null) roles = membership.Roles.ToArray();
+            }
+            map[ws.Id] = roles;
+        }
+        return map;
+    }
+
     private void StartCreate()
     {
         _editTarget = null;
         _form = new UserFormModel();
         _selectedRoles = [];
         _selectedCatalogIds = [];
+        _workspaceRoles = BuildWorkspaceRoles(null);
         _submitAttempted = false;
         _saveError = null;
         _showModal = true;
@@ -286,6 +369,7 @@
         };
         _selectedRoles = user.Roles.ToArray();
         _selectedCatalogIds = user.CatalogAccessList.Select(a => a.CatalogId);
+        _workspaceRoles = BuildWorkspaceRoles(user.Id);
         _submitAttempted = false;
         _saveError = null;
         _showModal = true;
@@ -309,12 +393,13 @@
 
             if (_editTarget is null)
             {
-                await UserService.CreateUserAsync(new CreateUserRequest(
+                var created = await UserService.CreateUserAsync(new CreateUserRequest(
                     _form.Email.Trim(),
                     _form.DisplayName.Trim(),
                     roles,
                     _form.HasAllCatalogAccess,
                     catalogIds));
+                await SyncWorkspaceMembershipsAsync(created.Id);
             }
             else
             {
@@ -324,13 +409,43 @@
                     roles,
                     _form.HasAllCatalogAccess,
                     catalogIds));
+                await SyncWorkspaceMembershipsAsync(_editTarget.Id);
             }
             _showModal = false;
-            await LoadUsersAsync();
+            await Task.WhenAll(LoadUsersAsync(), LoadMembershipsAsync());
         }
         catch (Exception ex) { _saveError = $"Failed to save user: {ex.Message}"; }
         finally { _saving = false; }
     }
+
+    private async Task SyncWorkspaceMembershipsAsync(Guid userId)
+    {
+        foreach (var ws in _workspaces)
+        {
+            var desired = _workspaceRoles.TryGetValue(ws.Id, out var r) ? r : [];
+            var original = OriginalWorkspaceRoles(userId, ws.Id);
+            if (RolesEqual(desired, original)) continue;
+
+            if (desired.Length == 0)
+                await WorkspaceService.RemoveMemberAsync(ws.Id, userId);
+            else
+                await WorkspaceService.SetMemberAsync(ws.Id,
+                    new SetWorkspaceMemberRequest(userId, desired.ToList()));
+        }
+    }
+
+    private string[] OriginalWorkspaceRoles(Guid userId, Guid workspaceId)
+    {
+        if (_membershipsByWorkspace.TryGetValue(workspaceId, out var members))
+        {
+            var membership = members.FirstOrDefault(m => m.UserId == userId);
+            if (membership is not null) return membership.Roles.ToArray();
+        }
+        return [];
+    }
+
+    private static bool RolesEqual(IReadOnlyCollection<string> a, IReadOnlyCollection<string> b) =>
+        a.Count == b.Count && new HashSet<string>(a).SetEquals(b);
 
     private async Task DeleteAsync(AppUserDto user)
     {
