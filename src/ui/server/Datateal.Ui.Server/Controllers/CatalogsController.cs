@@ -4,6 +4,7 @@ using Datateal.Core.Mediator;
 using Datateal.Ui.Server.Core.Catalogs;
 using Datateal.Ui.Server.Core.Repositories;
 using Datateal.Ui.Shared.Catalogs;
+using Datateal.Ui.Shared.Workspaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Cmd = Datateal.Ui.Server.Application.Mediator.Commands;
@@ -20,14 +21,27 @@ public class CatalogsController(
     ICatalogAccessService catalogAccess,
     ICatalogRepository catalogRepository) : ControllerBase
 {
+    /// <summary>
+    /// The workspace-scoped read endpoints require an explicit workspace the caller can
+    /// access. This prevents bypassing workspace-level catalog restrictions by omitting the
+    /// id or supplying a workspace the user is not a member of: a malicious caller could
+    /// otherwise read catalogs (and their metadata) that their active workspace is not granted.
+    /// </summary>
+    private bool CanAccessWorkspace(Guid workspaceId) =>
+        User.IsInRole(DatatealRole.Admin)
+        || WorkspaceRoleClaims.GetWorkspaceIds(User).Contains(workspaceId);
+
     [HttpGet]
-    public async Task<IReadOnlyList<CatalogDto>> GetAll([FromQuery] Guid? workspaceId = null, CancellationToken ct = default)
+    public async Task<IActionResult> GetAll([FromQuery] Guid? workspaceId = null, CancellationToken ct = default)
     {
+        if (workspaceId is null || !CanAccessWorkspace(workspaceId.Value))
+            return Forbid();
+
         var catalogs = await mediator.SendAsync(new Qry.GetCatalogsRequest(), ct);
         var accessibleIds = await catalogAccess.GetAccessibleCatalogIdsAsync(User, workspaceId, ct);
         if (accessibleIds is null)
-            return catalogs;
-        return catalogs.Where(c => accessibleIds.Contains(c.Id)).ToList();
+            return Ok(catalogs);
+        return Ok(catalogs.Where(c => accessibleIds.Contains(c.Id)).ToList());
     }
 
     /// <summary>All catalogs, unfiltered. For tenant-level management (catalog access, user grants).</summary>
@@ -39,6 +53,8 @@ public class CatalogsController(
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> GetById(Guid id, [FromQuery] Guid? workspaceId = null, CancellationToken ct = default)
     {
+        if (workspaceId is null || !CanAccessWorkspace(workspaceId.Value))
+            return Forbid();
         if (!await catalogAccess.HasAccessAsync(User, workspaceId, id, ct))
             return Forbid();
         var catalogs = await mediator.SendAsync(new Qry.GetCatalogsRequest(), ct);
@@ -97,6 +113,8 @@ public class CatalogsController(
     [HttpGet("{id:guid}/metadata")]
     public async Task<IActionResult> GetMetadata(Guid id, [FromQuery] Guid? workspaceId = null, CancellationToken ct = default)
     {
+        if (workspaceId is null || !CanAccessWorkspace(workspaceId.Value))
+            return Forbid();
         if (!await catalogAccess.HasAccessAsync(User, workspaceId, id, ct))
             return Forbid();
         var metadata = await mediator.SendAsync(new Qry.GetCatalogMetadataRequest(id), ct);
@@ -106,6 +124,8 @@ public class CatalogsController(
     [HttpGet("{id:guid}/info")]
     public async Task<IActionResult> GetInfo(Guid id, [FromQuery] Guid? workspaceId = null, CancellationToken ct = default)
     {
+        if (workspaceId is null || !CanAccessWorkspace(workspaceId.Value))
+            return Forbid();
         if (!await catalogAccess.HasAccessAsync(User, workspaceId, id, ct))
             return Forbid();
         var info = await mediator.SendAsync(new Qry.GetCatalogInfoRequest(id), ct);

@@ -30,6 +30,12 @@ internal class InteractivePoolRepository(DatatealDbContext dbContext) : IInterac
 
     public async Task<bool> HasNodeAsync(Guid workspaceId, string nodeName, CancellationToken cancellationToken = default)
     {
+        var nodeNames = await GetNodeNamesAsync(workspaceId, cancellationToken);
+        return nodeNames.Contains(nodeName);
+    }
+
+    public async Task<IReadOnlySet<string>> GetNodeNamesAsync(Guid workspaceId, CancellationToken cancellationToken = default)
+    {
         // Load only pool IDs for the workspace, then derive each node name in memory.
         // GetNodeName() = "i" + id.ToString("N")[..11] — not translatable to SQL.
         var poolIds = await dbContext.NodePoolConfigs
@@ -38,7 +44,9 @@ internal class InteractivePoolRepository(DatatealDbContext dbContext) : IInterac
             .Select(p => p.Id)
             .ToListAsync(cancellationToken);
 
-        return poolIds.Any(id => "i" + id.ToString("N")[..11].ToLowerInvariant() == nodeName);
+        return poolIds
+            .Select(id => "i" + id.ToString("N")[..11].ToLowerInvariant())
+            .ToHashSet(StringComparer.Ordinal);
     }
 
     private static InteractivePoolInfo ToInfo(InteractiveNodePoolConfig pool) => new(

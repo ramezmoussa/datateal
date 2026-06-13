@@ -27,6 +27,9 @@ public class UsersController(IMediator mediator) : ControllerBase
     [HttpPost]
     public async Task<IActionResult> Create(CreateUserRequest body, CancellationToken ct)
     {
+        if (InvalidTenantRoles(body.Roles) is { } error)
+            return error;
+
         var user = await mediator.SendAsync(
             new Cmd.CreateUserCommand(body.Email, body.DisplayName, body.Roles, body.HasAllCatalogAccess, body.CatalogIds), ct);
         return Created($"api/users/{user.Id}", user);
@@ -35,9 +38,31 @@ public class UsersController(IMediator mediator) : ControllerBase
     [HttpPut("{id:guid}")]
     public async Task<IActionResult> Update(Guid id, UpdateUserRequest body, CancellationToken ct)
     {
+        if (InvalidTenantRoles(body.Roles) is { } error)
+            return error;
+
         var user = await mediator.SendAsync(
             new Cmd.UpdateUserCommand(id, body.DisplayName, body.IsEnabled, body.Roles, body.HasAllCatalogAccess, body.CatalogIds), ct);
         return user is null ? NotFound() : Ok(user);
+    }
+
+    /// <summary>
+    /// The tenant role store (<c>AppUser.Roles</c>) may only hold tenant-global roles.
+    /// Per-workspace roles are granted via workspace memberships, so reject them here to
+    /// keep the role store clean and unambiguous.
+    /// </summary>
+    private BadRequestObjectResult? InvalidTenantRoles(IEnumerable<string> roles)
+    {
+        var invalid = roles.Where(r => !DatatealRole.IsTenantGlobal(r)).ToList();
+        return invalid.Count == 0
+            ? null
+            : BadRequest(new ProblemDetails
+            {
+                Status = 400,
+                Title = "Invalid roles",
+                Detail = $"Not valid tenant-global roles: {string.Join(", ", invalid)}. " +
+                         "Per-workspace roles are assigned from a workspace's members list.",
+            });
     }
 
     [HttpDelete("{id:guid}")]

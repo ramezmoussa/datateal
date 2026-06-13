@@ -26,4 +26,10 @@ public interface IInteractivePoolRepository
     /// the given <paramref name="nodeName"/> (i.e., the pool's derived node name matches).
     /// </summary>
     Task<bool> HasNodeAsync(Guid workspaceId, string nodeName, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Returns the set of node names derived from all interactive pools in
+    /// <paramref name="workspaceId"/>. Used to scope control-plane node listings to the workspace.
+    /// </summary>
+    Task<IReadOnlySet<string>> GetNodeNamesAsync(Guid workspaceId, CancellationToken cancellationToken = default);
 }
