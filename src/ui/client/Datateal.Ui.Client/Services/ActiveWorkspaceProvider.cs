@@ -86,7 +86,7 @@ public sealed class ActiveWorkspaceProvider : IActiveWorkspaceAccessor, IDisposa
 
     /// <summary>Builds a workspace-scoped URL for the active workspace.</summary>
     public string Link(string suffix) =>
-        ActiveWorkspaceId is { } id ? WorkspaceRoute.Build(id, suffix) : "/";
+        WorkspaceRoute.Build(ActiveWorkspaceId ?? Guid.Empty, suffix);
 
     private void OnLocationChanged(object? sender, LocationChangedEventArgs e) => ApplyUri(e.Location);
 
