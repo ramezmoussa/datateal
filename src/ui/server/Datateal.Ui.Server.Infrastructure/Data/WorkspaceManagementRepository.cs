@@ -58,6 +58,21 @@ internal class WorkspaceManagementRepository(DatatealDbContext db) : IWorkspaceM
         return true;
     }
 
+    public async Task<bool> SetDefaultAsync(Guid id, CancellationToken ct = default)
+    {
+        var workspace = await db.Workspaces.FirstOrDefaultAsync(w => w.Id == id, ct);
+        if (workspace is null || workspace.IsDefault) return false;
+
+        var currentDefault = await db.Workspaces.FirstOrDefaultAsync(w => w.IsDefault, ct);
+        if (currentDefault is not null)
+            currentDefault.IsDefault = false;
+
+        workspace.IsDefault = true;
+        workspace.UpdatedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync(ct);
+        return true;
+    }
+
     public async Task<IReadOnlyList<WorkspaceMembership>> GetMembershipsAsync(Guid workspaceId, CancellationToken ct = default) =>
         await db.WorkspaceMemberships
             .Include(m => m.User)

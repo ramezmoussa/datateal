@@ -16,6 +16,7 @@ public interface IWorkspaceManagementRepository
     Task<WorkspaceEntity> CreateAsync(string name, string? description, CancellationToken ct = default);
     Task<WorkspaceEntity?> UpdateAsync(Guid id, string name, string? description, CancellationToken ct = default);
     Task<bool> DeleteAsync(Guid id, CancellationToken ct = default);
+    Task<bool> SetDefaultAsync(Guid id, CancellationToken ct = default);
 
     Task<IReadOnlyList<WorkspaceMembership>> GetMembershipsAsync(Guid workspaceId, CancellationToken ct = default);
     Task SetMembershipAsync(Guid workspaceId, Guid userId, IReadOnlyList<string> roles, CancellationToken ct = default);

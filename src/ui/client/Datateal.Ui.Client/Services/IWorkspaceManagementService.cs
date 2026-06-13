@@ -9,6 +9,7 @@ public interface IWorkspaceManagementService
     Task<WorkspaceDto> CreateAsync(CreateWorkspaceRequest request, CancellationToken ct = default);
     Task<WorkspaceDto?> UpdateAsync(Guid id, UpdateWorkspaceRequest request, CancellationToken ct = default);
     Task DeleteAsync(Guid id, CancellationToken ct = default);
+    Task SetDefaultAsync(Guid id, CancellationToken ct = default);
 
     Task<IReadOnlyList<WorkspaceMemberDto>> GetMembersAsync(Guid workspaceId, CancellationToken ct = default);
     Task SetMemberAsync(Guid workspaceId, SetWorkspaceMemberRequest request, CancellationToken ct = default);

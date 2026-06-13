@@ -65,7 +65,7 @@ public sealed class ActiveWorkspaceProvider : IActiveWorkspaceAccessor, IDisposa
 
             ActiveWorkspaceId = stored is { } s && available.Any(w => w.Id == s)
                 ? s
-                : available.FirstOrDefault()?.Id;
+                : available.FirstOrDefault(w => w.IsDefault)?.Id ?? available.FirstOrDefault()?.Id;
         }
 
         IsInitialized = true;

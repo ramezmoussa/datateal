@@ -83,6 +83,18 @@ public class WorkspacesController(
         return deleted ? NoContent() : NotFound();
     }
 
+    [HttpPost("{id:guid}/set-default")]
+    [Authorize(Policy = AuthPolicy.Admin)]
+    public async Task<IActionResult> SetDefault(Guid id, CancellationToken ct)
+    {
+        var workspace = await repository.GetAsync(id, ct);
+        if (workspace is null) return NotFound();
+        if (workspace.IsDefault) return NoContent();
+
+        var changed = await repository.SetDefaultAsync(id, ct);
+        return changed ? NoContent() : NotFound();
+    }
+
     // ── Memberships ───────────────────────────────────────────────────────
 
     [HttpGet("{id:guid}/members")]

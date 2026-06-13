@@ -58,6 +58,16 @@
                     </Tooltip>
                 </SpaceItem>
                 <SpaceItem>
+                    <Tooltip Title="@(context.IsDefault ? "Already the default workspace" : "Set as default")">
+                        <Popconfirm Title="@($"Set '{context.Name}' as the default workspace? New users without a prior preference will be directed here first.")"
+                                    OnConfirm="() => SetDefaultAsync(context)" Disabled="context.IsDefault">
+                            <Button Size="@ButtonSize.Small" Disabled="context.IsDefault">
+                                <Icon Type="@IconType.Outline.Star" />
+                            </Button>
+                        </Popconfirm>
+                    </Tooltip>
+                </SpaceItem>
+                <SpaceItem>
                     <Tooltip Title="Edit">
                         <Button Size="@ButtonSize.Small" OnClick="() => StartEdit(context)">
                             <Icon Type="@IconType.Outline.Edit" />
@@ -326,6 +336,16 @@
             await LoadWorkspacesAsync();
         }
         catch (Exception ex) { _error = $"Failed to delete workspace: {ex.Message}"; }
+    }
+
+    private async Task SetDefaultAsync(WorkspaceDto workspace)
+    {
+        try
+        {
+            await WorkspaceService.SetDefaultAsync(workspace.Id);
+            await LoadWorkspacesAsync();
+        }
+        catch (Exception ex) { _error = $"Failed to set default workspace: {ex.Message}"; }
     }
 
     private async Task OpenMembersAsync(WorkspaceDto workspace)

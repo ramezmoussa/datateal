@@ -38,6 +38,12 @@ internal class WorkspaceManagementService(HttpClient httpClient) : IWorkspaceMan
         response.EnsureSuccessStatusCode();
     }
 
+    public async Task SetDefaultAsync(Guid id, CancellationToken ct = default)
+    {
+        var response = await httpClient.PostAsync($"api/workspaces/{id}/set-default", null, ct);
+        response.EnsureSuccessStatusCode();
+    }
+
     public async Task<IReadOnlyList<WorkspaceMemberDto>> GetMembersAsync(Guid workspaceId, CancellationToken ct = default) =>
         await httpClient.GetFromJsonAsync<IReadOnlyList<WorkspaceMemberDto>>($"api/workspaces/{workspaceId}/members", ct) ?? [];
 
