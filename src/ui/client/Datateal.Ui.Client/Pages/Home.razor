@@ -1,4 +1,5 @@
 @page "/"
+@page "/w/{WorkspaceId:guid}"
 
 @using Datateal.Ui.Shared.Workspace
 @using Datateal.Ui.Shared.Orchestration
@@ -89,6 +90,8 @@
 </div>
 
 @code {
+    [Parameter] public Guid? WorkspaceId { get; set; }
+
     private string _searchText = "";
 
     // Search data (loaded lazily)

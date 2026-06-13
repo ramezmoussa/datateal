@@ -30,7 +30,15 @@ public static class WorkspaceRoute
         return false;
     }
 
-    /// <summary>Builds <c>/w/{workspaceId}/{suffix}</c>.</summary>
-    public static string Build(Guid workspaceId, string suffix) =>
-        $"/{Prefix}/{workspaceId}/{suffix.TrimStart('/')}";
+    /// <summary>
+    /// Builds <c>/w/{workspaceId}/{suffix}</c>, or <c>/w/{workspaceId}</c> when
+    /// <paramref name="suffix"/> is empty.
+    /// </summary>
+    public static string Build(Guid workspaceId, string suffix)
+    {
+        var trimmed = suffix.TrimStart('/');
+        return string.IsNullOrEmpty(trimmed)
+            ? $"/{Prefix}/{workspaceId}"
+            : $"/{Prefix}/{workspaceId}/{trimmed}";
+    }
 }

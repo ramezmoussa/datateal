@@ -38,7 +38,7 @@
             </MenuItem>
         </AuthorizeView>
     </SubMenu>
-    <MenuItem Key="home" RouterLink="/" RouterMatch="NavLinkMatch.All">
+    <MenuItem Key="home" RouterLink="@Ws("")" RouterMatch="NavLinkMatch.All">
         <Icon Type="@IconType.Outline.Home" />
         <span>Home</span>
     </MenuItem>
@@ -54,10 +54,6 @@
             <span>Jobs</span>
         </MenuItem>
     </AuthorizeView>
-    <MenuItem Key="catalogs" RouterLink="/catalogs" RouterMatch="NavLinkMatch.Prefix">
-        <Icon Type="@IconType.Outline.Database" />
-        <span>Catalogs</span>
-    </MenuItem>
     <AuthorizeView Policy="@AuthPolicy.NodePoolOperate">
         <MenuItem Key="node-pools" RouterLink="@Ws("node-pools")" RouterMatch="NavLinkMatch.Prefix">
             <Icon Type="@IconType.Outline.Cluster" />
@@ -70,6 +66,10 @@
             <span>Environment</span>
         </MenuItem>
     </AuthorizeView>
+    <MenuItem Key="catalogs" RouterLink="/catalogs" RouterMatch="NavLinkMatch.Prefix">
+        <Icon Type="@IconType.Outline.Database" />
+        <span>Catalogs</span>
+    </MenuItem>
     <MenuItem Key="settings" RouterLink="/settings" RouterMatch="NavLinkMatch.Prefix">
         <Icon Type="@IconType.Outline.Setting" />
         <span>Settings</span>
