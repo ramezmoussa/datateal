@@ -91,6 +91,7 @@
         <Form Model="@_form" Layout="FormLayout.Vertical">
             <FormItem Label="Name">
                 <Input @bind-Value="context.Name" Placeholder="Sales (Dev)" BindOnInput
+                       OnPressEnter="@(async _ => await ConfirmSave())"
                        Class="@(NameDisplayError is not null ? "ant-input-status-error" : "")" />
                 @if (NameDisplayError is not null)
                 {
@@ -99,6 +100,7 @@
             </FormItem>
             <FormItem Label="Slug">
                 <Input @bind-Value="context.Slug" Placeholder="sales-dev" BindOnInput
+                       OnPressEnter="@(async _ => await ConfirmSave())"
                        Class="@(SlugDisplayError is not null ? "ant-input-status-error" : "")" />
                 <div style="color: #8c8c8c; font-size: 12px;">
                     Lowercase letters, numbers and hyphens. Encode environments by convention
