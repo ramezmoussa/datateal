@@ -14,6 +14,23 @@ Shared domain types (`NodeInfo`, `KernelInfo`, mediator interfaces) live in `src
 
 When a run is triggered, `TriggerJobHandler` serialises the complete `Job` entity as `SnapshotJson` on the `JobRun`. `RunCoordinator` executes from this snapshot, not the live database — editing a job never affects a run already in progress or recovering from a crash.
 
+## Job effective identity and catalog security
+
+Every `Job` carries two owner fields:
+
+- **`OwnerUserId`** (`Guid?`) — the `AppUser.Id` of the user who last created or modified the job. Copied to `JobRun.OwnerUserId` at trigger time. Used for runtime access checks.
+- **`CreatedByUserId`** (`Guid?`) — the user who first created the job. Audit-only; never used for access decisions.
+
+**`OwnerUserId` is required.** `CreateJob`, `UpdateJob`, and `ImportJob` request records declare `OwnerUserId` as a non-nullable `Guid` (no default). Handlers validate it is non-null before processing and throw `InvalidOperationException` (→ HTTP 400) if it is absent. Scheduled and manual triggers do **not** transport an identity — they use the stored `Job.OwnerUserId` directly.
+
+**Acting-user header transport**: the UI server's `OrchestratorProxy` reads the `datateal:user_id` claim from the authenticated user and injects it as `X-Datateal-Acting-User`. Orchestrator endpoints read this via `GetActingUser(HttpContext)` (defined at the end of `JobEndpoints`). This header is only set server-side and must never be trusted from external clients.
+
+**Catalog access enforcement** runs at two points:
+1. **Trigger time** (`TriggerJobHandler.EnsureOwnerCatalogAccessAsync`): pre-checks that all catalog references in the job snapshot are accessible to the owner. Returns a descriptive error before any run record is created.
+2. **Execution time** (`TaskExecutor.SetupCatalogsForWorkspaceItemAsync`): authoritative enforcement at the moment each catalog is being attached to a kernel. Throws on any inaccessible catalog. Fail-closed: a null owner (legacy job with no stored identity) blocks all catalog access.
+
+`ICatalogAccessAuthorizer` / `CatalogAccessAuthorizer` (in `Datateal.Orchestrator.Infrastructure`) wraps the shared `ICatalogAccessResolver` from `Datateal.Data`. The resolver applies the two-tier model: user-level restrictions (`AppUser.Roles`, `HasAllCatalogAccess`, explicit `CatalogAccessList`) intersected with workspace-level restrictions (`Catalog.AccessibleFromAllWorkspaces`, `CatalogWorkspaceAccess` grants).
+
 ## DAG execution
 
 **Skip propagation is eager**: a task is skipped as soon as any single dependency edge becomes permanently unsatisfiable. Downstream tasks are re-evaluated in the next fixed-point iteration.

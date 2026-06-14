@@ -24,17 +24,23 @@ Blazor Web App: ASP.NET Core server host (`Datateal.Ui.Server`) with a WebAssemb
 
 ## Workspace feature
 
-Workspaces store **notebooks** and **SQL query files** in a folder hierarchy backed by EF Core + SQLite using **TPH inheritance**. `WorkspaceItem` is the abstract EF base class; `Notebook` and `Query` are concrete subclasses. The EF discriminator column is `ItemType varchar(32)`. `Query` adds nullable columns for the last execution result (`LastExecutedAt`, `LastDurationMs`, `LastResultStatus`, `LastResultJson` as a JSON blob).
+The application supports **multiple workspaces**. Each workspace has its own set of notebooks, SQL queries, folders, node pools, jobs, and environment configuration. Users are members of workspaces with per-workspace roles; the workspace switcher in the header lets them navigate to any workspace they have access to.
+
+**WorkspacesPage** (`/workspaces`): tenant-level workspace list; Admins can create, rename, and delete workspaces, set a default workspace, and manage per-workspace memberships. Any authenticated user can see the workspaces they have access to.
+
+- Server: `WorkspacesController` at `api/workspaces`; listing filtered by the caller's memberships (Admin sees all); mutations require `Admin`; membership management requires `Admin` or `WorkspaceAdmin` of the target workspace.
+
+Workspaces store **notebooks** and **SQL query files** in a folder hierarchy backed by EF Core using **TPH inheritance**. `WorkspaceItem` is the abstract EF base class; `Notebook` and `Query` are concrete subclasses. The EF discriminator column is `ItemType varchar(32)`. `Query` adds nullable columns for the last execution result (`LastExecutedAt`, `LastDurationMs`, `LastResultStatus`, `LastResultJson` as a JSON blob).
 
 - Server: `WorkspaceController` at `api/workspaces/{workspaceId:guid}/items`; typed repository methods use `.OfType<Notebook>()` / `.OfType<Query>()`
 - Client: `IWorkspaceService` / `WorkspaceService` in `Datateal.Ui.Client/Services/`
 - Workspace listing: folders first (alphabetical), then notebooks and queries merged and sorted alphabetically
 
-**WorkspacePage** (`/workspace`): lists folders and items with a Type column; supports create, rename, move, clone, delete for both notebooks and queries.
+**WorkspacePage** (`/w/{workspaceId:guid}/workspace`): lists folders and items with a Type column; supports create, rename, move, clone, delete for both notebooks and queries.
 
-**QueryPage** (`/query`, `/query/{id}`): split-screen SQL editor (top) + results panel (bottom). A draggable divider uses `initQueryPageSplitter(topPaneId, handleId, dotNetRef)` JS interop; drag is pure JS for smoothness, fires `[JSInvokable] OnSplitterDragEnd(double height)` on release. `QueryPage` implements `IAsyncDisposable` to dispose the `DotNetObjectReference`.
+**QueryPage** (`/w/{workspaceId:guid}/query`, `/w/{workspaceId:guid}/query/{id}`): split-screen SQL editor (top) + results panel (bottom). A draggable divider uses `initQueryPageSplitter(topPaneId, handleId, dotNetRef)` JS interop; drag is pure JS for smoothness, fires `[JSInvokable] OnSplitterDragEnd(double height)` on release. `QueryPage` implements `IAsyncDisposable` to dispose the `DotNetObjectReference`.
 
-**NotebookPage** (`/notebook`, `/notebook/{id}`): polyglot notebook with Python, SQL, and Markdown cells. SQL cells are wrapped as `import duckdb; duckdb.sql("""...""")` before kernel execution.
+**NotebookPage** (`/w/{workspaceId:guid}/notebook`, `/w/{workspaceId:guid}/notebook/{id}`): polyglot notebook with Python, SQL, and Markdown cells. SQL cells are wrapped as `import duckdb; duckdb.sql("""...""")` before kernel execution.
 
 ## Interactive node pools
 
@@ -52,14 +58,25 @@ Interactive node pools are a class of `NodePoolConfig` with `PoolType = "Interac
 
 ## Client pages
 
+All workspace-specific pages are rooted at `/w/{WorkspaceId:guid}/`. Cross-workspace or admin pages sit at the top level.
+
 | Page | Route | Description |
 |---|---|---|
-| `Home.razor` | `/` | Welcome page |
-| `WorkspacePage.razor` | `/workspace` | Workspace browser |
-| `NotebookPage.razor` | `/notebook` | Polyglot notebook editor |
-| `QueryPage.razor` | `/query` | SQL query editor with results panel |
-| `NodePoolsPage.razor` | `/node-pools` | Node pool config management; tabs for Interactive, Job, and Active nodes |
-| `Kernels.razor` | `/nodes/{name}/kernels` | Kernel management per node |
+| `Home.razor` | `/` or `/w/{WorkspaceId:guid}` | Welcome / workspace landing page |
+| `WorkspacesPage.razor` | `/workspaces` | Tenant-level workspace list and administration |
+| `WorkspacePage.razor` | `/w/{WorkspaceId:guid}/workspace` | Workspace browser |
+| `NotebookPage.razor` | `/w/{WorkspaceId:guid}/notebook[/{Id:guid}]` | Polyglot notebook editor |
+| `QueryPage.razor` | `/w/{WorkspaceId:guid}/query[/{Id:guid}]` | SQL query editor with results panel |
+| `NodePoolsPage.razor` | `/w/{WorkspaceId:guid}/node-pools` | Node pool config management; tabs for Interactive, Job, and Active nodes |
+| `Kernels.razor` | `/w/{WorkspaceId:guid}/nodes/{Name}/kernels` | Kernel management per node |
+| `JobsPage.razor` | `/w/{WorkspaceId:guid}/jobs` | Job list and run history |
+| `JobEditorPage.razor` | `/w/{WorkspaceId:guid}/jobs/{Id:guid}` | Job definition editor |
+| `JobRunPage.razor` | `/w/{WorkspaceId:guid}/runs/{Id:guid}` | Job run detail and DAG progress |
+| `TaskRunNotebookPage.razor` | `/w/{WorkspaceId:guid}/runs/{RunId:guid}/tasks/{TaskRunId:guid}/notebook` | Task run notebook viewer |
+| `TaskRunQueryPage.razor` | `/w/{WorkspaceId:guid}/runs/{RunId:guid}/tasks/{TaskRunId:guid}/query` | Task run query viewer |
+| `EnvironmentPage.razor` | `/w/{WorkspaceId:guid}/environment` | Secrets, variables, and wheel packages |
+| `CatalogsPage.razor` | `/catalogs` | Tenant-level catalog management |
+| `UsersPage.razor` | `/users` | User administration (Admin only) |
 | `Settings.razor` | `/settings` | Theme settings |
 
 ## Styling
@@ -122,6 +139,15 @@ protected override async Task OnInitializedAsync()
 ### `AppClaimsTransformation` — use `AsNoTracking()`
 `AppClaimsTransformation` runs inside the same scoped `DatatealDbContext` as the rest of the request. Always query with `.AsNoTracking()` here. If the user entity is tracked, subsequent repository operations in the same request may find a stale cached instance in the EF identity map, causing silent data corruption or `DbUpdateConcurrencyException`.
 
+`AppClaimsTransformation` also emits a `datateal:user_id` claim (see `DatatealClaimTypes.UserId`) containing the user's `AppUser.Id` as a GUID. This is the stable application identity used to stamp job ownership and is injected as `X-Datateal-Acting-User` by `OrchestratorProxy` on every orchestrator call.
+
+### Per-workspace roles and claims
+Roles are two-tier:
+- **Tenant-global** (`Admin`, `CatalogContributor`): stored on `AppUser.Roles`; emitted as standard role claims.
+- **Per-workspace** (all other roles): stored on `WorkspaceMembership.Roles`; emitted as `datateal:workspace_role:{workspaceId}:{role}` claims by `AppClaimsTransformation`. Policy evaluation reads these via `WorkspaceRoleClaims`.
+
+The `WorkspaceMembershipManage` policy is satisfied by a tenant Admin **or** a `WorkspaceAdmin` of the target workspace.
+
 ### Updating `UserCatalogAccess` — bypass the change tracker
 Replacing a user's catalog access list must use `ExecuteDeleteAsync` (bulk SQL) rather than `Clear()` + `AddRange()` on the navigation collection. The EF change tracker cannot reliably reconcile the collection when the entity was previously loaded (even as `AsNoTracking`) in the same DI scope. The transaction must also be wrapped in `db.Database.CreateExecutionStrategy().ExecuteAsync(...)` because Npgsql's `NpgsqlRetryingExecutionStrategy` forbids user-initiated transactions outside a retriable unit.
 
@@ -130,6 +156,8 @@ Replacing a user's catalog access list must use `ExecuteDeleteAsync` (bulk SQL) 
 
 ### OrchestratorProxy — no silent fallthrough
 `GetRequiredPolicy` in `OrchestratorProxy.cs` throws `InvalidOperationException` for any path it does not recognize. When adding a new orchestrator endpoint that the client will call via `/api/orchestrator/`, add a matching branch to `GetRequiredPolicy` first. There is no default fallback policy.
+
+`OrchestratorProxy` also stamps the `X-Datateal-Acting-User` header on every proxied request using the `datateal:user_id` claim from the current user. This header is read by orchestrator endpoints to attribute job create/update/import operations to the correct owner. Never trust this header from external clients — it is always written server-side by the proxy.
 
 ## Monaco editor (`CodeCell`)
 

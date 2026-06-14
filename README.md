@@ -133,9 +133,25 @@ The standalone SQL editor provides a split-screen layout with a resizable SQL ed
 
 ---
 
-### Workspace
+### Workspaces
 
-Notebooks and SQL queries are organized in a hierarchical folder structure. The workspace browser supports:
+Datateal organises all content into **workspaces**. Each workspace is an isolated environment with its own notebooks, SQL queries, folders, node pools, jobs, schedules, and environment configuration. This enables a natural separation of concerns — for example, one workspace per line of business, or separate workspaces for development, test, and production environments within the same Datateal instance.
+
+#### Workspace Switching
+
+A workspace selector in the application header lists every workspace the current user has access to. Selecting a workspace navigates the entire application into that workspace context. All workspace-specific URLs encode the workspace ID (`/w/{workspaceId}/...`), so links to specific notebooks, queries, or job runs in a particular workspace can be shared directly.
+
+#### Workspace Management
+
+Tenant admins can create, rename, delete, and set a default workspace from the Workspaces administration page. Each workspace has a name and an optional description. Workspace names are unique across the instance.
+
+#### Workspace Membership
+
+Access to a workspace is controlled through **per-workspace memberships**. Tenant admins manage memberships for any workspace; a `WorkspaceAdmin` of a workspace can also manage memberships for their own workspace. Roles are granted per-workspace — a user can be a `JobContributor` in one workspace and a `WorkspaceReader` in another.
+
+#### Workspace Browser
+
+Within a workspace, notebooks and SQL queries are organised in a hierarchical folder structure. The browser supports:
 
 - Create, rename, move, clone, and delete notebooks, queries, and folders
 - A sidebar **catalog object explorer** that shows all attached DuckLake catalogs expanded to schemas, tables, views, and columns
@@ -179,6 +195,11 @@ Datateal uses the **DuckLake** open table format: metadata is stored in PostgreS
 
 - **Managed catalogs** share the platform's Postgres instance and a configured base data path (local or `abfss://` Azure Data Lake). Connection details are not stored in the database — they are resolved at runtime from `appsettings`, so credentials can be rotated without touching data.
 - **External catalogs** have user-supplied connection details (Postgres host, credentials, data path) stored in the database. Use these to connect to independently managed DuckLake catalogs.
+
+Catalog names are unique across the entire instance. Access is controlled on two independent axes:
+
+- **User-level**: by default users with `CatalogContributor` have unrestricted access; other users may have access restricted to an explicit allow-list of catalogs.
+- **Workspace-level**: by default a catalog is accessible from all workspaces; an admin can restrict it to an explicit set of workspaces.
 
 When opening a notebook or SQL editor, users select which catalogs to attach. The UI generates the Python setup code that installs and loads the `ducklake` DuckDB extension, creates the required DuckDB secrets, and executes `ATTACH 'ducklake:postgres:' AS catalog_name (DATA_PATH '...')`. The catalog is then immediately queryable by name in any SQL cell.
 
@@ -268,6 +289,7 @@ Jobs can have one or more **cron schedules** with:
 - **History retention**: old run records are automatically purged on a configurable schedule.
 - **YAML import/export**: jobs can be exported to and imported from a YAML format covering tasks, parameters, schedules, and node pool definitions. Workspace paths are resolved to stable IDs at import time, so notebooks and queries can be safely renamed or moved later.
 - **`%run` magic**: Python notebook cells can use `%run path/to/other/notebook` to inline another notebook's content, with recursive resolution and cycle detection.
+- **Effective owner identity**: every job records the user who last saved it. Catalog access is re-validated against that owner's permissions before the run starts and again at catalog attachment time. Jobs with no recorded owner cannot access restricted catalogs (fail closed).
 
 ---
 
@@ -327,16 +349,26 @@ The reference implementation is deployed via **[Microsoft Foundry](https://ai.az
 
 ### Authentication & Authorization
 
-Authentication is delegated to an external OIDC provider (Entra ID by default; pluggable via `IIdentityProviderSetup`). Authorization is fully app-managed with a role-based policy system:
+Authentication is delegated to an external OIDC provider (Entra ID by default; pluggable via `IIdentityProviderSetup`). Authorization is fully app-managed with a role-based policy system.
 
-| Role                                           | Capability                         |
-| ---------------------------------------------- | ---------------------------------- |
-| `Admin`                                        | Full access                        |
-| `NodePoolContributor` / `NodePoolOperator`     | Manage or operate compute nodes    |
-| `JobContributor` / `JobOperator` / `JobReader` | Manage, trigger, or monitor jobs   |
-| `WorkspaceContributor` / `WorkspaceReader`     | Edit or read notebooks and queries |
-| `CatalogContributor`                           | Manage catalog definitions         |
-| `EnvironmentManager`                           | Manage secrets and variables       |
+Roles are split into two tiers:
+
+**Tenant-level roles** — assigned globally to a user, not tied to any particular workspace:
+
+| Role | Capability |
+| ---- | ---------- |
+| `Admin` | Full access to all workspaces and tenant administration |
+| `CatalogContributor` | Create and manage DuckLake catalog definitions |
+
+**Per-workspace roles** — assigned per workspace through workspace memberships. A user can hold different roles in different workspaces:
+
+| Role | Capability |
+| ---- | ---------- |
+| `WorkspaceAdmin` | Manage workspace membership and settings |
+| `WorkspaceContributor` / `WorkspaceReader` | Edit or read notebooks and queries |
+| `NodePoolContributor` / `NodePoolOperator` | Manage or operate compute nodes |
+| `JobContributor` / `JobOperator` / `JobReader` | Manage, trigger, or monitor jobs |
+| `EnvironmentManager` | Manage secrets, variables, and wheel packages |
 
 A bootstrap `AdminUsers` list in `appsettings` lets the first admin log in before any users have been configured in the database.
 
