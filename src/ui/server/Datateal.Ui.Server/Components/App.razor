@@ -50,6 +50,15 @@
     </div>
     <Routes @rendermode="_renderMode"/>
     <script src="_content/AntDesign/js/ant-design-blazor.js"></script>
+    <!-- Load dagre/cytoscape before Monaco's AMD loader so they register as UMD globals
+         rather than AMD modules. This avoids a race condition where Monaco's async AMD
+         contribution-file fetches (triggered by python-language.js / duckdb-language.js)
+         could land while window.define was temporarily cleared by a post-Monaco hack,
+         causing "define is not a function" errors on cached page reloads (e.g. workspace switch). -->
+    <script src="@Assets["js/dagre.min.js"]"></script>
+    <script src="@Assets["js/cytoscape.min.js"]"></script>
+    <script src="@Assets["js/cytoscape-dagre.js"]"></script>
+    <script src="@Assets["js/job-dag.js"]"></script>
     <script src="_content/BlazorMonaco/jsInterop.js"></script>
     <script src="_content/BlazorMonaco/lib/monaco-editor/min/vs/loader.js"></script>
     <script src="_content/BlazorMonaco/lib/monaco-editor/min/vs/editor/editor.main.js"></script>
@@ -64,12 +73,6 @@
     <script src="@Assets["js/file-helpers.js"]"></script>
     <script src="@Assets["js/notebook-interop.js"]"></script>
     <script src="@Assets["js/crypto-storage.js"]"></script>
-    <script>var __define = window.define; window.define = undefined;</script>
-    <script src="@Assets["js/dagre.min.js"]"></script>
-    <script src="@Assets["js/cytoscape.min.js"]"></script>
-    <script src="@Assets["js/cytoscape-dagre.js"]"></script>
-    <script>window.define = __define;</script>
-    <script src="@Assets["js/job-dag.js"]"></script>
 </body>
 
 </html>
